@@ -42,12 +42,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 100, height: 100,
+              width: 120,
+              height: 120,
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.15),
                 borderRadius: AppRadius.xl,
               ),
-              child: const Center(child: Text('🧠', style: TextStyle(fontSize: 56))),
+              child: ClipRRect(
+                borderRadius: AppRadius.xl,
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
             ),
             const SizedBox(height: 20),
             Text('LinkMind',
@@ -63,4 +70,3 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     );
   }
 }
-

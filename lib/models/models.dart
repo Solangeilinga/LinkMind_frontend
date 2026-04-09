@@ -15,6 +15,8 @@ class UserModel {
   final String  level;
   final int     streakDays;
   final bool    isPremium;
+  final bool    isEmailVerified;      // ✅ AJOUTÉ
+  final bool    legalAccepted;        // ✅ AJOUTÉ
   final UserPreferences preferences;
   final List<UserBadge> badges;
 
@@ -34,6 +36,8 @@ class UserModel {
     required this.level,
     required this.streakDays,
     required this.isPremium,
+    this.isEmailVerified = false,     // ✅ AJOUTÉ
+    this.legalAccepted = false,       // ✅ AJOUTÉ
     required this.preferences,
     this.badges = const [],
   });
@@ -54,6 +58,8 @@ class UserModel {
     level:       json['level'] ?? 'bronze',
     streakDays:  json['streakDays'] ?? 0,
     isPremium:   json['isPremium'] ?? false,
+    isEmailVerified: json['isEmailVerified'] ?? false,   // ✅ AJOUTÉ
+    legalAccepted:   json['legalAccepted'] ?? false,     // ✅ AJOUTÉ
     preferences: json['preferences'] != null
         ? UserPreferences.fromJson(json['preferences'])
         : const UserPreferences(),
@@ -61,6 +67,28 @@ class UserModel {
         ?.map((b) => UserBadge.fromJson(b))
         .toList() ?? [],
   );
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'firstName': firstName,
+    'lastName': lastName,
+    'email': email,
+    'phone': phone,
+    'age': age,
+    'city': city,
+    'gender': gender,
+    'avatar': avatar,
+    'anonymousAlias': anonymousAlias,
+    'totalPoints': totalPoints,
+    'level': level,
+    'streakDays': streakDays,
+    'isPremium': isPremium,
+    'isEmailVerified': isEmailVerified,   // ✅ AJOUTÉ
+    'legalAccepted': legalAccepted,       // ✅ AJOUTÉ
+    'preferences': preferences.toJson(),
+    'badges': badges.map((b) => b.toJson()).toList(),
+  };
 
   int get levelProgress {
     switch (level) {
@@ -74,6 +102,50 @@ class UserModel {
   String get levelLabel {
     const labels = {'bronze': 'Bronze', 'silver': 'Argent', 'gold': 'Or', 'platinum': 'Platine'};
     return labels[level] ?? 'Bronze';
+  }
+
+  UserModel copyWith({
+    String? id,
+    String? name,
+    String? firstName,
+    String? lastName,
+    String? email,
+    String? phone,
+    int? age,
+    String? city,
+    String? gender,
+    String? avatar,
+    String? anonymousAlias,
+    int? totalPoints,
+    String? level,
+    int? streakDays,
+    bool? isPremium,
+    bool? isEmailVerified,
+    bool? legalAccepted,
+    UserPreferences? preferences,
+    List<UserBadge>? badges,
+  }) {
+    return UserModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
+      age: age ?? this.age,
+      city: city ?? this.city,
+      gender: gender ?? this.gender,
+      avatar: avatar ?? this.avatar,
+      anonymousAlias: anonymousAlias ?? this.anonymousAlias,
+      totalPoints: totalPoints ?? this.totalPoints,
+      level: level ?? this.level,
+      streakDays: streakDays ?? this.streakDays,
+      isPremium: isPremium ?? this.isPremium,
+      isEmailVerified: isEmailVerified ?? this.isEmailVerified,
+      legalAccepted: legalAccepted ?? this.legalAccepted,
+      preferences: preferences ?? this.preferences,
+      badges: badges ?? this.badges,
+    );
   }
 }
 
@@ -96,6 +168,13 @@ class UserPreferences {
     anonymousInCommunity: json['anonymousInCommunity'] ?? false,
     theme: json['theme'] ?? 'auto',
   );
+
+  Map<String, dynamic> toJson() => {
+    'notificationsEnabled': notificationsEnabled,
+    'reminderTime': reminderTime,
+    'anonymousInCommunity': anonymousInCommunity,
+    'theme': theme,
+  };
 }
 
 class UserBadge {
@@ -108,6 +187,11 @@ class UserBadge {
     badgeId: json['badgeId'],
     earnedAt: json['earnedAt'] != null ? DateTime.parse(json['earnedAt']) : null,
   );
+
+  Map<String, dynamic> toJson() => {
+    'badgeId': badgeId,
+    'earnedAt': earnedAt?.toIso8601String(),
+  };
 }
 
 // ─── Mood Model ──────────────────────────────────────────────────────────────
@@ -142,6 +226,17 @@ class MoodEntry {
     date: json['date'],
     recordedAt: json['recordedAt'] != null ? DateTime.parse(json['recordedAt']) : null,
   );
+
+  Map<String, dynamic> toJson() => {
+    if (id != null) '_id': id,
+    'score': score,
+    'label': label,
+    'note': note,
+    'factors': factors,
+    'energyLevel': energyLevel,
+    'date': date,
+    if (recordedAt != null) 'recordedAt': recordedAt?.toIso8601String(),
+  };
 }
 
 // ─── Challenge Model ─────────────────────────────────────────────────────────
@@ -191,6 +286,22 @@ class ChallengeModel {
     isCompleted: json['isCompleted'] ?? false,
     reason: json['reason'],
   );
+
+  Map<String, dynamic> toJson() => {
+    '_id': id,
+    'title': title,
+    'description': description,
+    'instructions': instructions,
+    'category': category,
+    'difficulty': difficulty,
+    'durationMinutes': durationMinutes,
+    'points': points,
+    'icon': icon,
+    'targetMoods': targetMoods,
+    'isPremium': isPremium,
+    'isCompleted': isCompleted,
+    'reason': reason,
+  };
 }
 
 // ─── Community Post Model ─────────────────────────────────────────────────────
@@ -231,4 +342,17 @@ class PostModel {
     isLiked: json['isLiked'] ?? false,
     createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : DateTime.now(),
   );
+
+  Map<String, dynamic> toJson() => {
+    '_id': id,
+    'author': author,
+    'content': content,
+    'postType': postType,
+    'moodScore': moodScore,
+    'isAnonymous': isAnonymous,
+    'likesCount': likesCount,
+    'commentsCount': commentsCount,
+    'isLiked': isLiked,
+    'createdAt': createdAt.toIso8601String(),
+  };
 }

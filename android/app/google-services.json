@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "20517091319",
+    "project_id": "linkmind-917b4",
+    "storage_bucket": "linkmind-917b4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:20517091319:android:73f7d0fd55cd4ba056a0f2",
+        "android_client_info": {
+          "package_name": "com.linkmind.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDU1Zq0Y-uweOYmACbPNMr18FMVJLSFexM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

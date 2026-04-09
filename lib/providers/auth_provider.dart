@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/models.dart';
 import '../services/api.service.dart';
+import 'package:flutter/foundation.dart';
 
 // ─── Auth State ───────────────────────────────────────────────────────────────
 class AuthState {
@@ -25,6 +26,64 @@ class AuthState {
     isAuthenticated: isAuthenticated ?? this.isAuthenticated,
     isLoading: isLoading ?? this.isLoading,
     user: user ?? this.user,
+    error: error,
+  );
+}
+
+// ─── Mood State ───────────────────────────────────────────────────────────────
+class MoodState {
+  final bool isLoading;
+  final Map<String, dynamic>? todayMood;
+  final List<Map<String, dynamic>> history;
+  final Map<String, dynamic>? stats;
+  final Map<String, dynamic>? recommendations;
+  final String? error;
+
+  const MoodState({
+    this.isLoading = false,
+    this.todayMood,
+    this.history = const [],
+    this.stats,
+    this.recommendations,
+    this.error,
+  });
+
+  MoodState copyWith({
+    bool? isLoading,
+    Map<String, dynamic>? todayMood,
+    List<Map<String, dynamic>>? history,
+    Map<String, dynamic>? stats,
+    Map<String, dynamic>? recommendations,
+    String? error,
+  }) => MoodState(
+    isLoading: isLoading ?? this.isLoading,
+    todayMood: todayMood ?? this.todayMood,
+    history: history ?? this.history,
+    stats: stats ?? this.stats,
+    recommendations: recommendations ?? this.recommendations,
+    error: error,
+  );
+}
+
+// ─── Challenges State ─────────────────────────────────────────────────────────
+class ChallengesState {
+  final bool isLoading;
+  final List<Map<String, dynamic>> daily;
+  final String? error;
+
+  const ChallengesState({
+    this.isLoading = false,
+    this.daily = const [],
+    this.error,
+  });
+
+  ChallengesState copyWith({
+    bool? isLoading,
+    List<Map<String, dynamic>>? daily,
+    String? error,
+  }) => ChallengesState(
+    isLoading: isLoading ?? this.isLoading,
+    daily: daily ?? this.daily,
     error: error,
   );
 }
@@ -120,50 +179,28 @@ class AuthNotifier extends StateNotifier<AuthState> {
   void updateUser(UserModel user) {
     state = state.copyWith(user: user);
   }
+
+  // ✅ AJOUTÉ: Rafraîchir les données utilisateur (après paiement Premium)
+  Future<void> refreshUser() async {
+    try {
+      final data = await _api.getMe();
+      if (data['user'] != null) {
+        final updatedUser = UserModel.fromJson(data['user']);
+        state = state.copyWith(user: updatedUser);
+        debugPrint('✅ Utilisateur rafraîchi: isPremium=${updatedUser.isPremium}');
+      }
+    } catch (e) {
+      debugPrint('❌ Erreur refreshUser: $e');
+    }
+  }
+
+  // ✅ Méthode ajoutée pour mood_screen.dart
+  Future<void> loadDailyChallenges({String? moodLabel}) async {
+    await _ref.read(challengesProvider.notifier).loadDaily(moodLabel: moodLabel);
+  }
 }
 
-// ─── Providers ────────────────────────────────────────────────────────────────
-final apiServiceProvider = Provider<ApiService>((ref) => ApiService());
-
-final authProvider = StateNotifierProvider<AuthNotifier, AuthState>(
-  (ref) => AuthNotifier(ref.read(apiServiceProvider), ref),
-);
-
-// ─── Mood Provider ────────────────────────────────────────────────────────────
-class MoodState {
-  final bool isLoading;
-  final Map<String, dynamic>? todayMood;
-  final List<Map<String, dynamic>> history;
-  final Map<String, dynamic>? stats;
-  final Map<String, dynamic>? recommendations;
-  final String? error;
-
-  const MoodState({
-    this.isLoading = false,
-    this.todayMood,
-    this.history = const [],
-    this.stats,
-    this.recommendations,
-    this.error,
-  });
-
-  MoodState copyWith({
-    bool? isLoading,
-    Map<String, dynamic>? todayMood,
-    List<Map<String, dynamic>>? history,
-    Map<String, dynamic>? stats,
-    Map<String, dynamic>? recommendations,
-    String? error,
-  }) => MoodState(
-    isLoading: isLoading ?? this.isLoading,
-    todayMood: todayMood ?? this.todayMood,
-    history: history ?? this.history,
-    stats: stats ?? this.stats,
-    recommendations: recommendations ?? this.recommendations,
-    error: error,
-  );
-}
-
+// ─── Mood Notifier ────────────────────────────────────────────────────────────
 class MoodNotifier extends StateNotifier<MoodState> {
   final ApiService _api;
 
@@ -224,33 +261,7 @@ class MoodNotifier extends StateNotifier<MoodState> {
   }
 }
 
-final moodProvider = StateNotifierProvider<MoodNotifier, MoodState>(
-  (ref) => MoodNotifier(ref.read(apiServiceProvider)),
-);
-
-// ─── Challenges Provider ──────────────────────────────────────────────────────
-class ChallengesState {
-  final bool isLoading;
-  final List<Map<String, dynamic>> daily;
-  final String? error;
-
-  const ChallengesState({
-    this.isLoading = false,
-    this.daily = const [],
-    this.error,
-  });
-
-  ChallengesState copyWith({
-    bool? isLoading,
-    List<Map<String, dynamic>>? daily,
-    String? error,
-  }) => ChallengesState(
-    isLoading: isLoading ?? this.isLoading,
-    daily: daily ?? this.daily,
-    error: error,
-  );
-}
-
+// ─── Challenges Notifier ──────────────────────────────────────────────────────
 class ChallengesNotifier extends StateNotifier<ChallengesState> {
   final ApiService _api;
 
@@ -292,6 +303,17 @@ class ChallengesNotifier extends StateNotifier<ChallengesState> {
     }
   }
 }
+
+// ─── Providers ────────────────────────────────────────────────────────────────
+final apiServiceProvider = Provider<ApiService>((ref) => ApiService());
+
+final authProvider = StateNotifierProvider<AuthNotifier, AuthState>(
+  (ref) => AuthNotifier(ref.read(apiServiceProvider), ref),
+);
+
+final moodProvider = StateNotifierProvider<MoodNotifier, MoodState>(
+  (ref) => MoodNotifier(ref.read(apiServiceProvider)),
+);
 
 final challengesProvider = StateNotifierProvider<ChallengesNotifier, ChallengesState>(
   (ref) => ChallengesNotifier(ref.read(apiServiceProvider)),

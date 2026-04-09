@@ -3,193 +3,197 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../utils/theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/content_provider.dart';
+import '../../models/challenge.dart';
+import '../../services/security.service.dart';
 
-class ChallengesScreen extends ConsumerWidget {
+class ChallengesScreen extends ConsumerStatefulWidget {
   const ChallengesScreen({super.key});
 
-  static const _categoryColors = {
-    'breathing':  AppColors.primary,
-    'meditation': AppColors.primary,
-    'journaling': AppColors.primary,
-    'gratitude':  AppColors.primary,
-    'movement':   AppColors.primary,
-    'social':     AppColors.primary,
-    'creativity': AppColors.primary,
-    'game':       AppColors.primary,
-  };
+  @override
+  ConsumerState<ChallengesScreen> createState() => _ChallengesScreenState();
+}
 
-  static const _categoryLabels = {
-    'breathing': 'Respiration',
-    'meditation': 'Méditation',
-    'journaling': 'Journal',
-    'gratitude': 'Gratitude',
-    'movement': 'Mouvement',
-    'social': 'Social',
-    'creativity': 'Créativité',
-    'game': 'Mini-jeu',
-  };
-
-  static const _difficultyLabels = {
-    'easy': ('Facile', Color(0xFF6BCF7F)),
-    'medium': ('Moyen', Color(0xFFFFD93D)),
-    'hard': ('Difficile', Color(0xFFFF7675)),
-  };
+class _ChallengesScreenState extends ConsumerState<ChallengesScreen> {
+  bool _isRefreshing = false;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshData();
+    });
+  }
+
+  Future<void> _refreshData() async {
+    if (_isRefreshing) return;
+    
+    setState(() => _isRefreshing = true);
+    await ref.read(challengesProvider.notifier).loadDaily();
+    if (mounted) {
+      setState(() => _isRefreshing = false);
+      SecurityService.recordActivity(type: 'refresh_challenges');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(challengesProvider);
-    final authState = ref.watch(authProvider);
+    final contentState = ref.watch(contentProvider);
+
+    // Build lookup maps from DB
+    final categoryMap = { for (final c in contentState.challengeCategories) c.id: c };
+    final difficultyMap = { for (final d in contentState.challengeDifficulties) d.id: d };
+
+    // ✅ Convertir les Map en Challenge objects
+    final challenges = state.daily.map((c) => Challenge.fromJson(c)).toList();
 
     return Scaffold(
-      body: SafeArea(
-        child: RefreshIndicator(
-          color: AppColors.primary,
-          onRefresh: () => ref.read(challengesProvider.notifier).loadDaily(),
-          child: CustomScrollView(
-            slivers: [
-              // Header
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Défis du jour', style: AppTextStyles.h2),
-                      const SizedBox(height: 4),
-                      Text('Complète des défis pour gagner des points',
-                          style: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted)),
-                    ],
-                  ),
+      appBar: AppBar(
+        title: const Text('Défis du jour'),
+        centerTitle: true,
+        backgroundColor: AppColors.surface,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: _isRefreshing || state.isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.primary,
+                    ),
+                  )
+                : const Icon(Icons.refresh, color: AppColors.primary),
+            onPressed: (_isRefreshing || state.isLoading) ? null : _refreshData,
+            tooltip: 'Actualiser',
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: _refreshData,
+        child: CustomScrollView(
+          slivers: [
+            // Header
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('🎯 Défis du jour', style: AppTextStyles.h2),
+                    SizedBox(height: 4),
+                    Text('Complète des défis pour gagner des points',
+                        style: AppTextStyles.body),
+                  ],
                 ),
               ),
+            ),
 
-              // Daily XP bar
+            // Daily XP bar
+            if (!state.isLoading && challenges.isNotEmpty)
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: _DailyProgressBar(
-                    completed: state.daily.where((c) => c['isCompleted'] == true).length,
-                    total: state.daily.length,
+                    completed: challenges.where((c) => c.isCompleted).length,
+                    total: challenges.length,
                   ),
                 ),
               ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 16)),
-              // Section title
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+            // Section title
+            if (!state.isLoading && challenges.isNotEmpty)
               const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: 20),
                   child: Text('Activités personnalisées', style: AppTextStyles.h3),
                 ),
               ),
+            if (!state.isLoading && challenges.isNotEmpty)
               const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
-              // Challenge list
-              if (state.isLoading)
-                const SliverToBoxAdapter(
-                  child: Center(child: Padding(
+            // Challenge list
+            if (state.isLoading)
+              const SliverToBoxAdapter(
+                child: Center(
+                  child: Padding(
                     padding: EdgeInsets.all(40),
                     child: CircularProgressIndicator(color: AppColors.primary),
-                  )),
-                )
-              else if (state.daily.isEmpty)
-                SliverToBoxAdapter(
-                  child: _EmptyState(onRefresh: () => ref.read(challengesProvider.notifier).loadDaily()),
-                )
-              else
-                SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) {
-                      final challenge = state.daily[i];
-                      return Padding(
-                        padding: EdgeInsets.fromLTRB(20, 0, 20, i < state.daily.length - 1 ? 12 : 0),
-                        child: _ChallengeCard(
-                          challenge: challenge,
-                          categoryColors: _categoryColors,
-                          categoryLabels: _categoryLabels,
-                          difficultyLabels: _difficultyLabels,
-                          onTap: () => context.push('/challenges/${challenge['_id'] ?? challenge['id']}'),
-                        ),
-                      );
-                    },
-                    childCount: state.daily.length,
                   ),
                 ),
+              )
+            else if (challenges.isEmpty)
+              SliverToBoxAdapter(
+                child: _EmptyState(onRefresh: _refreshData),
+              )
+            else
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, i) {
+                    final challenge = challenges[i];
+                    final category = categoryMap[challenge.category];
+                    final difficulty = difficultyMap[challenge.difficulty];
 
-              const SliverToBoxAdapter(child: SizedBox(height: 100)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showCompleteDialog(BuildContext context, Map<String, dynamic> result, Map<String, dynamic> challenge) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.lg),
-        title: const Text('🎉 Défi accompli !', textAlign: TextAlign.center),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(challenge['icon'] ?? '⚡', style: const TextStyle(fontSize: 48), textAlign: TextAlign.center),
-            const SizedBox(height: 8),
-            Text('+${challenge['points']} points gagnés',
-                style: AppTextStyles.h3.copyWith(color: AppColors.primary), textAlign: TextAlign.center),
-            if (result['newBadges'] is List && (result['newBadges'] as List).isNotEmpty) ...[
-              const SizedBox(height: 12),
-              ...((result['newBadges'] as List).map((b) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(b['icon'] ?? '🏅', style: const TextStyle(fontSize: 20)),
-                    const SizedBox(width: 8),
-                    Text('Badge "${b['name']}" débloqué !',
-                        style: AppTextStyles.body.copyWith(color: AppColors.accentOrange, fontWeight: FontWeight.w700)),
-                  ],
+                    return Padding(
+                      padding: EdgeInsets.fromLTRB(20, 0, 20, i < challenges.length - 1 ? 12 : 0),
+                      child: _ChallengeCard(
+                        challenge: challenge,
+                        category: category,
+                        difficulty: difficulty,
+                        onTap: () async {
+                          SecurityService.recordActivity(
+                            type: 'open_challenge',
+                            metadata: {'challengeId': challenge.id},
+                          );
+                          if (context.mounted) {
+                            await context.push('/challenges/${challenge.id}');
+                            if (mounted) {
+                              _refreshData();
+                            }
+                          }
+                        },
+                      ),
+                    );
+                  },
+                  childCount: challenges.length,
                 ),
-              ))),
-            ],
+              ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
         ),
-        actions: [
-          Center(
-            child: TextButton(
-              onPressed: () {
-                Navigator.of(context, rootNavigator: true).pop();
-              },
-              child: const Text('Continuer'),
-            ),
-          ),
-        ],
       ),
     );
   }
 }
 
 class _ChallengeCard extends StatelessWidget {
-  final Map<String, dynamic> challenge;
-  final Map<String, Color> categoryColors;
-  final Map<String, String> categoryLabels;
-  final Map<String, (String, Color)> difficultyLabels;
+  final Challenge challenge;
+  final dynamic category;
+  final dynamic difficulty;
   final VoidCallback onTap;
 
   const _ChallengeCard({
     required this.challenge,
-    required this.categoryColors,
-    required this.categoryLabels,
-    required this.difficultyLabels,
+    required this.category,
+    required this.difficulty,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final category = challenge['category'] as String? ?? '';
-    final isCompleted = challenge['isCompleted'] == true;
-    final catColor = categoryColors[category] ?? AppColors.primary;
-    final (diffLabel, diffColor) = difficultyLabels[challenge['difficulty']] ?? ('Facile', AppColors.secondary);
+    final catColor = category != null 
+        ? Color(int.parse(category.colorHex.substring(1), radix: 16) + 0xFF000000)
+        : AppColors.primary;
+    final diffColor = difficulty != null
+        ? Color(int.parse(difficulty.colorHex.substring(1), radix: 16) + 0xFF000000)
+        : const Color(0xFF6BCF7F);
+    final isCompleted = challenge.isCompleted;
 
     return GestureDetector(
       onTap: onTap,
@@ -216,7 +220,7 @@ class _ChallengeCard extends StatelessWidget {
                 color: catColor.withValues(alpha: 0.15),
                 borderRadius: AppRadius.md,
               ),
-              child: Center(child: Text(challenge['icon'] ?? '⚡', style: const TextStyle(fontSize: 26))),
+              child: Center(child: Text(challenge.icon, style: const TextStyle(fontSize: 26))),
             ),
             const SizedBox(width: 14),
             // Info
@@ -224,9 +228,9 @@ class _ChallengeCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(challenge['title'] ?? '', style: AppTextStyles.h4),
+                  Text(challenge.title, style: AppTextStyles.h4),
                   const SizedBox(height: 3),
-                  Text(challenge['description'] ?? '',
+                  Text(challenge.description,
                       style: AppTextStyles.bodySmall.copyWith(color: AppColors.onSurfaceMuted),
                       maxLines: 2, overflow: TextOverflow.ellipsis),
                   const SizedBox(height: 8),
@@ -234,20 +238,22 @@ class _ChallengeCard extends StatelessWidget {
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
-                        _Tag(label: categoryLabels[category] ?? category, color: catColor),
+                        _Tag(label: category?.label ?? challenge.category, color: catColor),
                         const SizedBox(width: 6),
-                        _Tag(label: diffLabel, color: diffColor),
+                        _Tag(label: difficulty?.label ?? challenge.difficulty, color: diffColor),
                         const SizedBox(width: 6),
-                        _Tag(label: '${challenge['durationMinutes']} min', color: AppColors.onSurfaceMuted),
+                        _Tag(label: '${challenge.durationMinutes} min', color: AppColors.onSurfaceMuted),
+                        if (challenge.completionType.type != 'action')
+                          Padding(
+                            padding: const EdgeInsets.only(left: 6),
+                            child: _Tag(
+                              label: _getTypeLabel(challenge.completionType.type),
+                              color: AppColors.accentOrange,
+                            ),
+                          ),
                       ],
                     ),
                   ),
-                  if (challenge['reason'] != null) ...[
-                    const SizedBox(height: 6),
-                    Text('💡 ${challenge['reason']}',
-                        style: AppTextStyles.caption.copyWith(
-                          color: AppColors.primary, fontStyle: FontStyle.italic)),
-                  ],
                 ],
               ),
             ),
@@ -262,7 +268,7 @@ class _ChallengeCard extends StatelessWidget {
                     color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: AppRadius.full,
                   ),
-                  child: Text('+${challenge['points']} pts',
+                  child: Text('+${challenge.points} pts',
                       style: AppTextStyles.caption.copyWith(
                         color: AppColors.primary, fontWeight: FontWeight.w800)),
                 ),
@@ -302,6 +308,16 @@ class _ChallengeCard extends StatelessWidget {
       ),
     );
   }
+
+  String _getTypeLabel(String type) {
+    switch (type) {
+      case 'timer': return '⏱️ Chrono';
+      case 'reflection': return '💭 Réflexion';
+      case 'social': return '👥 Social';
+      case 'exploration': return '🔍 Découverte';
+      default: return '⚡ Action';
+    }
+  }
 }
 
 class _Tag extends StatelessWidget {
@@ -333,8 +349,12 @@ class _DailyProgressBar extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: AppRadius.md,
+        gradient: LinearGradient(
+          colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: AppRadius.lg,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -364,56 +384,6 @@ class _DailyProgressBar extends StatelessWidget {
   }
 }
 
-class _BreathingSpotlight extends StatelessWidget {
-  const _BreathingSpotlight();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF74B9FF).withValues(alpha: 0.1),
-        borderRadius: AppRadius.lg,
-        border: Border.all(color: const Color(0xFF74B9FF).withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 56, height: 56,
-            decoration: BoxDecoration(
-              color: const Color(0xFF74B9FF).withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            child: const Center(child: Text('🌬️', style: TextStyle(fontSize: 28))),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Exercice rapide', style: AppTextStyles.caption.copyWith(
-                    color: const Color(0xFF74B9FF), fontWeight: FontWeight.w800)),
-                const SizedBox(height: 2),
-                Text('Respiration 4-7-8', style: AppTextStyles.h4),
-                Text('Réduit le stress en 3 minutes',
-                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.onSurfaceMuted)),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF74B9FF),
-              borderRadius: AppRadius.md,
-            ),
-            child: Text('Démarrer', style: AppTextStyles.button.copyWith(color: Colors.white, fontSize: 13)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _EmptyState extends StatelessWidget {
   final VoidCallback onRefresh;
   const _EmptyState({required this.onRefresh});
@@ -433,7 +403,25 @@ class _EmptyState extends StatelessWidget {
                 style: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted),
                 textAlign: TextAlign.center),
             const SizedBox(height: 20),
-            ElevatedButton(onPressed: onRefresh, child: const Text('Actualiser')),
+            ElevatedButton.icon(
+              onPressed: onRefresh,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Actualiser'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () {
+                context.push('/home');
+              },
+              icon: const Icon(Icons.mood, size: 18),
+              label: const Text('Enregistrer mon humeur'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              ),
+            ),
           ],
         ),
       ),

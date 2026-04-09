@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../utils/theme.dart';
 import '../../services/api.service.dart';
@@ -24,14 +25,19 @@ class _ChatMessage {
   });
 }
 
-// ─── Starter prompts ──────────────────────────────────────────────────────────
-const _starters = [
-  ('😰', 'Je suis stressé par mes examens', 'stressed'),
-  ('😔', 'Je me sens seul(e) à l\'université', 'sad'),
-  ('😴', 'Je n\'arrive plus à me concentrer', 'tired'),
-  ('💭', 'J\'ai du mal à me motiver', 'neutral'),
-  ('😟', 'J\'ai des pensées qui me pèsent', 'anxious'),
-  ('🎯', 'Comment mieux organiser mes révisions ?', 'neutral'),
+// ─── Starter prompt model ─────────────────────────────────────────────────────
+class _Starter {
+  final String emoji, text, context;
+  const _Starter(this.emoji, this.text, this.context);
+}
+
+const _defaultStarters = [
+  _Starter('😰', "Je suis stressé(e) par mes examens", 'stressed'),
+  _Starter('😔', "Je me sens seul(e)", 'sad'),
+  _Starter('😴', "Je n'arrive plus à me concentrer", 'tired'),
+  _Starter('💭', "J'ai du mal à me motiver", 'neutral'),
+  _Starter('😟', "J'ai des pensées qui me pèsent", 'anxious'),
+  _Starter('🎯', "Comment mieux organiser mes révisions ?", 'neutral'),
 ];
 
 // ─── Assistant Screen ──────────────────────────────────────────────────────────
@@ -48,6 +54,11 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> with TickerPr
   bool _isTyping = false;
   bool _hasStarted = false;
   Map<String, dynamic>? _userContext;
+  int  _messagesUsed  = 0;
+  List<_Starter> _starters = _defaultStarters;
+  int  _messagesLimit = 10;
+  bool _isPremium     = false;
+  bool _limitReached  = false;
 
   late AnimationController _typingController;
 
@@ -56,6 +67,7 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> with TickerPr
     super.initState();
     _typingController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000))
       ..repeat(reverse: true);
+    _loadStarters();
   }
 
   @override
@@ -64,6 +76,22 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> with TickerPr
     _inputCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadStarters() async {
+    try {
+      final data = await ApiService().getAssistantStarters();
+      final list = data['starters'] as List? ?? [];
+      if (list.isNotEmpty && mounted) {
+        setState(() {
+          _starters = list.map((s) => _Starter(
+            s['emoji'] ?? '💭',
+            s['text'] ?? '',
+            s['context'] ?? 'neutral',
+          )).toList();
+        });
+      }
+    } catch (_) {} // garde les defaults
   }
 
   void _scrollToBottom() {
@@ -102,7 +130,11 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> with TickerPr
 
       if (mounted) {
         setState(() {
-          _isTyping = false;
+          _isTyping      = false;
+          _messagesUsed  = response['messagesUsed']  ?? _messagesUsed;
+          _messagesLimit = response['messagesLimit'] ?? _messagesLimit;
+          _isPremium     = response['isPremium']     ?? _isPremium;
+          _limitReached  = !_isPremium && _messagesUsed >= _messagesLimit;
           _messages.add(_ChatMessage(
             content: response['message'] ?? '',
             isUser: false,
@@ -114,6 +146,22 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> with TickerPr
           ));
         });
         _scrollToBottom();
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() { _isTyping = false; });
+        // Check if limit reached (429)
+        if (e.message.contains('limit_reached') || e.message.contains('limite')) {
+          setState(() { _limitReached = true; });
+        } else {
+          setState(() {
+            _messages.add(_ChatMessage(
+              content: 'Je rencontre un problème de connexion. Réessaie dans un moment. 🌐',
+              isUser: false,
+              time: DateTime.now(),
+            ));
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -142,7 +190,9 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> with TickerPr
                 color: AppColors.primary,
                 shape: BoxShape.circle,
               ),
-              child: const Center(child: Text('🧠', style: TextStyle(fontSize: 20))),
+              child: ClipOval(child: Image.asset(
+                'assets/images/logo.png',
+                width: 36, height: 36, fit: BoxFit.cover)),
             ),
             const SizedBox(width: 10),
             Column(
@@ -156,6 +206,35 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> with TickerPr
           ],
         ),
         actions: [
+          // Compteur de messages (freemium uniquement)
+          if (!_isPremium)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _messagesUsed >= _messagesLimit
+                        ? AppColors.accent.withValues(alpha: 0.12)
+                        : AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: _messagesUsed >= _messagesLimit
+                          ? AppColors.accent.withValues(alpha: 0.4)
+                          : AppColors.primary.withValues(alpha: 0.2)),
+                  ),
+                  child: Text(
+                    '${_messagesLimit - _messagesUsed} restants',
+                    style: AppTextStyles.caption.copyWith(
+                      color: _messagesUsed >= _messagesLimit
+                          ? AppColors.accent
+                          : AppColors.primary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           if (_hasStarted)
             IconButton(
               icon: const Icon(Icons.refresh_outlined, color: AppColors.onSurfaceMuted),
@@ -175,10 +254,11 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> with TickerPr
               children: [
                 const Icon(Icons.lock_outline, size: 14, color: AppColors.primary),
                 const SizedBox(width: 6),
-                Text(
-                  'Conversation confidentielle — Mindo ne partage rien avec personne',
+                Expanded(child: Text(
+                  'Conversation confidentielle — Mindo ne partage rien',
                   style: AppTextStyles.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700),
-                ),
+                  overflow: TextOverflow.ellipsis,
+                )),
               ],
             ),
           ),
@@ -186,7 +266,9 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> with TickerPr
           // Messages area
           Expanded(
             child: !_hasStarted
-                ? _WelcomeView(onStarterTapped: (text, ctx) => _sendMessage(text, userCtx: ctx))
+                ? _WelcomeView(
+                    starters: _starters,
+                    onStarterTapped: (text, ctx) => _sendMessage(text, userCtx: ctx))
                 : ListView.builder(
                     controller: _scrollCtrl,
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -201,8 +283,59 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> with TickerPr
                   ),
           ),
 
-          // Input bar
-          _InputBar(
+          // Bannière avertissement (2 messages restants)
+          if (!_isPremium && _messagesUsed >= _messagesLimit - 2 && !_limitReached)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: AppColors.secondary.withValues(alpha: 0.1),
+              child: Row(children: [
+                const Icon(Icons.info_outline, size: 14, color: AppColors.secondary),
+                const SizedBox(width: 6),
+                Text(
+                  "${_messagesLimit - _messagesUsed} message${_messagesLimit - _messagesUsed > 1 ? 's' : ''} restant${_messagesLimit - _messagesUsed > 1 ? 's' : ''} aujourd'hui",
+                  style: AppTextStyles.caption.copyWith(
+                      color: AppColors.secondary, fontWeight: FontWeight.w700)),
+              ]),
+            ),
+
+          // Bannière limite atteinte
+          if (_limitReached)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.2))),
+              child: Column(children: [
+                const Text('🔒', style: TextStyle(fontSize: 32)),
+                const SizedBox(height: 8),
+                Text('Limite quotidienne atteinte',
+                    style: AppTextStyles.h4.copyWith(color: AppColors.primary)),
+                const SizedBox(height: 4),
+                Text("Tu as utilisé tes 10 messages Mindo aujourd'hui.\nReviens demain ou passe en Premium pour des conversations illimitées.",
+                    style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.onSurfaceMuted, height: 1.5),
+                    textAlign: TextAlign.center),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {},
+                    icon: const Text('👑', style: TextStyle(fontSize: 16)),
+                    label: const Text('Passer en Premium'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.secondary,
+                      minimumSize: const Size.fromHeight(46)),
+                  ),
+                ),
+              ]),
+            ),
+
+          // Input bar (masqué si limite atteinte)
+          if (!_limitReached) _InputBar(
             ctrl: _inputCtrl,
             isTyping: _isTyping,
             onSend: () => _sendMessage(_inputCtrl.text),
@@ -237,7 +370,8 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> with TickerPr
 // ─── Welcome View ─────────────────────────────────────────────────────────────
 class _WelcomeView extends StatelessWidget {
   final Function(String, Map<String, dynamic>?) onStarterTapped;
-  const _WelcomeView({required this.onStarterTapped});
+  final List<_Starter> starters;
+  const _WelcomeView({required this.onStarterTapped, required this.starters});
 
   @override
   Widget build(BuildContext context) {
@@ -255,7 +389,9 @@ class _WelcomeView extends StatelessWidget {
                 BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 8)),
               ],
             ),
-            child: const Center(child: Text('🧠', style: TextStyle(fontSize: 40))),
+            child: ClipOval(child: Image.asset(
+              'assets/images/logo.png',
+              width: 80, height: 80, fit: BoxFit.cover)),
           ),
           const SizedBox(height: 20),
           Text('Bonjour, je suis Mindo 👋', style: AppTextStyles.h2, textAlign: TextAlign.center),
@@ -274,10 +410,10 @@ class _WelcomeView extends StatelessWidget {
           const SizedBox(height: 32),
           Text('Par quoi veux-tu commencer ?', style: AppTextStyles.h4),
           const SizedBox(height: 14),
-          ..._starters.map((s) => Padding(
+          ...starters.map((s) => Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: GestureDetector(
-              onTap: () => onStarterTapped(s.$2, {'mood': s.$3}),
+              onTap: () => onStarterTapped(s.text, {'mood': s.context}),
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
@@ -289,10 +425,10 @@ class _WelcomeView extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Text(s.$1, style: const TextStyle(fontSize: 22)),
+                    Text(s.emoji, style: const TextStyle(fontSize: 22)),
                     const SizedBox(width: 14),
                     Expanded(
-                      child: Text(s.$2,
+                      child: Text(s.text,
                           style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700)),
                     ),
                     const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.onSurfaceMuted),
@@ -495,8 +631,23 @@ class _ProfessionalCard extends StatelessWidget {
                 _helpItem('🏫', 'Service de santé universitaire (SUMP)'),
                 _helpItem('📞', 'Ligne d\'écoute étudiante de ton université'),
                 _helpItem('👨‍⚕️', 'Centre Médical le plus proche'),
-                _helpItem('🤝', 'Parle à un professeur ou référent pédagogique'),
               ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Bouton vers la place de marché
+          GestureDetector(
+            onTap: () => context.go('/professionals'),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: AppRadius.md),
+              child: Center(child: Text(
+                '🩺 Voir les professionnels LinkMind',
+                style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.accent, fontWeight: FontWeight.w800))),
             ),
           ),
         ],
@@ -532,7 +683,9 @@ class _TypingIndicator extends StatelessWidget {
               color: AppColors.primary,
               shape: BoxShape.circle,
             ),
-            child: const Center(child: Text('🧠', style: TextStyle(fontSize: 16))),
+            child: ClipOval(child: Image.asset(
+              'assets/images/logo.png',
+              width: 32, height: 32, fit: BoxFit.cover)),
           ),
           const SizedBox(width: 8),
           Container(

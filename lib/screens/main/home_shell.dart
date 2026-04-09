@@ -1,18 +1,34 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../providers/content_provider.dart';
 import '../../utils/theme.dart';
 
-class HomeShell extends StatelessWidget {
+class HomeShell extends ConsumerStatefulWidget {
   final Widget child;
   const HomeShell({super.key, required this.child});
+  @override
+  ConsumerState<HomeShell> createState() => _HomeShellState();
+}
 
+class _HomeShellState extends ConsumerState<HomeShell> {
   static const _tabs = [
-    _NavItem('/home', Icons.mood_outlined, Icons.mood, 'Humeur'),
+    _NavItem('/home', Icons.mood_outlined, Icons.mood, 'Mood'),
     _NavItem('/assistant', Icons.psychology_outlined, Icons.psychology, 'Mindo'),
-    _NavItem('/community', Icons.people_outline, Icons.people, 'Communauté'),
+    _NavItem('/community', Icons.people_outline, Icons.people, 'Hub'),
+    _NavItem('/professionals', Icons.medical_services_outlined, Icons.medical_services, 'Pros'),
     _NavItem('/challenges', Icons.bolt_outlined, Icons.bolt, 'Défis'),
     _NavItem('/profile', Icons.person_outline, Icons.person, 'Profil'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Charger les données dynamiques (moods, types pros)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(contentProvider.notifier).load();
+    });
+  }
 
   int _currentIndex(BuildContext context) {
     final loc = GoRouterState.of(context).matchedLocation;
@@ -25,7 +41,7 @@ class HomeShell extends StatelessWidget {
     final currentIndex = _currentIndex(context);
 
     return Scaffold(
-      body: child,
+      body: widget.child,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: AppColors.surface,
@@ -67,8 +83,12 @@ class HomeShell extends StatelessWidget {
                           ),
                           child: isMindo
                               ? Center(
-                                  child: Text('🧠',
-                                      style: TextStyle(fontSize: isActive ? 22 : 18)))
+                                  child: Image.asset(
+                                    'assets/images/logo.png',
+                                    width: isActive ? 24 : 20,
+                                    height: isActive ? 24 : 20,
+                                    fit: BoxFit.contain,
+                                  ))
                               : Icon(
                                   isActive ? tab.activeIcon : tab.icon,
                                   color: isActive ? AppColors.primary : AppColors.onSurfaceMuted,

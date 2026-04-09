@@ -1,0 +1,248 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../utils/theme.dart';
+import '../../services/api.service.dart';
+import '../../providers/auth_provider.dart';
+
+class VerifyEmailScreen extends ConsumerStatefulWidget {
+  const VerifyEmailScreen({super.key});
+
+  @override
+  ConsumerState<VerifyEmailScreen> createState() => _VerifyEmailScreenState();
+}
+
+class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
+  final TextEditingController _codeController = TextEditingController();
+  bool _isLoading = false;
+  bool _isResending = false;
+  String? _error;
+  String? _success;
+  String? _channel; // 'email' ou 'sms'
+  String? _destinationMasked;
+
+  @override
+  void initState() {
+    super.initState();
+    _sendInitialCode();
+  }
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendInitialCode() async {
+    setState(() => _isLoading = true);
+    try {
+      final response = await ApiService().sendVerification();
+      setState(() {
+        _channel = response['channel'];
+        _destinationMasked = response['destination'];
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Impossible d\'envoyer le code de vérification';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _verifyCode() async {
+    final code = _codeController.text.trim();
+    if (code.isEmpty || code.length != 6) {
+      setState(() => _error = 'Code à 6 chiffres requis');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final verified = await ApiService().verifyEmail(code);
+      if (verified && mounted) {
+        await ref.read(authProvider.notifier).refreshUser();
+        if (mounted) {
+          context.go('/legal-onboarding');
+        }
+      } else {
+        setState(() => _error = 'Code invalide');
+      }
+    } catch (e) {
+      setState(() => _error = 'Erreur, réessaie plus tard');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _resendCode() async {
+    setState(() {
+      _isResending = true;
+      _error = null;
+      _success = null;
+    });
+
+    try {
+      final response = await ApiService().sendVerification();
+      setState(() {
+        _success = 'Nouveau code envoyé par ${response['channel'] == 'email' ? 'email' : 'SMS'}';
+        _isResending = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Erreur, réessaie plus tard';
+        _isResending = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading && _channel == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      );
+    }
+
+    final icon = _channel == 'email' ? '📧' : '📱';
+    final title = _channel == 'email' ? 'Vérifie ton email' : 'Vérifie ton téléphone';
+    final subtitle = _channel == 'email' 
+        ? 'Un code de vérification a été envoyé à ton adresse email'
+        : 'Un code de vérification a été envoyé par SMS à ton numéro';
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Vérification'),
+        elevation: 0,
+        backgroundColor: AppColors.surface,
+        automaticallyImplyLeading: false,
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 40),
+              Center(
+                child: Text(icon, style: const TextStyle(fontSize: 56)),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                title,
+                style: AppTextStyles.h2,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                subtitle,
+                style: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              if (_destinationMasked != null)
+                Text(
+                  _destinationMasked!,
+                  style: AppTextStyles.h4.copyWith(color: AppColors.primary),
+                  textAlign: TextAlign.center,
+                ),
+              const SizedBox(height: 24),
+
+              if (_error != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withValues(alpha: 0.1),
+                    borderRadius: AppRadius.md,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline, color: AppColors.accent),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(_error!, style: AppTextStyles.bodySmall)),
+                    ],
+                  ),
+                ),
+
+              if (_success != null)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary.withValues(alpha: 0.1),
+                    borderRadius: AppRadius.md,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle_outline, color: AppColors.secondary),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(_success!, style: AppTextStyles.bodySmall)),
+                    ],
+                  ),
+                ),
+
+              const SizedBox(height: 24),
+
+              TextField(
+                controller: _codeController,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 24, letterSpacing: 8),
+                decoration: InputDecoration(
+                  hintText: '000000',
+                  counterText: '',
+                  border: OutlineInputBorder(
+                    borderRadius: AppRadius.md,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _verifyCode,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 20, height: 20,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Text('Vérifier'),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Tu n\'as pas reçu le code ?',
+                    style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted),
+                  ),
+                  TextButton(
+                    onPressed: _isResending ? null : _resendCode,
+                    child: _isResending
+                        ? const SizedBox(
+                            width: 16, height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Text('Renvoyer'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

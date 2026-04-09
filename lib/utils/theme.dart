@@ -11,21 +11,21 @@ class AppColors {
   static const secondary      = Color(0xFFF5B731);
   static const secondaryLight = Color(0xFFF8C95A);
 
-  // Accents — orange palette from image
-  static const accent       = Color(0xFFE07B2A); // orange
-  static const accentOrange = Color(0xFFD95E2B); // orange-rouge
-  static const accentRed    = Color(0xFFC93B2B); // rouge-orangé
+  // Accents
+  static const accent       = Color(0xFFE07B2A);
+  static const accentOrange = Color(0xFFD95E2B);
+  static const accentRed    = Color(0xFFC93B2B);
 
-  // Mood colors — harmonized with warm palette
-  static const moodGreat    = Color(0xFFF5B731); // jaune doré
-  static const moodGood     = Color(0xFF5BAD72); // vert (neutral positif)
-  static const moodNeutral  = Color(0xFF5B8FC4); // bleu calme
-  static const moodTired    = Color(0xFF8B7EC8); // violet doux
-  static const moodStressed = Color(0xFFD95E2B); // orange-rouge
-  static const moodAnxious  = Color(0xFFE07B2A); // orange
-  static const moodSad      = Color(0xFF5BA8A8); // bleu-vert
+  // Mood colors
+  static const moodGreat    = Color(0xFFF5B731);
+  static const moodGood     = Color(0xFF5BAD72);
+  static const moodNeutral  = Color(0xFF5B8FC4);
+  static const moodTired    = Color(0xFF8B7EC8);
+  static const moodStressed = Color(0xFFD95E2B);
+  static const moodAnxious  = Color(0xFFE07B2A);
+  static const moodSad      = Color(0xFF5BA8A8);
 
-  // Neutrals — warm-tinted (bordeaux harmony)
+  // Light mode neutrals
   static const background      = Color(0xFFFAF7F5);
   static const surface         = Color(0xFFFFFFFF);
   static const surfaceVariant  = Color(0xFFF5EFED);
@@ -33,20 +33,23 @@ class AppColors {
   static const onSurfaceMuted  = Color(0xFF8A7070);
   static const divider         = Color(0xFFEDE5E3);
 
-  // Dark mode
-  static const backgroundDark     = Color(0xFF120508);
-  static const surfaceDark        = Color(0xFF1E0A0E);
-  static const surfaceVariantDark = Color(0xFF2A1218);
+  // Dark mode neutrals
+  static const backgroundDark      = Color(0xFF120508);
+  static const surfaceDark         = Color(0xFF1E0A0E);
+  static const surfaceVariantDark  = Color(0xFF2A1218);
+  static const onSurfaceDark       = Color(0xFFF2E8EA);
+  static const onSurfaceMutedDark  = Color(0xFF9A8085);
+  static const dividerDark         = Color(0xFF3A1E22);
 }
 
 // ─── Text Styles ─────────────────────────────────────────────────────────────
 class AppTextStyles {
   static const String fontFamily = 'Nunito';
 
-  static const h1 = TextStyle(fontSize: 28, fontWeight: FontWeight.w800, fontFamily: fontFamily, height: 1.2);
-  static const h2 = TextStyle(fontSize: 22, fontWeight: FontWeight.w800, fontFamily: fontFamily, height: 1.3);
-  static const h3 = TextStyle(fontSize: 18, fontWeight: FontWeight.w700, fontFamily: fontFamily, height: 1.3);
-  static const h4 = TextStyle(fontSize: 16, fontWeight: FontWeight.w700, fontFamily: fontFamily);
+  static const h1      = TextStyle(fontSize: 28, fontWeight: FontWeight.w800, fontFamily: fontFamily, height: 1.2);
+  static const h2      = TextStyle(fontSize: 22, fontWeight: FontWeight.w800, fontFamily: fontFamily, height: 1.3);
+  static const h3      = TextStyle(fontSize: 18, fontWeight: FontWeight.w700, fontFamily: fontFamily, height: 1.3);
+  static const h4      = TextStyle(fontSize: 16, fontWeight: FontWeight.w700, fontFamily: fontFamily);
   static const body      = TextStyle(fontSize: 14, fontWeight: FontWeight.w500, fontFamily: fontFamily, height: 1.5);
   static const bodySmall = TextStyle(fontSize: 12, fontWeight: FontWeight.w500, fontFamily: fontFamily);
   static const caption   = TextStyle(fontSize: 11, fontWeight: FontWeight.w600, fontFamily: fontFamily, letterSpacing: 0.3);
@@ -75,6 +78,7 @@ class AppRadius {
 class AppTheme {
   static ThemeData get light => ThemeData(
     useMaterial3: true,
+    brightness: Brightness.light,
     colorScheme: ColorScheme.fromSeed(
       seedColor: AppColors.primary,
       surface: AppColors.surface,
@@ -94,6 +98,7 @@ class AppTheme {
         fontFamily: AppTextStyles.fontFamily,
         color: AppColors.onSurface,
       ),
+      iconTheme: IconThemeData(color: AppColors.onSurface),
     ),
     cardTheme: CardThemeData(
       color: AppColors.surface,
@@ -123,19 +128,133 @@ class AppTheme {
       hintStyle: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     ),
+    dividerTheme: const DividerThemeData(color: AppColors.divider, thickness: 1),
+    checkboxTheme: CheckboxThemeData(
+      fillColor: WidgetStateProperty.resolveWith((s) =>
+          s.contains(WidgetState.selected) ? AppColors.primary : Colors.transparent),
+      checkColor: WidgetStateProperty.all(Colors.white),
+      side: const BorderSide(color: AppColors.divider),
+    ),
+    sliderTheme: const SliderThemeData(
+      activeTrackColor: AppColors.primary,
+      thumbColor: AppColors.primary,
+      inactiveTrackColor: AppColors.divider,
+      overlayColor: Color(0x2277021D),
+    ),
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith((s) =>
+          s.contains(WidgetState.selected) ? AppColors.primary : Colors.white),
+      trackColor: WidgetStateProperty.resolveWith((s) =>
+          s.contains(WidgetState.selected)
+              ? AppColors.primary.withValues(alpha: 0.4)
+              : AppColors.divider),
+    ),
+    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      backgroundColor: AppColors.surface,
+      selectedItemColor: AppColors.primary,
+      unselectedItemColor: AppColors.onSurfaceMuted,
+      elevation: 0,
+    ),
+    tabBarTheme: TabBarThemeData(
+      labelColor: AppColors.primary,
+      unselectedLabelColor: AppColors.onSurfaceMuted,
+      indicatorColor: AppColors.primary,
+      dividerColor: Colors.transparent,
+    ),
   );
 
+  // ─── Dark theme complet ─────────────────────────────────────────────────────
   static ThemeData get dark => ThemeData(
     useMaterial3: true,
+    brightness: Brightness.dark,
     colorScheme: ColorScheme.fromSeed(
       seedColor: AppColors.primary,
       surface: AppColors.surfaceDark,
       primary: AppColors.primaryLight,
       secondary: AppColors.secondaryLight,
+      error: AppColors.accent,
       brightness: Brightness.dark,
     ),
     fontFamily: AppTextStyles.fontFamily,
     scaffoldBackgroundColor: AppColors.backgroundDark,
+    appBarTheme: const AppBarTheme(
+      backgroundColor: AppColors.surfaceDark,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+      titleTextStyle: TextStyle(
+        fontSize: 20, fontWeight: FontWeight.w800,
+        fontFamily: AppTextStyles.fontFamily,
+        color: AppColors.onSurfaceDark,
+      ),
+      iconTheme: IconThemeData(color: AppColors.onSurfaceDark),
+    ),
+    cardTheme: CardThemeData(
+      color: AppColors.surfaceDark,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
+      margin: EdgeInsets.zero,
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primaryLight,
+        foregroundColor: Colors.white,
+        textStyle: AppTextStyles.button,
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
+        minimumSize: const Size.fromHeight(52),
+        elevation: 0,
+      ),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: AppColors.surfaceVariantDark,
+      border: OutlineInputBorder(borderRadius: AppRadius.md, borderSide: BorderSide.none),
+      enabledBorder: OutlineInputBorder(borderRadius: AppRadius.md, borderSide: BorderSide.none),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: AppRadius.md,
+        borderSide: const BorderSide(color: AppColors.primaryLight, width: 2),
+      ),
+      hintStyle: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMutedDark),
+    ),
+    dividerTheme: const DividerThemeData(color: AppColors.dividerDark, thickness: 1),
+    checkboxTheme: CheckboxThemeData(
+      fillColor: WidgetStateProperty.resolveWith((s) =>
+          s.contains(WidgetState.selected) ? AppColors.primaryLight : Colors.transparent),
+      checkColor: WidgetStateProperty.all(Colors.white),
+      side: const BorderSide(color: AppColors.dividerDark),
+    ),
+    sliderTheme: const SliderThemeData(
+      activeTrackColor: AppColors.primaryLight,
+      thumbColor: AppColors.primaryLight,
+      inactiveTrackColor: AppColors.dividerDark,
+      overlayColor: Color(0x229E1530),
+    ),
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith((s) =>
+          s.contains(WidgetState.selected) ? AppColors.primaryLight : AppColors.onSurfaceMutedDark),
+      trackColor: WidgetStateProperty.resolveWith((s) =>
+          s.contains(WidgetState.selected)
+              ? AppColors.primaryLight.withValues(alpha: 0.4)
+              : AppColors.dividerDark),
+    ),
+    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      backgroundColor: AppColors.surfaceDark,
+      selectedItemColor: AppColors.primaryLight,
+      unselectedItemColor: AppColors.onSurfaceMutedDark,
+      elevation: 0,
+    ),
+    tabBarTheme: TabBarThemeData(
+      labelColor: AppColors.primaryLight,
+      unselectedLabelColor: AppColors.onSurfaceMutedDark,
+      indicatorColor: AppColors.primaryLight,
+      dividerColor: Colors.transparent,
+    ),
+    textTheme: const TextTheme(
+      bodyLarge:   TextStyle(color: AppColors.onSurfaceDark, fontFamily: AppTextStyles.fontFamily),
+      bodyMedium:  TextStyle(color: AppColors.onSurfaceDark, fontFamily: AppTextStyles.fontFamily),
+      bodySmall:   TextStyle(color: AppColors.onSurfaceMutedDark, fontFamily: AppTextStyles.fontFamily),
+      titleLarge:  TextStyle(color: AppColors.onSurfaceDark, fontFamily: AppTextStyles.fontFamily, fontWeight: FontWeight.w800),
+      titleMedium: TextStyle(color: AppColors.onSurfaceDark, fontFamily: AppTextStyles.fontFamily, fontWeight: FontWeight.w700),
+    ),
   );
 }
 
@@ -149,18 +268,18 @@ class MoodDefinition {
 }
 
 const List<MoodDefinition> kMoods = [
-  MoodDefinition(id: 'great',   label: 'Super bien',    emoji: '😄', color: AppColors.moodGreat,    score: 5),
-  MoodDefinition(id: 'good',    label: 'Bien',           emoji: '🙂', color: AppColors.moodGood,     score: 4),
-  MoodDefinition(id: 'neutral', label: 'Neutre',         emoji: '😐', color: AppColors.moodNeutral,  score: 3),
-  MoodDefinition(id: 'tired',   label: 'Fatigué(e)',     emoji: '😔', color: AppColors.moodTired,    score: 2),
-  MoodDefinition(id: 'stressed',label: 'Stressé(e)',     emoji: '😰', color: AppColors.moodStressed, score: 1),
-  MoodDefinition(id: 'anxious', label: 'Anxieux(se)',    emoji: '😟', color: AppColors.moodAnxious,  score: 1),
-  MoodDefinition(id: 'sad',     label: 'Triste',         emoji: '😢', color: AppColors.moodSad,      score: 2),
+  MoodDefinition(id: 'great',    label: 'Super bien',  emoji: '😄', color: AppColors.moodGreat,    score: 5),
+  MoodDefinition(id: 'good',     label: 'Bien',         emoji: '🙂', color: AppColors.moodGood,     score: 4),
+  MoodDefinition(id: 'neutral',  label: 'Neutre',       emoji: '😐', color: AppColors.moodNeutral,  score: 3),
+  MoodDefinition(id: 'tired',    label: 'Fatigué(e)',   emoji: '😔', color: AppColors.moodTired,    score: 2),
+  MoodDefinition(id: 'stressed', label: 'Stressé(e)',   emoji: '😰', color: AppColors.moodStressed, score: 1),
+  MoodDefinition(id: 'anxious',  label: 'Anxieux(se)',  emoji: '😟', color: AppColors.moodAnxious,  score: 1),
+  MoodDefinition(id: 'sad',      label: 'Triste',       emoji: '😢', color: AppColors.moodSad,      score: 2),
 ];
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 class AppConstants {
   static const appName = 'LinkMind';
-  static const String baseUrl = 'http://192.168.12.135:3000/api';
+  static const String baseUrl = 'https://linkmind-backend-sub4.onrender.com/api';
   static const int tokenRefreshThreshold = 300;
 }
