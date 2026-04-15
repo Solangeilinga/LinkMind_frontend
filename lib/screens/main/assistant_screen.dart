@@ -94,9 +94,12 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> with TickerPr
     } catch (_) {} // garde les defaults
   }
 
+  // ✅ CORRECTION : Scroll 100% sécurisé sans crash
   void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollCtrl.hasClients) {
+    // Un léger délai permet à l'UI de se mettre à jour (ex: apparition du clavier ou nouveau message)
+    Future.delayed(const Duration(milliseconds: 150), () {
+      // On vérifie que le widget existe toujours ET que le ScrollController est bien attaché à une vue
+      if (mounted && _scrollCtrl.hasClients) {
         _scrollCtrl.animateTo(
           _scrollCtrl.position.maxScrollExtent,
           duration: const Duration(milliseconds: 300),
@@ -120,6 +123,7 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> with TickerPr
       ));
       _isTyping = true;
     });
+    
     _scrollToBottom();
 
     try {
@@ -161,6 +165,7 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> with TickerPr
               time: DateTime.now(),
             ));
           });
+          _scrollToBottom();
         }
       }
     } catch (e) {
@@ -173,6 +178,7 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> with TickerPr
             time: DateTime.now(),
           ));
         });
+        _scrollToBottom();
       }
     }
   }
@@ -186,7 +192,7 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> with TickerPr
           children: [
             Container(
               width: 36, height: 36,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.primary,
                 shape: BoxShape.circle,
               ),
@@ -315,7 +321,7 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> with TickerPr
                 Text('Limite quotidienne atteinte',
                     style: AppTextStyles.h4.copyWith(color: AppColors.primary)),
                 const SizedBox(height: 4),
-                Text("Tu as utilisé tes 10 messages Mindo aujourd'hui.\nReviens demain ou passe en Premium pour des conversations illimitées.",
+                Text("Tu as utilisé tes $_messagesLimit messages Mindo aujourd'hui.\nReviens demain ou passe en Premium pour des conversations illimitées.",
                     style: AppTextStyles.bodySmall.copyWith(
                         color: AppColors.onSurfaceMuted, height: 1.5),
                     textAlign: TextAlign.center),
@@ -323,7 +329,9 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> with TickerPr
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () {},
+                    onPressed: () {
+                      // TODO: Redirection vers l'écran Premium
+                    },
                     icon: const Text('👑', style: TextStyle(fontSize: 16)),
                     label: const Text('Passer en Premium'),
                     style: ElevatedButton.styleFrom(
@@ -356,8 +364,12 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen> with TickerPr
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              await ApiService().clearAssistantSession();
-              setState(() { _messages.clear(); _hasStarted = false; });
+              try {
+                await ApiService().clearAssistantSession();
+              } catch (_) {} // Ignore les erreurs silencieuses pour la réinitialisation
+              if (mounted) {
+                setState(() { _messages.clear(); _hasStarted = false; });
+              }
             },
             child: const Text('Recommencer'),
           ),
@@ -690,9 +702,9 @@ class _TypingIndicator extends StatelessWidget {
           const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: AppColors.surface,
-              borderRadius: const BorderRadius.only(
+              borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(18), topRight: Radius.circular(18),
                 bottomLeft: Radius.circular(4), bottomRight: Radius.circular(18),
               ),
@@ -750,7 +762,7 @@ class _InputBar extends StatelessWidget {
                 hintStyle: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted),
                 filled: true,
                 fillColor: AppColors.surfaceVariant,
-                border: OutlineInputBorder(
+                border: const OutlineInputBorder(
                   borderRadius: AppRadius.lg,
                   borderSide: BorderSide.none,
                 ),

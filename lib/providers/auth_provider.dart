@@ -99,18 +99,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> _init() async {
     try {
+      // Timeout global de 5 secondes pour toute l'initialisation
+      await Future.wait([
+        _api.getAccessToken().timeout(const Duration(seconds: 5)),
+      ]);
       final token = await _api.getAccessToken();
       if (token != null) {
-        final data = await _api.getMe();
+        final data = await _api.getMe().timeout(const Duration(seconds: 5));
+        final user = UserModel.fromJson(data['user']);
+        debugPrint('🔍 [AuthInit] legalAccepted = ${user.legalAccepted}');
         state = AuthState(
           isAuthenticated: true,
           isLoading: false,
-          user: UserModel.fromJson(data['user']),
+          user: user,
         );
       } else {
         state = const AuthState(isAuthenticated: false, isLoading: false);
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('⚠️ [AuthInit] Timeout ou erreur réseau : $e');
       state = const AuthState(isAuthenticated: false, isLoading: false);
     }
   }
@@ -120,10 +127,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final data = await _api.login(email: email, phone: phone, password: password);
       await _api.saveTokens(data['accessToken'], data['refreshToken']);
+      final user = UserModel.fromJson(data['user']);
+      debugPrint('🔍 [Login] legalAccepted = ${user.legalAccepted}');
       state = AuthState(
         isAuthenticated: true,
         isLoading: false,
-        user: UserModel.fromJson(data['user']),
+        user: user,
       );
       _ref.read(challengesProvider.notifier).reset();
       _ref.read(moodProvider.notifier).reset();
@@ -155,10 +164,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
         anonymousAlias: anonymousAlias,
       );
       await _api.saveTokens(data['accessToken'], data['refreshToken']);
+      final user = UserModel.fromJson(data['user']);
+      debugPrint('🔍 [Register] legalAccepted = ${user.legalAccepted}');
       state = AuthState(
         isAuthenticated: true,
         isLoading: false,
-        user: UserModel.fromJson(data['user']),
+        user: user,
       );
       _ref.read(challengesProvider.notifier).reset();
       _ref.read(moodProvider.notifier).reset();
@@ -180,23 +191,107 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(user: user);
   }
 
-  // ✅ AJOUTÉ: Rafraîchir les données utilisateur (après paiement Premium)
   Future<void> refreshUser() async {
     try {
       final data = await _api.getMe();
       if (data['user'] != null) {
         final updatedUser = UserModel.fromJson(data['user']);
         state = state.copyWith(user: updatedUser);
-        debugPrint('✅ Utilisateur rafraîchi: isPremium=${updatedUser.isPremium}');
+        debugPrint('✅ Utilisateur rafraîchi: isPremium=${updatedUser.isPremium}, legalAccepted=${updatedUser.legalAccepted}');
       }
     } catch (e) {
       debugPrint('❌ Erreur refreshUser: $e');
     }
   }
 
-  // ✅ Méthode ajoutée pour mood_screen.dart
   Future<void> loadDailyChallenges({String? moodLabel}) async {
     await _ref.read(challengesProvider.notifier).loadDaily(moodLabel: moodLabel);
+  }
+
+  // ─── Mot de passe oublié & OTP ──────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> forgotPassword({String? email, String? phone}) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final data = await _api.post('/auth/forgot-password', {
+        if (email != null) 'email': email,
+        if (phone != null) 'phone': phone,
+      });
+      state = state.copyWith(isLoading: false);
+      return data;
+    } on ApiException catch (e) {
+      state = state.copyWith(isLoading: false, error: e.message);
+      rethrow;
+    } catch (e, stack) {
+      debugPrint('❌ Erreur forgotPassword: $e\n$stack');
+      state = state.copyWith(isLoading: false, error: 'Une erreur est survenue');
+      rethrow;
+    }
+  }
+
+  Future<String?> verifyOtp({String? email, String? phone, required String code}) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final data = await _api.post('/auth/verify-otp', {
+        if (email != null) 'email': email,
+        if (phone != null) 'phone': phone,
+        'code': code,
+      });
+      state = state.copyWith(isLoading: false);
+      return data['resetToken'] as String?;
+    } on ApiException catch (e) {
+      state = state.copyWith(isLoading: false, error: e.message);
+      rethrow;
+    } catch (e, stack) {
+      debugPrint('❌ Erreur verifyOtp: $e\n$stack');
+      state = state.copyWith(isLoading: false, error: 'Une erreur est survenue');
+      rethrow;
+    }
+  }
+
+  Future<void> resetPassword({
+    String? email, 
+    String? phone, 
+    required String resetToken, 
+    required String newPassword
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      await _api.post('/auth/reset-password', {
+        if (email != null) 'email': email,
+        if (phone != null) 'phone': phone,
+        'resetToken': resetToken,
+        'newPassword': newPassword,
+      });
+      state = state.copyWith(isLoading: false);
+    } on ApiException catch (e) {
+      state = state.copyWith(isLoading: false, error: e.message);
+      rethrow;
+    } catch (e, stack) {
+      debugPrint('❌ Erreur resetPassword: $e\n$stack');
+      state = state.copyWith(isLoading: false, error: 'Une erreur est survenue');
+      rethrow;
+    }
+  }
+
+  // ─── Vérification Email / Téléphone ─────────────────────────────────────────
+
+  Future<Map<String, dynamic>> sendVerification() async {
+    try {
+      return await _api.sendVerification();
+    } catch (e, stack) {
+      debugPrint('❌ Erreur sendVerification: $e\n$stack');
+      rethrow;
+    }
+  }
+
+  Future<bool> verifyEmail(String code) async {
+    try {
+      return await _api.verifyEmail(code);
+    } catch (e, stack) {
+      debugPrint('❌ Erreur verifyEmail: $e\n$stack');
+      rethrow;
+    }
   }
 }
 

@@ -7,6 +7,7 @@ import '../providers/auth_provider.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
+
   @override
   ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
@@ -20,14 +21,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   void _navigate() {
     if (!mounted) return;
-    final auth = ref.read(authProvider);
-    if (!auth.isLoading) {
-      context.go(auth.isAuthenticated ? '/home' : '/auth/login');
+    final authState = ref.read(authProvider);
+    if (!authState.isLoading) {
+      context.go(authState.isAuthenticated ? '/home' : '/auth/login');
     } else {
-      // Wait for auth to finish
-      ref.listenManual(authProvider, (_, next) {
-        if (!next.isLoading && mounted) {
-          context.go(next.isAuthenticated ? '/home' : '/auth/login');
+      // Attendre un frame supplémentaire pour laisser le temps à l'initialisation
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          final newAuthState = ref.read(authProvider);
+          context.go(newAuthState.isAuthenticated ? '/home' : '/auth/login');
         }
       });
     }
@@ -35,6 +37,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
     return Scaffold(
       backgroundColor: AppColors.primary,
       body: Center(
@@ -63,7 +66,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             Text('Where Minds Connect',
                 style: AppTextStyles.body.copyWith(color: Colors.white70)),
             const SizedBox(height: 60),
-            const CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+            if (authState.isLoading)
+              const CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
           ],
         ),
       ),

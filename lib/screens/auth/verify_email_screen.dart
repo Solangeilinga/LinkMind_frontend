@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../utils/theme.dart';
-import '../../services/api.service.dart';
 import '../../providers/auth_provider.dart';
 
 class VerifyEmailScreen extends ConsumerStatefulWidget {
@@ -18,13 +17,16 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   bool _isResending = false;
   String? _error;
   String? _success;
-  String? _channel; // 'email' ou 'sms'
+  String? _channel;
   String? _destinationMasked;
 
   @override
   void initState() {
     super.initState();
-    _sendInitialCode();
+    // ✅ CORRECTION : Ne pas appeler de setState avant que le widget soit monté
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _sendInitialCode();
+    });
   }
 
   @override
@@ -34,19 +36,25 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   }
 
   Future<void> _sendInitialCode() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      final response = await ApiService().sendVerification();
-      setState(() {
-        _channel = response['channel'];
-        _destinationMasked = response['destination'];
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = 'Impossible d\'envoyer le code de vérification';
-        _isLoading = false;
-      });
+      final response = await ref.read(authProvider.notifier).sendVerification();
+      if (mounted) {
+        setState(() {
+          _channel = response['channel'];
+          _destinationMasked = response['destination'];
+          _isLoading = false;
+        });
+      }
+    } catch (e, stack) {
+      debugPrint('Erreur _sendInitialCode: $e\n$stack');
+      if (mounted) {
+        setState(() {
+          _error = 'Impossible d\'envoyer le code de vérification';
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -57,23 +65,25 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
       return;
     }
 
+    FocusScope.of(context).unfocus();
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
     try {
-      final verified = await ApiService().verifyEmail(code);
+      final verified = await ref.read(authProvider.notifier).verifyEmail(code);
       if (verified && mounted) {
         await ref.read(authProvider.notifier).refreshUser();
         if (mounted) {
           context.go('/legal-onboarding');
         }
       } else {
-        setState(() => _error = 'Code invalide');
+        if (mounted) setState(() => _error = 'Code invalide');
       }
-    } catch (e) {
-      setState(() => _error = 'Erreur, réessaie plus tard');
+    } catch (e, stack) {
+      debugPrint('Erreur _verifyCode: $e\n$stack');
+      if (mounted) setState(() => _error = 'Erreur, réessaie plus tard');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -87,16 +97,21 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
     });
 
     try {
-      final response = await ApiService().sendVerification();
-      setState(() {
-        _success = 'Nouveau code envoyé par ${response['channel'] == 'email' ? 'email' : 'SMS'}';
-        _isResending = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = 'Erreur, réessaie plus tard';
-        _isResending = false;
-      });
+      final response = await ref.read(authProvider.notifier).sendVerification();
+      if (mounted) {
+        setState(() {
+          _success = 'Nouveau code envoyé par ${response['channel'] == 'email' ? 'email' : 'SMS'}';
+          _isResending = false;
+        });
+      }
+    } catch (e, stack) {
+      debugPrint('Erreur _resendCode: $e\n$stack');
+      if (mounted) {
+        setState(() {
+          _error = 'Erreur, réessaie plus tard';
+          _isResending = false;
+        });
+      }
     }
   }
 
@@ -192,6 +207,12 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                 keyboardType: TextInputType.number,
                 maxLength: 6,
                 textAlign: TextAlign.center,
+                onChanged: (val) {
+                  // ✅ Auto-submit quand 6 chiffres sont entrés
+                  if (val.length == 6) {
+                    _verifyCode();
+                  }
+                },
                 style: const TextStyle(fontSize: 24, letterSpacing: 8),
                 decoration: InputDecoration(
                   hintText: '000000',

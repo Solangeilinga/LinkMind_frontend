@@ -28,11 +28,12 @@ class AuthMiddleware {
 
   static void _redirectToLogin(BuildContext context) {
     if (context.mounted) {
-      context.go('/login');
+      // ✅ CORRECTION : La route définie dans main.dart est /auth/login
+      context.go('/auth/login'); 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Session expirée, veuillez vous reconnecter'),
-          backgroundColor: Colors.orange,
+          backgroundColor: Colors.orange, // Ou AppColors.accentOrange
         ),
       );
     }

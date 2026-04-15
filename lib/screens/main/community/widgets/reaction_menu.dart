@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../../utils/theme.dart';
-import '../../../../services/api.service.dart';
 
 class ReactionItem extends StatelessWidget {
   final String emoji;
@@ -27,7 +26,6 @@ class ReactionItem extends StatelessWidget {
   }
 }
 
-// ✅ CORRIGÉ : Ajout du paramètre postId et onReaction
 void showReactionMenu(
   BuildContext context,
   String postId,
@@ -46,10 +44,11 @@ void showReactionMenu(
         children: [
           ReactionItem(emoji: '❤️', label: 'J\'aime', onTap: onLike),
           ReactionItem(emoji: '🤝', label: 'Moi aussi', onTap: onSameFeeling),
-          ReactionItem(emoji: '😮', label: 'Wow', onTap: () => onReaction('wow')),
-          ReactionItem(emoji: '😢', label: 'Triste', onTap: () => onReaction('sad')),
-          ReactionItem(emoji: '🔥', label: 'Fier', onTap: () => onReaction('proud')),
-          ReactionItem(emoji: '💪', label: 'Fort', onTap: () => onReaction('strong')),
+          // ✅ Types compatibles avec le backend
+          ReactionItem(emoji: '😮', label: 'Wow', onTap: () => onReaction('fire')),
+          ReactionItem(emoji: '😢', label: 'Triste', onTap: () => onReaction('heart')),
+          ReactionItem(emoji: '🔥', label: 'Fier', onTap: () => onReaction('strong')),
+          ReactionItem(emoji: '💪', label: 'Fort', onTap: () => onReaction('hug')),
         ],
       ),
     ),

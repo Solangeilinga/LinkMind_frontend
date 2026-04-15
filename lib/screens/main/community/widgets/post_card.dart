@@ -11,7 +11,7 @@ class PostCard extends StatefulWidget {
   final Map<String, dynamic> post;
   final VoidCallback onLike;
   final VoidCallback onDelete;
-  final VoidCallback? onEdit;  // ✅ AJOUTÉ
+  final VoidCallback? onEdit;
   final bool isMine;
 
   const PostCard({
@@ -33,23 +33,56 @@ class _PostCardState extends State<PostCard> {
   bool _loadingComments = false;
   bool _commentsLoaded = false;
   List<Map<String, dynamic>> _comments = [];
+
+  // États pour les réactions
   late bool _isLiked;
-  late int _likesCount;
   late bool _isSameFeeling;
-  late int _sameFeelingsCount;
+  late int _totalReactions;
+  late List<Map<String, dynamic>> _reactions; // stocke les réactions du post
+
   bool _isEditing = false;
   final _editController = TextEditingController();
 
   String get _postId => (widget.post['_id'] ?? widget.post['id'] ?? '').toString();
   String get _content => widget.post['content'] as String? ?? '';
 
+  // Calcule le total des réactions et met à jour la liste
+  void _updateReactionsFromPost() {
+    final reactions = widget.post['reactions'] as List? ?? [];
+    _reactions = reactions.map((r) => Map<String, dynamic>.from(r)).toList();
+    _totalReactions = _reactions.fold<int>(0, (sum, r) => sum + (r['count'] as int? ?? 0));
+  }
+
+  // Retourne les 3 réactions les plus fréquentes (avec leur emoji)
+  List<Map<String, dynamic>> _getTopReactions() {
+    final Map<String, int> counts = {};
+    for (final r in _reactions) {
+      final type = r['type'] as String;
+      counts[type] = (counts[type] ?? 0) + 1;
+    }
+    final sorted = counts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final topTypes = sorted.take(3).map((e) => e.key).toList();
+
+    const emojiMap = {
+      'heart': '❤️',
+      'hug': '🤗',
+      'strong': '💪',
+      'fire': '🔥',
+      'same_feeling': '🤝',
+    };
+
+    return topTypes.map((type) {
+      return {'type': type, 'emoji': emojiMap[type] ?? '👍', 'count': counts[type]!};
+    }).toList();
+  }
+
   @override
   void initState() {
     super.initState();
     _isLiked = widget.post['isLiked'] == true;
-    _likesCount = (widget.post['likesCount'] ?? 0) as int;
     _isSameFeeling = widget.post['isSameFeeling'] == true;
-    _sameFeelingsCount = (widget.post['sameFeelingsCount'] ?? 0) as int;
+    _updateReactionsFromPost();
     _editController.text = _content;
   }
 
@@ -63,44 +96,90 @@ class _PostCardState extends State<PostCard> {
   void didUpdateWidget(PostCard old) {
     super.didUpdateWidget(old);
     _isLiked = widget.post['isLiked'] == true;
-    _likesCount = (widget.post['likesCount'] ?? 0) as int;
     _isSameFeeling = widget.post['isSameFeeling'] == true;
-    _sameFeelingsCount = (widget.post['sameFeelingsCount'] ?? 0) as int;
+    _updateReactionsFromPost();
     if (_content != old.post['content']) {
       _editController.text = _content;
     }
   }
 
-  void _handlePostLike() {
+  // ---- Réactions -------------------------------------------------
+  void _handlePostLike() async {
+    final wasLiked = _isLiked;
     setState(() {
-      if (_isLiked) {
-        _isLiked = false;
-        _likesCount = (_likesCount - 1).clamp(0, 999999);
-      } else {
-        _isLiked = true;
-        _likesCount += 1;
-      }
+      _isLiked = !wasLiked;
+      _totalReactions += wasLiked ? -1 : 1;
     });
     widget.onLike();
+    try {
+      final r = await ApiService().toggleLike(_postId);
+      if (mounted) {
+        setState(() {
+          _isLiked = r['liked'] as bool;
+          _totalReactions += (_isLiked == wasLiked) ? 0 : (_isLiked ? 1 : -1);
+        });
+      }
+    } catch (_) {
+      setState(() {
+        _isLiked = wasLiked;
+        _totalReactions += wasLiked ? 1 : -1;
+      });
+    }
   }
 
-  // ✅ AJOUTÉ: Gestion des réactions multiples
-  Future<void> _handleReaction(String type) async {
-    final postId = _postId;
+  Future<void> _handleSameFeeling() async {
+    final wasSame = _isSameFeeling;
+    setState(() {
+      _isSameFeeling = !wasSame;
+      _totalReactions += wasSame ? -1 : 1;
+    });
     try {
-      final response = await ApiService().toggleReaction(postId, type);
+      final r = await ApiService().toggleSameFeeling(_postId);
       if (mounted) {
-        // Mettre à jour l'affichage des réactions
         setState(() {
-          final reactions = response['reactions'] as List? ?? [];
-          // Mettre à jour l'état local si nécessaire
+          _isSameFeeling = r['sameFeeling'] as bool;
+          _totalReactions += (_isSameFeeling == wasSame) ? 0 : (_isSameFeeling ? 1 : -1);
+        });
+      }
+    } catch (_) {
+      setState(() {
+        _isSameFeeling = wasSame;
+        _totalReactions += wasSame ? 1 : -1;
+      });
+    }
+  }
+
+  Future<void> _handleReaction(String type) async {
+    final previousTotal = _totalReactions;
+    try {
+      final response = await ApiService().toggleReaction(_postId, type);
+      if (mounted) {
+        final reactions = response['reactions'] as List? ?? [];
+        final newTotal = reactions.fold<int>(0, (sum, r) => sum + (r['count'] as int? ?? 0));
+        setState(() {
+          _reactions = reactions.map((r) => Map<String, dynamic>.from(r)).toList();
+          _totalReactions = newTotal;
+          _isLiked = reactions.any((r) => r['type'] == 'heart' && r['isMine'] == true);
+          _isSameFeeling = reactions.any((r) => r['type'] == 'same_feeling' && r['isMine'] == true);
         });
       }
     } catch (e) {
+      setState(() => _totalReactions = previousTotal);
       debugPrint('Erreur réaction: $e');
     }
   }
 
+  void _showReactionMenu() {
+    showReactionMenu(
+      context,
+      _postId,
+      _handlePostLike,
+      _handleSameFeeling,
+      _handleReaction,
+    );
+  }
+
+  // ---- Commentaires ---------------------------------
   Future<void> _loadComments() async {
     if (_commentsLoaded || _loadingComments) return;
     setState(() => _loadingComments = true);
@@ -118,54 +197,18 @@ class _PostCardState extends State<PostCard> {
     }
   }
 
-  void _showReactionMenu() {
-    showReactionMenu(
-      context,
-      _postId,
-      _handlePostLike,
-      _handleSameFeeling,
-      _handleReaction,
-    );
+  void _toggleComments() {
+    if (!_showComments) _loadComments();
+    setState(() => _showComments = !_showComments);
   }
 
-  Future<void> _handleSameFeeling() async {
-    final postId = _postId;
-    setState(() {
-      if (_isSameFeeling) {
-        _isSameFeeling = false;
-        _sameFeelingsCount = (_sameFeelingsCount - 1).clamp(0, 999999);
-      } else {
-        _isSameFeeling = true;
-        _sameFeelingsCount += 1;
-      }
-    });
-    try {
-      final r = await ApiService().toggleSameFeeling(postId);
-      setState(() {
-        _isSameFeeling = r['sameFeeling'] as bool;
-        _sameFeelingsCount = r['sameFeelingsCount'] as int;
-      });
-    } catch (_) {
-      setState(() {
-        if (_isSameFeeling) {
-          _isSameFeeling = false;
-          _sameFeelingsCount = (_sameFeelingsCount - 1).clamp(0, 999999);
-        } else {
-          _isSameFeeling = true;
-          _sameFeelingsCount += 1;
-        }
-      });
-    }
-  }
-
-  // ✅ AJOUTÉ: Édition du post
+  // ---- Édition, suppression -------------------------
   Future<void> _handleEdit() async {
     final newContent = _editController.text.trim();
     if (newContent.isEmpty || newContent == _content) {
       setState(() => _isEditing = false);
       return;
     }
-
     try {
       await ApiService().editPost(_postId, newContent);
       widget.post['content'] = newContent;
@@ -183,16 +226,12 @@ class _PostCardState extends State<PostCard> {
       if (mounted) {
         setState(() => _isEditing = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur: ${e.toString()}'),
-            backgroundColor: AppColors.accent,
-          ),
+          SnackBar(content: Text('Erreur: ${e.toString()}'), backgroundColor: AppColors.accent),
         );
       }
     }
   }
 
-  // ✅ AJOUTÉ: Vérifier si le post peut être édité (moins de 24h)
   bool get _canEdit {
     final createdAt = widget.post['createdAt'];
     if (createdAt == null) return false;
@@ -218,17 +257,10 @@ class _PostCardState extends State<PostCard> {
         ],
       ),
     );
-    
-    if (ok == true) {
-      widget.onDelete();
-    }
+    if (ok == true) widget.onDelete();
   }
 
-  void _toggleComments() {
-    if (!_showComments) _loadComments();
-    setState(() => _showComments = !_showComments);
-  }
-
+  // ---- Callbacks commentaires ---------------------------------
   void _onCommentPosted(Map<String, dynamic> comment, String? parentId) {
     setState(() {
       if (parentId != null) {
@@ -257,9 +289,7 @@ class _PostCardState extends State<PostCard> {
     for (final c in list) {
       if ((c['_id'] ?? '').toString() == id) return c;
       final found = _findComment(
-        (c['replies'] as List? ?? [])
-            .map((r) => Map<String, dynamic>.from(r as Map))
-            .toList(),
+        (c['replies'] as List? ?? []).map((r) => Map<String, dynamic>.from(r as Map)).toList(),
         id,
       );
       if (found != null) return found;
@@ -274,9 +304,7 @@ class _PostCardState extends State<PostCard> {
         return true;
       }
       if (_replaceComment(
-        (list[i]['replies'] as List? ?? [])
-            .map((r) => Map<String, dynamic>.from(r as Map))
-            .toList(),
+        (list[i]['replies'] as List? ?? []).map((r) => Map<String, dynamic>.from(r as Map)).toList(),
         id,
         replacement,
       )) {
@@ -300,6 +328,7 @@ class _PostCardState extends State<PostCard> {
     }
   }
 
+  // ---- Build -------------------------------------------------
   @override
   Widget build(BuildContext context) {
     final post = widget.post;
@@ -312,6 +341,9 @@ class _PostCardState extends State<PostCard> {
     final isLong = content.length > 300;
     final displayContent = isLong && !_expanded ? '${content.substring(0, 300)}…' : content;
 
+    // Récupère les 3 réactions les plus fréquentes
+    final topReactions = _getTopReactions();
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -320,22 +352,17 @@ class _PostCardState extends State<PostCard> {
             ? Border.all(color: AppColors.primary.withValues(alpha: 0.25), width: 1.5)
             : null,
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          )
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // En-tête (auteur, type, menu)
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
           child: Row(children: [
             Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                  color: typeConf.color.withValues(alpha: 0.15), shape: BoxShape.circle),
+              width: 42, height: 42,
+              decoration: BoxDecoration(color: typeConf.color.withValues(alpha: 0.15), shape: BoxShape.circle),
               child: Center(child: Text(typeConf.emoji, style: const TextStyle(fontSize: 20))),
             ),
             const SizedBox(width: 10),
@@ -344,11 +371,7 @@ class _PostCardState extends State<PostCard> {
                 Row(children: [
                   Flexible(
                     child: Text(
-                      anonName(
-                        _postId,
-                        alias: (widget.post['anonymousAlias'] ??
-                            (widget.post['author'] as Map?)?['anonymousAlias']) as String?,
-                      ),
+                      anonName(_postId, alias: (widget.post['anonymousAlias'] ?? (widget.post['author'] as Map?)?['anonymousAlias']) as String?),
                       style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w800),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -356,33 +379,22 @@ class _PostCardState extends State<PostCard> {
                   const SizedBox(width: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                        color: typeConf.color.withValues(alpha: 0.12), borderRadius: AppRadius.full),
-                    child: Text(
-                      typeConf.label,
-                      style: AppTextStyles.caption.copyWith(
-                          color: typeConf.color, fontWeight: FontWeight.w700, fontSize: 10),
-                    ),
+                    decoration: BoxDecoration(color: typeConf.color.withValues(alpha: 0.12), borderRadius: AppRadius.full),
+                    child: Text(typeConf.label,
+                        style: AppTextStyles.caption.copyWith(color: typeConf.color, fontWeight: FontWeight.w700, fontSize: 10)),
                   ),
                 ]),
                 Row(children: [
-                  Text(
-                    fmtDate(post['createdAt']),
-                    style: AppTextStyles.caption.copyWith(
-                        color: AppColors.onSurfaceMuted, fontSize: 11),
-                  ),
+                  Text(fmtDate(post['createdAt']),
+                      style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted, fontSize: 11)),
                   if (editedAt != null) ...[
                     const SizedBox(width: 6),
-                    Text(
-                      '(modifié)',
-                      style: AppTextStyles.caption.copyWith(
-                          color: AppColors.onSurfaceMuted, fontSize: 10, fontStyle: FontStyle.italic),
-                    ),
+                    Text('(modifié)',
+                        style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted, fontSize: 10, fontStyle: FontStyle.italic)),
                   ],
                 ]),
               ]),
             ),
-            // ✅ AJOUTÉ: Menu pour mes posts (édition/suppression)
             if (widget.isMine)
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert, size: 20, color: AppColors.onSurfaceMuted),
@@ -391,10 +403,7 @@ class _PostCardState extends State<PostCard> {
                     setState(() => _isEditing = true);
                   } else if (value == 'edit' && !_canEdit) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('La modification n\'est possible que dans les 24h'),
-                        backgroundColor: AppColors.accent,
-                      ),
+                      const SnackBar(content: Text('La modification n\'est possible que dans les 24h'), backgroundColor: AppColors.accent),
                     );
                   } else if (value == 'delete') {
                     _handleDelete(context);
@@ -431,15 +440,9 @@ class _PostCardState extends State<PostCard> {
             padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.07),
-                borderRadius: AppRadius.full,
-              ),
-              child: Text(
-                '$moodEmoji Je ressens ça',
-                style: AppTextStyles.caption.copyWith(
-                    color: AppColors.primary, fontWeight: FontWeight.w700),
-              ),
+              decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.07), borderRadius: AppRadius.full),
+              child: Text('$moodEmoji Je ressens ça',
+                  style: AppTextStyles.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700)),
             ),
           ),
         Padding(
@@ -447,78 +450,78 @@ class _PostCardState extends State<PostCard> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             if (_isEditing)
               Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  TextField(
-                    controller: _editController,
-                    maxLines: 10,
-                    maxLength: 1500,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      hintText: 'Modifie ton post...',
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 200),
+                    child: TextField(
+                      controller: _editController,
+                      maxLines: null,
+                      expands: true,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        hintText: 'Modifie ton post...',
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      TextButton(
-                        onPressed: () => setState(() => _isEditing = false),
-                        child: const Text('Annuler'),
-                      ),
+                      TextButton(onPressed: () => setState(() => _isEditing = false), child: const Text('Annuler')),
                       const SizedBox(width: 8),
-                      ElevatedButton(
-                        onPressed: _handleEdit,
-                        child: const Text('Enregistrer'),
-                      ),
+                      ElevatedButton(onPressed: _handleEdit, child: const Text('Enregistrer')),
                     ],
                   ),
                 ],
               )
             else ...[
-              Text(
-                displayContent,
-                style: AppTextStyles.body.copyWith(color: AppColors.onSurface, height: 1.6),
-              ),
+              Text(displayContent, style: AppTextStyles.body.copyWith(color: AppColors.onSurface, height: 1.6)),
               if (isLong)
                 GestureDetector(
                   onTap: () => setState(() => _expanded = !_expanded),
                   child: Padding(
                     padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      _expanded ? 'Voir moins ▲' : 'Lire la suite ▼',
-                      style: AppTextStyles.caption.copyWith(
-                          color: AppColors.primary, fontWeight: FontWeight.w800),
-                    ),
+                    child: Text(_expanded ? 'Voir moins ▲' : 'Lire la suite ▼',
+                        style: AppTextStyles.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.w800)),
                   ),
                 ),
             ],
           ]),
         ),
-        if (_isLiked || _likesCount > 0 || commentsCount > 0)
+        // Ligne des réactions (comme Facebook)
+        if (_totalReactions > 0 || commentsCount > 0)
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-            child: Row(children: [
-              if (_likesCount > 0) ...[
-                const Text('❤️', style: TextStyle(fontSize: 13)),
-                const SizedBox(width: 4),
-                Text(
-                  '$_likesCount',
-                  style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted),
-                ),
-              ],
-              const Spacer(),
-              if (commentsCount > 0)
-                GestureDetector(
-                  onTap: _toggleComments,
-                  child: Text(
-                    '$commentsCount commentaire${commentsCount > 1 ? "s" : ""}',
-                    style: AppTextStyles.caption.copyWith(
+            child: Row(
+              children: [
+                if (_totalReactions > 0) ...[
+                  // Affichage des 3 premières réactions (icônes)
+                  ...topReactions.map((reaction) => Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Text(reaction['emoji'] as String, style: const TextStyle(fontSize: 13)),
+                  )),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$_totalReactions',
+                    style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted),
+                  ),
+                ],
+                const Spacer(),
+                if (commentsCount > 0)
+                  GestureDetector(
+                    onTap: _toggleComments,
+                    child: Text(
+                      '$commentsCount commentaire${commentsCount > 1 ? "s" : ""}',
+                      style: AppTextStyles.caption.copyWith(
                         color: AppColors.onSurfaceMuted,
                         decoration: TextDecoration.underline,
-                        decorationColor: AppColors.onSurfaceMuted),
+                        decorationColor: AppColors.onSurfaceMuted,
+                      ),
+                    ),
                   ),
-                ),
-            ]),
+              ],
+            ),
           ),
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -526,7 +529,6 @@ class _PostCardState extends State<PostCard> {
         ),
         // Actions
         Row(children: [
-          // J'aime
           Expanded(
             child: GestureDetector(
               onTap: _handlePostLike,
@@ -538,8 +540,7 @@ class _PostCardState extends State<PostCard> {
                   children: [
                     AnimatedSwitcher(
                       duration: const Duration(milliseconds: 200),
-                      transitionBuilder: (child, anim) =>
-                          ScaleTransition(scale: anim, child: child),
+                      transitionBuilder: (child, anim) => ScaleTransition(scale: anim, child: child),
                       child: Icon(
                         _isLiked ? Icons.favorite : Icons.favorite_border,
                         key: ValueKey(_isLiked),
@@ -548,9 +549,9 @@ class _PostCardState extends State<PostCard> {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    if (_likesCount > 0)
+                    if (_totalReactions > 0)
                       Text(
-                        '$_likesCount',
+                        '$_totalReactions',
                         style: AppTextStyles.caption.copyWith(
                           color: _isLiked ? AppColors.accent : AppColors.onSurfaceMuted,
                           fontWeight: _isLiked ? FontWeight.w800 : FontWeight.w600,
@@ -562,32 +563,6 @@ class _PostCardState extends State<PostCard> {
             ),
           ),
           Container(width: 1, height: 24, color: AppColors.divider),
-          // Moi aussi
-          Expanded(
-            child: GestureDetector(
-              onTap: _handleSameFeeling,
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text('🤝', style: TextStyle(fontSize: 16)),
-                    const SizedBox(width: 4),
-                    if (_sameFeelingsCount > 0)
-                      Text(
-                        '$_sameFeelingsCount',
-                        style: AppTextStyles.caption.copyWith(
-                          color: _isSameFeeling ? AppColors.secondary : AppColors.onSurfaceMuted,
-                          fontWeight: _isSameFeeling ? FontWeight.w800 : FontWeight.w600,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Container(width: 1, height: 24, color: AppColors.divider),
-          // Commenter
           Expanded(
             child: GestureDetector(
               onTap: _toggleComments,
@@ -596,11 +571,7 @@ class _PostCardState extends State<PostCard> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      Icons.chat_bubble_outline,
-                      size: 20,
-                      color: _showComments ? AppColors.primary : AppColors.onSurfaceMuted,
-                    ),
+                    Icon(Icons.chat_bubble_outline, size: 20, color: _showComments ? AppColors.primary : AppColors.onSurfaceMuted),
                     const SizedBox(width: 4),
                     if (commentsCount > 0)
                       Text(
@@ -616,14 +587,7 @@ class _PostCardState extends State<PostCard> {
             ),
           ),
           Container(width: 1, height: 24, color: AppColors.divider),
-          // Signalement (uniquement si ce n'est pas mon post)
-          if (!widget.isMine)
-            ReportButton(
-              targetType: 'post',
-              targetId: _postId,
-              isSmall: true,
-            ),
-          // ✅ SUPPRIMÉ: Bouton delete dans le menu maintenant
+          if (!widget.isMine) ReportButton(targetType: 'post', targetId: _postId, isSmall: true),
         ]),
         if (_showComments)
           CommentsSection(

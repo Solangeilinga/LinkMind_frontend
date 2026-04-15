@@ -111,7 +111,7 @@ class ApiService {
     };
   }
 
-  // Helper pour nettoyer les posts (corrige l'erreur post.toObject is not a function)
+  // Helper pour nettoyer les posts
   dynamic _cleanPosts(dynamic response) {
     if (response is Map<String, dynamic> && response.containsKey('posts')) {
       final posts = response['posts'];
@@ -278,27 +278,20 @@ class ApiService {
   }
 
   // ─── Verification (Email ou SMS) ───────────────────────────────────────────
-  /// Envoie un code de vérification par email ou SMS selon le moyen de contact
-  Future<Map<String, dynamic>> sendVerification() async {
-    return await post('/auth/send-verification', {});
-  }
+  Future<Map<String, dynamic>> sendVerification() async =>
+      await post('/auth/send-verification', {});
 
-  /// Vérifie le code de vérification
   Future<bool> verifyEmail(String code) async {
     final response = await post('/auth/verify-email', {'code': code});
     return response['verified'] == true;
   }
 
   // ─── Legal ─────────────────────────────────────────────────────────────────
-  Future<void> acceptLegal() async =>
-      await post('/users/accept-legal', {});
+  Future<void> acceptLegal() async => await post('/users/accept-legal', {});
 
   // ─── Account Management (RGPD) ─────────────────────────────────────────────
-  Future<void> deleteAccount() async => 
-      await delete('/users/me');
-      
-  Future<dynamic> exportMyData() async => 
-      await get('/users/me/export');
+  Future<void> deleteAccount() async => await delete('/users/me');
+  Future<dynamic> exportMyData() async => await get('/users/me/export');
 
   // ─── User Activity ─────────────────────────────────────────────────────────
   Future<void> recordActivity({
@@ -331,19 +324,14 @@ class ApiService {
     });
   }
 
-  Future<Map<String, dynamic>> getTodayMood() async =>
-      await get('/mood/today');
-
+  Future<Map<String, dynamic>> getTodayMood() async => await get('/mood/today');
   Future<Map<String, dynamic>> getMoodHistory({int days = 7}) async =>
       await get('/mood/history', queryParams: {'days': days.toString()});
-
-  Future<Map<String, dynamic>> getMoodInsights() async =>
-      await get('/mood/insights');
+  Future<Map<String, dynamic>> getMoodInsights() async => await get('/mood/insights');
 
   // ─── Challenges ────────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> getDailyChallenges({String? moodLabel}) async =>
-      await get('/challenges/daily',
-          queryParams: moodLabel != null ? {'moodLabel': moodLabel} : null);
+      await get('/challenges/daily', queryParams: moodLabel != null ? {'moodLabel': moodLabel} : null);
 
   Future<Map<String, dynamic>> completeChallenge(
     String challengeId, {
@@ -372,11 +360,23 @@ class ApiService {
   }
 
   // ─── Community ─────────────────────────────────────────────────────────────
-  Future<Map<String, dynamic>> getFeed({int page = 1}) async =>
-      await get('/community/feed', queryParams: {'page': page.toString()});
+  // ✅ CORRECTION : getFeed avec page, limit et type (filtre)
+  Future<Map<String, dynamic>> getFeed({int page = 1, int limit = 20, String? type}) async {
+    final Map<String, String> params = {
+      'page': page.toString(),
+      'limit': limit.toString(),
+    };
+    if (type != null && type.isNotEmpty) params['type'] = type;
+    return await get('/community/feed', queryParams: params);
+  }
 
-  Future<Map<String, dynamic>> getMyPosts({int page = 1}) async =>
-      await get('/community/my-posts', queryParams: {'page': page.toString()});
+  // ✅ CORRECTION : getMyPosts avec page et limit
+  Future<Map<String, dynamic>> getMyPosts({int page = 1, int limit = 20}) async {
+    return await get('/community/my-posts', queryParams: {
+      'page': page.toString(),
+      'limit': limit.toString(),
+    });
+  }
 
   Future<Map<String, dynamic>> createPost({
     required String content,
@@ -410,10 +410,7 @@ class ApiService {
       await post('/community/posts/$postId/react', {'type': type});
 
   Future<Map<String, dynamic>> searchPosts(String query, {String? postType}) async =>
-      await get('/community/search', queryParams: {
-        'q': query,
-        if (postType != null) 'type': postType,
-      });
+      await get('/community/search', queryParams: {'q': query, if (postType != null) 'type': postType});
 
   Future<Map<String, dynamic>> getGroupChallenges() async =>
       await get('/community/group-challenges');
@@ -421,21 +418,11 @@ class ApiService {
   // ─── Notifications ─────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> getNotifications({int page = 1}) async =>
       await get('/notifications', queryParams: {'page': page.toString()});
-
-  Future<void> markNotificationRead(String id) async =>
-      await patch('/notifications/$id/read', {});
-
-  Future<void> markAllNotificationsRead() async =>
-      await patch('/notifications/read-all', {});
-
-  Future<void> deleteNotification(String id) async =>
-      await delete('/notifications/$id');
-
-  Future<void> clearAllNotifications() async =>
-      await delete('/notifications');
-
-  Future<void> registerFcmToken(String token) async =>
-      await post('/notifications/fcm-token', {'token': token});
+  Future<void> markNotificationRead(String id) async => await patch('/notifications/$id/read', {});
+  Future<void> markAllNotificationsRead() async => await patch('/notifications/read-all', {});
+  Future<void> deleteNotification(String id) async => await delete('/notifications/$id');
+  Future<void> clearAllNotifications() async => await delete('/notifications');
+  Future<void> registerFcmToken(String token) async => await post('/notifications/fcm-token', {'token': token});
 
   // ─── Professionals ─────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> getProfessionals({
@@ -450,9 +437,7 @@ class ApiService {
     return await get('/professionals', queryParams: params);
   }
 
-  Future<Map<String, dynamic>> getProfessional(String id) async =>
-      await get('/professionals/$id');
-
+  Future<Map<String, dynamic>> getProfessional(String id) async => await get('/professionals/$id');
   Future<Map<String, dynamic>> bookProfessional({
     required String professionalId,
     required String message,
@@ -465,10 +450,7 @@ class ApiService {
       if (consultationType != null) 'consultationType': consultationType,
     });
   }
-
-  Future<Map<String, dynamic>> getMyBookings() async =>
-      await get('/professionals/bookings/me');
-
+  Future<Map<String, dynamic>> getMyBookings() async => await get('/professionals/bookings/me');
   Future<Map<String, dynamic>> updateBooking({
     required String bookingId,
     String? consultationType,
@@ -481,19 +463,12 @@ class ApiService {
     if (message != null) data['message'] = message;
     return await put('/professionals/bookings/$bookingId', data);
   }
-
-  Future<void> cancelBooking(String bookingId) async =>
-      await delete('/professionals/bookings/$bookingId');
+  Future<void> cancelBooking(String bookingId) async => await delete('/professionals/bookings/$bookingId');
 
   // ─── User ──────────────────────────────────────────────────────────────────
-  Future<Map<String, dynamic>> getMe() async =>
-      await get('/users/me');
-
-  Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async =>
-      await patch('/users/me', data);
-
-  Future<Map<String, dynamic>> getLeaderboard() async =>
-      await get('/users/leaderboard');
+  Future<Map<String, dynamic>> getMe() async => await get('/users/me');
+  Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async => await patch('/users/me', data);
+  Future<Map<String, dynamic>> getLeaderboard() async => await get('/users/leaderboard');
 
   // ─── Assistant ─────────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> chatWithAssistant({
@@ -505,7 +480,6 @@ class ApiService {
       if (context != null) 'context': context,
     });
   }
-
   Future<void> clearAssistantSession() async {
     try {
       final headers = await _getHeaders();
@@ -517,34 +491,15 @@ class ApiService {
   }
 
   // ─── Content (from DB) ────────────────────────────────────────────────────
-  Future<Map<String, dynamic>> getDailyMessage() async =>
-      await get('/content/daily-message');
-
+  Future<Map<String, dynamic>> getDailyMessage() async => await get('/content/daily-message');
   Future<Map<String, dynamic>> getWellnessTips({String? mood}) async =>
-      await get('/content/wellness-tips',
-          queryParams: mood != null ? {'mood': mood} : null);
-
-  Future<Map<String, dynamic>> getStressFactors() async =>
-      await get('/content/stress-factors');
-
-  Future<Map<String, dynamic>> getBadgesConfig() async =>
-      await get('/content/badges');
-
-  Future<Map<String, dynamic>> getAssistantStarters() async =>
-      await get('/content/assistant-starters');
-
-  Future<Map<String, dynamic>> getMoodDefinitions() async =>
-      await get('/content/moods');
-
-  Future<Map<String, dynamic>> getProfessionalTypes() async =>
-      await get('/content/professional-types');
-
-  Future<Map<String, dynamic>> getChallengeCategories() async =>
-      await get('/content/challenge-categories');
-
-  Future<Map<String, dynamic>> getChallengeDifficulties() async =>
-      await get('/content/challenge-difficulties');
-
-  Future<Map<String, dynamic>> getPostTypes() async =>
-      await get('/content/post-types');
+      await get('/content/wellness-tips', queryParams: mood != null ? {'mood': mood} : null);
+  Future<Map<String, dynamic>> getStressFactors() async => await get('/content/stress-factors');
+  Future<Map<String, dynamic>> getBadgesConfig() async => await get('/content/badges');
+  Future<Map<String, dynamic>> getAssistantStarters() async => await get('/content/assistant-starters');
+  Future<Map<String, dynamic>> getMoodDefinitions() async => await get('/content/moods');
+  Future<Map<String, dynamic>> getProfessionalTypes() async => await get('/content/professional-types');
+  Future<Map<String, dynamic>> getChallengeCategories() async => await get('/content/challenge-categories');
+  Future<Map<String, dynamic>> getChallengeDifficulties() async => await get('/content/challenge-difficulties');
+  Future<Map<String, dynamic>> getPostTypes() async => await get('/content/post-types');
 }

@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../utils/theme.dart';
-import '../../services/api.service.dart';
+import '../../utils/validators.dart';
+import '../../providers/auth_provider.dart';
 
-
-// Normalise un numéro : supprime espaces, tirets, points
-String _normalizePhone(String p) => p.replaceAll(RegExp(r'[\s\-\.]'), '');
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
   @override
@@ -20,12 +18,11 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _confirmPassCtrl = TextEditingController();
 
   int     _step       = 0; // 0=saisie identifiant, 1=saisie OTP, 2=nouveau mdp
-  bool    _loading    = false;
   bool    _obscure1   = true;
   bool    _obscure2   = true;
   String? _error;
-  String? _hint;       // ex: "Code envoyé à ab***@gmail.com"
-  String? _resetToken; // token temporaire après OTP vérifié
+  String? _hint;
+  String? _resetToken;
 
   @override
   void dispose() {
@@ -34,65 +31,64 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     super.dispose();
   }
 
-  // Étape 0 → envoie OTP
   Future<void> _sendOtp() async {
     final identifier = _identifierCtrl.text.trim();
     if (identifier.isEmpty) {
       setState(() => _error = 'Saisis ton email ou ton numéro de téléphone');
       return;
     }
-    setState(() { _loading = true; _error = null; });
+    FocusScope.of(context).unfocus();
+    setState(() => _error = null);
+    
     try {
       final isEmail = identifier.contains('@');
-      final phone = isEmail ? null : _normalizePhone(identifier);
-      final data = await ApiService().post('/auth/forgot-password', {
-        if (isEmail) 'email': identifier,
-        if (!isEmail) 'phone': phone!,
-      });
+      final phone = isEmail ? null : Validators.normalizePhone(identifier);
+      
+      final data = await ref.read(authProvider.notifier).forgotPassword(
+        email: isEmail ? identifier : null,
+        phone: phone,
+      );
+      
       setState(() {
-        _loading = false;
-        _hint    = data['hint'] as String?;
-        _step    = 1;
+        _hint = data['hint'] as String?;
+        _step = 1;
       });
-    } on ApiException catch (e) {
-      setState(() { _loading = false; _error = e.message; });
     } catch (_) {
-      setState(() { _loading = false; _error = 'Une erreur est survenue'; });
+      // L'erreur est déjà gérée et stockée dans l'état du provider
     }
   }
 
-  // Étape 1 → vérifie OTP
   Future<void> _verifyOtp() async {
     final otp = _otpCtrl.text.trim();
     if (otp.length != 6) {
       setState(() => _error = 'Le code fait 6 chiffres');
       return;
     }
-    setState(() { _loading = true; _error = null; });
+    FocusScope.of(context).unfocus();
+    setState(() => _error = null);
+    
     try {
       final identifier = _identifierCtrl.text.trim();
       final isEmail = identifier.contains('@');
-      final data = await ApiService().post('/auth/verify-otp', {
-        if (isEmail) 'email': identifier,
-        if (!isEmail) 'phone': identifier,
-        'code': otp,
-      });
+      final phone = isEmail ? null : Validators.normalizePhone(identifier);
+
+      final token = await ref.read(authProvider.notifier).verifyOtp(
+        email: isEmail ? identifier : null,
+        phone: phone,
+        code: otp,
+      );
+      
       setState(() {
-        _loading    = false;
-        _resetToken = data['resetToken'] as String?;
-        _step       = 2;
+        _resetToken = token;
+        _step = 2;
       });
-    } on ApiException catch (e) {
-      setState(() { _loading = false; _error = e.message; });
-    } catch (_) {
-      setState(() { _loading = false; _error = 'Une erreur est survenue'; });
-    }
+    } catch (_) {}
   }
 
-  // Étape 2 → reset mot de passe
   Future<void> _resetPassword() async {
     final newPass = _newPassCtrl.text;
     final confirm = _confirmPassCtrl.text;
+    
     if (newPass.length < 6) {
       setState(() => _error = 'Le mot de passe doit faire au moins 6 caractères');
       return;
@@ -101,31 +97,36 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       setState(() => _error = 'Les mots de passe ne correspondent pas');
       return;
     }
-    setState(() { _loading = true; _error = null; });
+    FocusScope.of(context).unfocus();
+    setState(() => _error = null);
+    
     try {
       final identifier = _identifierCtrl.text.trim();
       final isEmail = identifier.contains('@');
-      await ApiService().post('/auth/reset-password', {
-        if (isEmail) 'email': identifier,
-        if (!isEmail) 'phone': identifier,
-        'resetToken':  _resetToken,
-        'newPassword': newPass,
-      });
+      final phone = isEmail ? null : Validators.normalizePhone(identifier);
+
+      await ref.read(authProvider.notifier).resetPassword(
+        email: isEmail ? identifier : null,
+        phone: phone,
+        resetToken: _resetToken!,
+        newPassword: newPass,
+      );
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Mot de passe réinitialisé ✅'),
               backgroundColor: AppColors.secondary));
         context.go('/auth/login');
       }
-    } on ApiException catch (e) {
-      setState(() { _loading = false; _error = e.message; });
-    } catch (_) {
-      setState(() { _loading = false; _error = 'Une erreur est survenue'; });
-    }
+    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+    final displayError = _error ?? authState.error; // Priorité à l'erreur locale, puis globale
+    final isLoading = authState.isLoading;
+
     return Scaffold(
       appBar: AppBar(
         leading: BackButton(onPressed: () {
@@ -143,7 +144,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           padding: const EdgeInsets.all(24),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
-            // Indicateur d'étape
             Row(children: List.generate(3, (i) => Expanded(
               child: Container(
                 height: 4,
@@ -155,8 +155,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             ))),
             const SizedBox(height: 28),
 
-            // Erreur
-            if (_error != null) ...[
+            if (displayError != null) ...[
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -166,14 +165,14 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 child: Row(children: [
                   const Icon(Icons.error_outline, color: AppColors.accent, size: 16),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(_error!,
+                  Expanded(child: Text(displayError,
                       style: AppTextStyles.bodySmall.copyWith(color: AppColors.accent))),
                 ]),
               ),
               const SizedBox(height: 16),
             ],
 
-            // ── Étape 0 : Identifiant ──
+            // ── Étape 0 ──
             if (_step == 0) ...[
               Text('Mot de passe oublié ?', style: AppTextStyles.h2),
               const SizedBox(height: 8),
@@ -191,7 +190,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               ),
             ],
 
-            // ── Étape 1 : Code OTP ──
+            // ── Étape 1 (AVEC AUTO-SUBMIT) ──
             if (_step == 1) ...[
               Text('Entre ton code', style: AppTextStyles.h2),
               const SizedBox(height: 8),
@@ -214,6 +213,12 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 keyboardType: TextInputType.number,
                 maxLength: 6,
                 textAlign: TextAlign.center,
+                onChanged: (val) {
+                  // ✅ Auto-submit quand 6 chiffres sont entrés
+                  if (val.length == 6) {
+                    _verifyOtp();
+                  }
+                },
                 style: AppTextStyles.h2.copyWith(letterSpacing: 12),
                 decoration: InputDecoration(
                   hintText: '000000',
@@ -225,7 +230,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               ),
               const SizedBox(height: 12),
               GestureDetector(
-                onTap: _loading ? null : () {
+                onTap: isLoading ? null : () {
                   setState(() { _step = 0; _otpCtrl.clear(); _error = null; });
                 },
                 child: Text("Renvoyer le code",
@@ -237,7 +242,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               ),
             ],
 
-            // ── Étape 2 : Nouveau mot de passe ──
+            // ── Étape 2 ──
             if (_step == 2) ...[
               Text('Nouveau mot de passe', style: AppTextStyles.h2),
               const SizedBox(height: 8),
@@ -276,13 +281,13 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _loading ? null : () {
+                onPressed: isLoading ? null : () {
                   if (_step == 0) _sendOtp();
                   else if (_step == 1) _verifyOtp();
                   else _resetPassword();
                 },
                 style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(54)),
-                child: _loading
+                child: isLoading
                     ? const SizedBox(width: 20, height: 20,
                         child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                     : Text(_step == 0 ? 'Envoyer le code'

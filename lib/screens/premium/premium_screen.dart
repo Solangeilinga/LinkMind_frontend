@@ -285,7 +285,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                   SizedBox(height: 16),
                   _PremiumFeature(emoji: '🧠', title: 'Mindo illimité', description: 'Plus de limite de 10 messages par jour'),
                   _PremiumFeature(emoji: '📊', title: 'Rapports PDF détaillés', description: 'Exporte ton évolution en PDF'),
-                  _PremiumFeature(emoji: '🚫', title: 'Sans publicités', description: 'Navigation sans interruptions'),
+                  _PremiumFeature(emoji: '⭐', title: 'Accès prioritaire aux professionnels', description: 'priorité sur les rendez-vous'),
                   _PremiumFeature(emoji: '🎁', title: 'Contenu exclusif', description: 'Défis et contenus Premium'),
                 ],
               ),

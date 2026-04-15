@@ -64,7 +64,11 @@ class _MoodScreenState extends ConsumerState<MoodScreen> with SingleTickerProvid
   }
 
   @override
-  void dispose() { _fadeController.dispose(); _noteController.dispose(); super.dispose(); }
+  void dispose() { 
+    _fadeController.dispose(); 
+    _noteController.dispose(); 
+    super.dispose(); 
+  }
 
   Future<void> _logMood() async {
     if (_selectedMoodIndex == null) return;
@@ -111,94 +115,106 @@ class _MoodScreenState extends ConsumerState<MoodScreen> with SingleTickerProvid
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnim,
-          child: CustomScrollView(slivers: [
-            SliverToBoxAdapter(child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-              child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('$greeting ${user?.name.split(' ').first ?? ''} 👋',
-                      style: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted)),
-                  Text('Comment te sens-tu ?', style: AppTextStyles.h2),
-                ])),
-                Flexible(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                  _PointsBadge(points: user?.totalPoints ?? 0),
-                  if ((user?.streakDays ?? 0) > 0) ...[
-                    const SizedBox(height: 4),
-                    _StreakBadge(days: user!.streakDays),
-                  ],
-                ])),
-              ]),
-            )),
-
-            SliverToBoxAdapter(child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: _DailyMessageCard(message: _todayMessage),
-            )),
-
-            SliverToBoxAdapter(child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: _MoodCard(
-                moods: moods,
-                selectedIndex: _selectedMoodIndex,
-                moodLogged: _moodLogged,
-                isLogging: _isLogging,
-                todayMood: moodState.todayMood,
-                onMoodSelected: (i) => setState(() { _selectedMoodIndex = i; _moodLogged = false; }),
-                onLog: _logMood,
-              ),
-            )),
-
-            if (_selectedMoodIndex != null && !_moodLogged) ...[
-              SliverToBoxAdapter(child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                child: _StressLevelSlider(
-                  value: _stressLevel,
-                  onChanged: (v) => setState(() => _stressLevel = v)),
-              )),
-              if (stressFactors.isNotEmpty)
+          // ✅ AJOUT DU REFRESH INDICATOR ICI
+          child: RefreshIndicator(
+            color: AppColors.primary,
+            onRefresh: () async {
+              ref.read(moodProvider.notifier).reset();
+              await _loadContent();
+            },
+            child: CustomScrollView(
+              // ✅ OBLIGATOIRE POUR QUE LE REFRESH FONCTIONNE TOUT LE TEMPS
+              physics: const AlwaysScrollableScrollPhysics(), 
+              slivers: [
                 SliverToBoxAdapter(child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                  child: _FactorSelector(
-                    factors: stressFactors,
-                    selected: _selectedFactors,
-                    onToggle: (f) => setState(() =>
-                      _selectedFactors.contains(f) ? _selectedFactors.remove(f) : _selectedFactors.add(f)),
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('$greeting ${user?.name.split(' ').first ?? ''} 👋',
+                          style: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted)),
+                      Text('Comment te sens-tu ?', style: AppTextStyles.h2),
+                    ])),
+                    Flexible(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                      _PointsBadge(points: user?.totalPoints ?? 0),
+                      if ((user?.streakDays ?? 0) > 0) ...[
+                        const SizedBox(height: 4),
+                        _StreakBadge(days: user!.streakDays),
+                      ],
+                    ])),
+                  ]),
+                )),
+
+                SliverToBoxAdapter(child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                  child: _DailyMessageCard(message: _todayMessage),
+                )),
+
+                SliverToBoxAdapter(child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                  child: _MoodCard(
+                    moods: moods,
+                    selectedIndex: _selectedMoodIndex,
+                    moodLogged: _moodLogged,
+                    isLogging: _isLogging,
+                    todayMood: moodState.todayMood,
+                    onMoodSelected: (i) => setState(() { _selectedMoodIndex = i; _moodLogged = false; }),
+                    onLog: _logMood,
                   ),
                 )),
-              SliverToBoxAdapter(child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-                child: TextField(
-                  controller: _noteController, maxLines: 2, maxLength: 280,
-                  decoration: const InputDecoration(
-                    hintText: 'Ajoute une note libre... (optionnel)',
-                    counterStyle: TextStyle(fontSize: 11)),
-                  onChanged: (v) => _note = v.isEmpty ? null : v,
-                  style: AppTextStyles.body,
-                ),
-              )),
-            ],
 
-            SliverToBoxAdapter(child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-              child: _WeeklyMoodChart(history: moodState.history, stats: moodState.stats),
-            )),
+                if (_selectedMoodIndex != null && !_moodLogged) ...[
+                  SliverToBoxAdapter(child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                    child: _StressLevelSlider(
+                      value: _stressLevel,
+                      onChanged: (v) => setState(() => _stressLevel = v)),
+                  )),
+                  if (stressFactors.isNotEmpty)
+                    SliverToBoxAdapter(child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                      child: _FactorSelector(
+                        factors: stressFactors,
+                        selected: _selectedFactors,
+                        onToggle: (f) => setState(() =>
+                          _selectedFactors.contains(f) ? _selectedFactors.remove(f) : _selectedFactors.add(f)),
+                      ),
+                    )),
+                  SliverToBoxAdapter(child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+                    child: TextField(
+                      controller: _noteController, maxLines: 2, maxLength: 280,
+                      decoration: const InputDecoration(
+                        hintText: 'Ajoute une note libre... (optionnel)',
+                        counterStyle: TextStyle(fontSize: 11)),
+                      onChanged: (v) => _note = v.isEmpty ? null : v,
+                      style: AppTextStyles.body,
+                    ),
+                  )),
+                ],
 
-            SliverToBoxAdapter(child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-              child: _WellnessTipsSection(
-                tips: _selectedMoodIndex != null && !_moodLogged
-                    ? _currentTips
-                    : (_wellnessTips[moodState.todayMood?['label']] ?? _wellnessTips['neutral'] ?? []),
-                moodId: _selectedMoodIndex != null
-                    ? moods[_selectedMoodIndex!].id
-                    : (moodState.todayMood?['label'] ?? 'neutral'),
-                moodColor: _selectedMoodIndex != null ? moods[_selectedMoodIndex!].color : AppColors.primary,
-              ),
-            )),
+                SliverToBoxAdapter(child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                  child: _WeeklyMoodChart(history: moodState.history, stats: moodState.stats),
+                )),
 
-            const SliverToBoxAdapter(child: AdBanner(placement: 'mood_screen')),
-            const SliverToBoxAdapter(child: SizedBox(height: 100)),
-          ]),
+                SliverToBoxAdapter(child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                  child: _WellnessTipsSection(
+                    tips: _selectedMoodIndex != null && !_moodLogged
+                        ? _currentTips
+                        : (_wellnessTips[moodState.todayMood?['label']] ?? _wellnessTips['neutral'] ?? []),
+                    moodId: _selectedMoodIndex != null
+                        ? moods[_selectedMoodIndex!].id
+                        : (moodState.todayMood?['label'] ?? 'neutral'),
+                    moodColor: _selectedMoodIndex != null ? moods[_selectedMoodIndex!].color : AppColors.primary,
+                  ),
+                )),
+
+                const SliverToBoxAdapter(child: AdBanner(placement: 'mood_screen')),
+                const SliverToBoxAdapter(child: SizedBox(height: 100)),
+              ]
+            ),
+          ),
         ),
       ),
     );
@@ -457,89 +473,70 @@ class _WeeklyMoodChart extends StatelessWidget {
 
     String scoreEmoji(double s) {
       if (s == 0) return '';
-      if (s <= 1) return '😔'; if (s <= 2) return '😕';
-      if (s <= 3) return '😐'; if (s <= 4) return '😊'; return '😄';
+      if (s <= 1.5) return '😔'; 
+      if (s <= 2.5) return '😕';
+      if (s <= 3.5) return '😐'; 
+      if (s <= 4.5) return '😊'; 
+      return '😄';
     }
+
     Color scoreColor(double s) {
-      if (s == 0) return AppColors.divider;
-      if (s <= 2) return const Color(0xFFFF7675);
-      if (s <= 3) return const Color(0xFFFFD93D);
-      return AppColors.secondary;
+      if (s == 0) return AppColors.surfaceVariant;
+      if (s <= 1.5) return const Color(0xFFFF7675); // Sad
+      if (s <= 2.5) return const Color(0xFFFFB347); // Anxious/Tired
+      if (s <= 3.5) return const Color(0xFFFFD93D); // Neutral
+      if (s <= 4.5) return const Color(0xFF6BCF7F); // Good
+      return const Color(0xFF2ECC71); // Great
     }
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.surface, borderRadius: AppRadius.lg,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 15)]),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('Mon évolution', style: AppTextStyles.h4),
-          if (stats?['trend'] != null) _TrendBadge(trend: stats!['trend']),
-        ]),
-        if (stats?['avgScore'] != null) ...[
-          const SizedBox(height: 3),
-          Text('Moyenne : ${stats!['avgScore']}/5 cette semaine',
-              style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
-        ],
-        const SizedBox(height: 14),
-        SizedBox(
-          height: barAreaHeight,
-          child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: days7.map((d) {
-            final barH = d.score > 0 ? (d.score / 5) * maxBarHeight : 4.0;
-            final color = scoreColor(d.score);
-            return Expanded(child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3),
-              child: Column(mainAxisAlignment: MainAxisAlignment.end, mainAxisSize: MainAxisSize.min, children: [
-                SizedBox(height: 16, child: d.score > 0
-                    ? Text(scoreEmoji(d.score), style: const TextStyle(fontSize: 12), textAlign: TextAlign.center)
-                    : const SizedBox.shrink()),
-                const SizedBox(height: 2),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 500), curve: Curves.easeOutCubic,
-                  height: barH,
-                  decoration: BoxDecoration(
-                    color: d.score == 0 ? AppColors.divider
-                        : d.isToday ? color : color.withValues(alpha: 0.45),
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-                    border: d.isToday && d.score > 0
-                        ? Border.all(color: color, width: 1.5) : null)),
-                const SizedBox(height: 4),
-                Text(d.isToday ? '•' : d.label, style: AppTextStyles.caption.copyWith(
-                  fontSize: d.isToday ? 14 : 10,
-                  color: d.isToday ? AppColors.primary : AppColors.onSurfaceMuted,
-                  fontWeight: d.isToday ? FontWeight.w900 : FontWeight.w500, height: 1)),
-              ]),
-            ));
-          }).toList()),
-        ),
-        if (history.isEmpty) ...[
-          const SizedBox(height: 8),
-          Center(child: Text('Enregistre ton humeur chaque jour pour voir ton évolution !',
-              style: AppTextStyles.caption.copyWith(
-                  color: AppColors.onSurfaceMuted, fontStyle: FontStyle.italic),
-              textAlign: TextAlign.center)),
-        ],
-      ]),
+        color: AppColors.surface, 
+        borderRadius: AppRadius.lg,
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)]
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Ton évolution', style: AppTextStyles.h4),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: barAreaHeight,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: days7.map((d) {
+                final s = d.score;
+                final height = s == 0 ? 8.0 : (s / 5.0) * maxBarHeight;
+                return Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (s > 0) Text(scoreEmoji(s), style: const TextStyle(fontSize: 14)),
+                    const SizedBox(height: 4),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 500),
+                      curve: Curves.easeOut,
+                      width: 24, 
+                      height: height,
+                      decoration: BoxDecoration(
+                        color: scoreColor(s),
+                        borderRadius: BorderRadius.circular(6)
+                      )
+                    ),
+                    const SizedBox(height: 8),
+                    Text(d.label, style: AppTextStyles.caption.copyWith(
+                      color: d.isToday ? AppColors.primary : AppColors.onSurfaceMuted,
+                      fontWeight: d.isToday ? FontWeight.w800 : FontWeight.w600
+                    ))
+                  ]
+                );
+              }).toList(),
+            )
+          )
+        ]
+      )
     );
-  }
-}
-
-class _TrendBadge extends StatelessWidget {
-  final String trend;
-  const _TrendBadge({required this.trend});
-  @override
-  Widget build(BuildContext context) {
-    final (label, color) = switch (trend) {
-      'improving' => ('📈 En progrès', AppColors.secondary),
-      'declining' => ('📉 Attention',  AppColors.accent),
-      _           => ('➡️ Stable',     AppColors.accentOrange),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12), borderRadius: AppRadius.full),
-      child: Text(label, style: AppTextStyles.caption.copyWith(color: color, fontWeight: FontWeight.w800)));
   }
 }
 
@@ -548,165 +545,124 @@ class _WellnessTipsSection extends StatelessWidget {
   final List<_WellnessTip> tips;
   final String moodId;
   final Color moodColor;
-  const _WellnessTipsSection({required this.tips, required this.moodId, required this.moodColor});
+  
+  const _WellnessTipsSection({
+    required this.tips, 
+    required this.moodId, 
+    required this.moodColor
+  });
 
   @override
-  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Text('💡 Conseils pour toi', style: AppTextStyles.h3),
-    const SizedBox(height: 4),
-    Text(_getTipSubtitle(moodId),
-        style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
-    const SizedBox(height: 12),
-    ...tips.map((tip) => Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: GestureDetector(
-        onTap: tip.route != null ? () => context.push(tip.route!) : null,
-        child: Container(
+  Widget build(BuildContext context) {
+    if (tips.isEmpty) return const SizedBox.shrink();
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Recommandé pour toi', style: AppTextStyles.h4),
+        const SizedBox(height: 12),
+        ...tips.map((t) => Container(
+          margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppColors.surface, borderRadius: AppRadius.md,
-            border: Border.all(color: AppColors.divider),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)]),
-          child: Row(children: [
-            Container(
-              width: 44, height: 44,
-              decoration: BoxDecoration(
-                  color: moodColor.withValues(alpha: 0.12), borderRadius: AppRadius.md),
-              child: Center(child: Text(tip.icon, style: const TextStyle(fontSize: 22)))),
-            const SizedBox(width: 14),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(tip.title, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w800)),
-              Text(tip.desc, style: AppTextStyles.bodySmall.copyWith(color: AppColors.onSurfaceMuted)),
-            ])),
-            if (tip.route != null) Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.onSurfaceMuted),
-          ]),
-        ),
-      ),
-    )),
-  ]);
-
-  String _getTipSubtitle(String moodId) => switch (moodId) {
-    'stressed' => 'Des actions concrètes pour réduire le stress maintenant',
-    'anxious'  => "Techniques éprouvées pour calmer l'anxiété",
-    'tired'    => 'Recharge ton énergie avec ces conseils',
-    'sad'      => "Tu n'es pas seul(e) — voici comment aller de l'avant",
-    'neutral'  => 'Quelques idées pour améliorer ta journée',
-    'good' || 'great' => 'Profite de cette énergie positive !',
-    _          => 'Adapté à ton état du moment',
-  };
+            color: moodColor.withValues(alpha: 0.08),
+            borderRadius: AppRadius.md,
+            border: Border.all(color: moodColor.withValues(alpha: 0.2))
+          ),
+          child: Row(
+            children: [
+              Text(t.icon, style: const TextStyle(fontSize: 24)),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(t.title, style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Text(t.desc, style: AppTextStyles.caption.copyWith(
+                      color: AppColors.onSurfaceMuted, height: 1.3))
+                  ]
+                )
+              ),
+              if (t.route != null) ...[
+                const SizedBox(width: 8),
+                Icon(Icons.chevron_right, color: moodColor, size: 20)
+              ]
+            ]
+          )
+        )).toList()
+      ]
+    );
+  }
 }
 
-// ─── Wellness Sheet ───────────────────────────────────────────────────────────
+// ─── Wellness Sheet (Bottom Sheet) ────────────────────────────────────────────
 class _WellnessSheet extends StatelessWidget {
   final String moodId;
   final List<_WellnessTip> tips;
+  
   const _WellnessSheet({required this.moodId, required this.tips});
 
   @override
   Widget build(BuildContext context) {
-    final isLowMood = ['stressed', 'anxious', 'sad', 'tired'].contains(moodId);
-    final moodEmoji = switch (moodId) {
-      'great' => '😄', 'good' => '🙂', 'neutral' => '😐',
-      'tired' => '😔', 'stressed' => '😰', 'anxious' => '😟', 'sad' => '😢', _ => '😐',
-    };
-
-    return DraggableScrollableSheet(
-      initialChildSize: 0.75, maxChildSize: 0.95, minChildSize: 0.5,
-      builder: (_, ctrl) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-        child: ListView(controller: ctrl, padding: const EdgeInsets.fromLTRB(24, 12, 24, 40), children: [
-          Center(child: Container(width: 40, height: 4,
-              decoration: BoxDecoration(color: AppColors.divider, borderRadius: AppRadius.full))),
-          const SizedBox(height: 20),
-          Text(moodEmoji, style: const TextStyle(fontSize: 52), textAlign: TextAlign.center),
-          const SizedBox(height: 10),
-          Text(_getSheetTitle(moodId), style: AppTextStyles.h2, textAlign: TextAlign.center),
-          const SizedBox(height: 8),
-          Text(_getSheetMessage(moodId),
-              style: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted, height: 1.5),
-              textAlign: TextAlign.center),
-          const SizedBox(height: 20),
-          Center(child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            decoration: BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.full),
-            child: Text('⚡ +10 points gagnés',
-                style: AppTextStyles.body.copyWith(color: Colors.white, fontWeight: FontWeight.w800)))),
-          const SizedBox(height: 24),
-          Text('Ce que je te recommande', style: AppTextStyles.h3),
-          const SizedBox(height: 12),
-          ...tips.take(3).map((tip) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: GestureDetector(
-              onTap: () { Navigator.pop(context); if (tip.route != null) context.push(tip.route!); },
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: AppRadius.md),
-                child: Row(children: [
-                  Text(tip.icon, style: const TextStyle(fontSize: 26)),
-                  const SizedBox(width: 14),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(tip.title, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w800)),
-                    Text(tip.desc, style: AppTextStyles.bodySmall.copyWith(color: AppColors.onSurfaceMuted)),
-                  ])),
-                  if (tip.route != null) const Icon(Icons.arrow_forward_ios, size: 14, color: AppColors.onSurfaceMuted),
-                ]),
-              ),
-            ),
-          )),
-          if (isLowMood) ...[
-            const SizedBox(height: 16),
-            GestureDetector(
-              onTap: () { Navigator.pop(context); context.push('/community'); },
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.md),
-                child: Row(children: [
-                  const Text('🤝', style: TextStyle(fontSize: 28)),
-                  const SizedBox(width: 14),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text("Tu n'es pas seul(e)", style: AppTextStyles.body.copyWith(
-                        color: Colors.white, fontWeight: FontWeight.w800)),
-                    Text("Des centaines de jeunes partagent anonymement",
-                        style: AppTextStyles.bodySmall.copyWith(color: Colors.white70)),
-                  ])),
-                  const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.white70),
-                ]),
-              ),
-            ),
-          ],
-          const SizedBox(height: 20),
-          ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text("Merci, je m'en occupe")),
-        ]),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28))
       ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.divider, 
+                  borderRadius: AppRadius.full
+                )
+              )
+            ),
+            const SizedBox(height: 20),
+            Text('Prends un moment pour toi', style: AppTextStyles.h3),
+            const SizedBox(height: 16),
+            ...tips.map((t) => ListTile(
+              leading: Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceVariant,
+                  borderRadius: BorderRadius.circular(10)
+                ),
+                child: Center(child: Text(t.icon, style: const TextStyle(fontSize: 20)))
+              ),
+              title: Text(t.title, style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w800)),
+              subtitle: Text(t.desc, style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
+              contentPadding: const EdgeInsets.symmetric(vertical: 6),
+              trailing: t.route != null ? const Icon(Icons.chevron_right, size: 20) : null,
+              onTap: () {
+                Navigator.pop(context);
+                if (t.route != null) context.push(t.route!);
+              }
+            )),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+                child: const Text('Compris')
+              )
+            )
+          ]
+        )
+      )
     );
   }
-
-  String _getSheetTitle(String id) => switch (id) {
-    'stressed' => "Je comprends, c'est stressant",
-    'anxious'  => "L'anxiété, ça se gère",
-    'tired'    => 'Tu as besoin de te reposer',
-    'sad'      => "C'est okay de ne pas aller bien",
-    'neutral'  => 'Humeur enregistrée !',
-    'good'     => 'Bonne journée en vue !',
-    'great'    => 'Tu es au top aujourd\'hui !',
-    _          => 'Humeur enregistrée !',
-  };
-
-  String _getSheetMessage(String id) => switch (id) {
-    'stressed' => "Le stress académique est très courant. Tu as fait le premier pas en l'identifiant.",
-    'anxious'  => "L'anxiété peut être difficile seul(e). Ces techniques simples peuvent vraiment aider.",
-    'tired'    => "La fatigue impacte la concentration et le moral. Prends soin de toi d'abord.",
-    'sad'      => "Tes émotions sont valides. Les identifier est déjà un acte courageux.",
-    'neutral'  => 'Une bonne journée se construit avec de petites habitudes positives.',
-    'good'     => "Profite de cette énergie et partage-la autour de toi !",
-    'great'    => "Cette énergie positive est précieuse. Utilise-la bien !",
-    _          => 'Chaque jour compte dans ton parcours bien-être.',
-  };
 }
 
-// ─── Shared badges ────────────────────────────────────────────────────────────
+// ─── Badges ───────────────────────────────────────────────────────────────────
 class _PointsBadge extends StatelessWidget {
   final int points;
   const _PointsBadge({required this.points});

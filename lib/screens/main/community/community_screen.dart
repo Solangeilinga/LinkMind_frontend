@@ -44,28 +44,28 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   }
 
   Future<void> _loadFeed() async {
+    if (!mounted) return;
     setState(() => _isLoadingAll = true);
     try {
-      final data = await ApiService().getFeed();
+      final data = await ApiService().getFeed(page: 1);
       if (mounted) {
         setState(() {
           _allPosts = List<Map<String, dynamic>>.from(data['posts'] ?? []);
           _isLoadingAll = false;
         });
-        
-        // 🔒 Enregistrer l'activité de chargement du feed
         SecurityService.recordActivity(type: 'view_feed');
       }
     } catch (e) {
-      debugPrint('❌ Erreur lors du chargement du feed: $e');  // ✅ debugPrint
+      debugPrint('❌ Erreur chargement feed: $e');
       if (mounted) setState(() => _isLoadingAll = false);
     }
   }
 
   Future<void> _loadMyPosts() async {
+    if (!mounted) return;
     setState(() => _isLoadingMine = true);
     try {
-      final data = await ApiService().getMyPosts();
+      final data = await ApiService().getMyPosts(page: 1);
       if (mounted) {
         setState(() {
           _myPosts = List<Map<String, dynamic>>.from(data['posts'] ?? []);
@@ -73,19 +73,16 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
         });
       }
     } catch (e) {
-      debugPrint('❌ Erreur lors du chargement de mes posts: $e');  // ✅ debugPrint
+      debugPrint('❌ Erreur chargement mes posts: $e');
       if (mounted) setState(() => _isLoadingMine = false);
     }
   }
 
-  Future<void> _refreshAllData() async {
-    await Future.wait([
-      _loadFeed(),
-      _loadMyPosts(),
-    ]);
+  Future<void> _refreshAll() async {
+    await Future.wait([_loadFeed(), _loadMyPosts()]);
   }
 
-  Future<void> _togglePostLike(String postId) async {
+  Future<void> _toggleLike(String postId) async {
     void optimistic(List<Map<String, dynamic>> list) {
       final idx = list.indexWhere((p) => (p['_id'] ?? p['id'])?.toString() == postId);
       if (idx == -1) return;
@@ -93,60 +90,61 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
       list[idx] = {
         ...list[idx],
         'isLiked': !liked,
-        'likesCount': ((list[idx]['likesCount'] ?? 0) as int) + (liked ? -1 : 1)
+        'likesCount': ((list[idx]['likesCount'] ?? 0) as int) + (liked ? -1 : 1),
       };
     }
 
-    setState(() {
-      optimistic(_allPosts);
-      optimistic(_myPosts);
-    });
-
-    // 🔒 Enregistrer l'activité de like
-    SecurityService.recordActivity(type: 'like', metadata: {'postId': postId});
-
-    try {
-      final r = await ApiService().toggleLike(postId);
-      setState(() {
-        for (final list in [_allPosts, _myPosts]) {
-          final idx = list.indexWhere((p) => (p['_id'] ?? p['id'])?.toString() == postId);
-          if (idx != -1) {
-            list[idx] = {...list[idx], 'isLiked': r['liked'], 'likesCount': r['likesCount']};
-          }
-        }
-      });
-    } catch (_) {
+    if (mounted) {
       setState(() {
         optimistic(_allPosts);
         optimistic(_myPosts);
       });
     }
+
+    SecurityService.recordActivity(type: 'like', metadata: {'postId': postId});
+
+    try {
+      final r = await ApiService().toggleLike(postId);
+      if (mounted) {
+        setState(() {
+          for (final list in [_allPosts, _myPosts]) {
+            final idx = list.indexWhere((p) => (p['_id'] ?? p['id'])?.toString() == postId);
+            if (idx != -1) {
+              list[idx] = {...list[idx], 'isLiked': r['liked'], 'likesCount': r['likesCount']};
+            }
+          }
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          optimistic(_allPosts);
+          optimistic(_myPosts);
+        });
+      }
+    }
   }
 
   Future<void> _deletePost(String postId) async {
-    setState(() {
-      _allPosts.removeWhere((post) => (post['_id'] ?? post['id']).toString() == postId);
-      _myPosts.removeWhere((post) => (post['_id'] ?? post['id']).toString() == postId);
-    });
+    if (mounted) {
+      setState(() {
+        _allPosts.removeWhere((p) => (p['_id'] ?? p['id']).toString() == postId);
+        _myPosts.removeWhere((p) => (p['_id'] ?? p['id']).toString() == postId);
+      });
+    }
 
     try {
       await ApiService().deletePost(postId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Post supprimé avec succès'),
-            backgroundColor: AppColors.secondary,
-          ),
+          const SnackBar(content: Text('Post supprimé'), backgroundColor: AppColors.secondary),
         );
       }
     } catch (e) {
       if (mounted) {
-        await _refreshAllData();
+        await _refreshAll();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Erreur lors de la suppression'),
-            backgroundColor: AppColors.accent,
-          ),
+          const SnackBar(content: Text('Erreur suppression'), backgroundColor: AppColors.accent),
         );
       }
     }
@@ -154,27 +152,35 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
 
   void _openComposePage() {
     SecurityService.recordActivity(type: 'open_compose');
-    
+
     Navigator.of(context).push(
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => ComposePage(
           onSubmit: (content, type, moodEmoji) async {
-            await ApiService().createPost(
-              content: content,
-              postType: type,
-              isAnonymous: true,
-              moodEmoji: moodEmoji,
-            );
+            try {
+              await ApiService().createPost(
+                content: content,
+                postType: type,
+                isAnonymous: true,
+                moodEmoji: moodEmoji,
+              );
+              if (mounted) {
+                await _loadFeed();
+                await _loadMyPosts();
+              }
+            } catch (e) {
+              debugPrint('Erreur publication: $e');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Erreur: $e'), backgroundColor: AppColors.accent),
+                );
+              }
+            }
           },
         ),
       ),
-    ).then((_) {
-      if (mounted) {
-        _loadFeed();
-        _loadMyPosts();
-      }
-    });
+    );
   }
 
   List<Map<String, dynamic>> _filtered(List<Map<String, dynamic>> posts) {
@@ -200,11 +206,8 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('Communauté 🌍', style: AppTextStyles.h2),
-                          Text(
-                            'Espace sécurisé · Tout est anonyme',
-                            style: AppTextStyles.caption.copyWith(
-                                color: AppColors.onSurfaceMuted),
-                          ),
+                          Text('Espace sécurisé · Tout est anonyme',
+                              style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
                         ],
                       ),
                       ActivityRecorder(
@@ -224,22 +227,16 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                   const SizedBox(height: 14),
                   Container(
                     height: 38,
-                    decoration: BoxDecoration(
-                        color: AppColors.surfaceVariant, borderRadius: AppRadius.full),
+                    decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: AppRadius.full),
                     child: TabBar(
                       controller: _tabController,
-                      indicator: BoxDecoration(
-                          color: AppColors.primary, borderRadius: AppRadius.full),
+                      indicator: BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.full),
                       indicatorSize: TabBarIndicatorSize.tab,
                       labelColor: Colors.white,
                       unselectedLabelColor: AppColors.onSurfaceMuted,
-                      labelStyle:
-                          AppTextStyles.caption.copyWith(fontWeight: FontWeight.w800),
+                      labelStyle: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w800),
                       dividerColor: Colors.transparent,
-                      tabs: const [
-                        Tab(text: 'Communauté'),
-                        Tab(text: 'Mes posts'),
-                      ],
+                      tabs: const [Tab(text: 'Communauté'), Tab(text: 'Mes posts')],
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -252,7 +249,10 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                           emoji: '🌐',
                           isSelected: _activeFilter == null,
                           color: AppColors.primary,
-                          onTap: () => setState(() => _activeFilter = null),
+                          onTap: () {
+                            setState(() => _activeFilter = null);
+                            _loadFeed();
+                          },
                         ),
                         const SizedBox(width: 8),
                         ...postTypeConfig.entries.map(
@@ -263,8 +263,10 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                               emoji: e.value.emoji,
                               isSelected: _activeFilter == e.key,
                               color: e.value.color,
-                              onTap: () => setState(() => _activeFilter =
-                                  _activeFilter == e.key ? null : e.key),
+                              onTap: () {
+                                setState(() => _activeFilter = _activeFilter == e.key ? null : e.key);
+                                _loadFeed();
+                              },
                             ),
                           ),
                         ),
@@ -283,7 +285,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                     posts: _filtered(_allPosts),
                     isLoading: _isLoadingAll,
                     onRefresh: _loadFeed,
-                    onLike: _togglePostLike,
+                    onLike: _toggleLike,
                     onDelete: _deletePost,
                     onCompose: _openComposePage,
                     emptyMessage: _activeFilter != null
@@ -294,7 +296,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                     posts: _filtered(_myPosts),
                     isLoading: _isLoadingMine,
                     onRefresh: _loadMyPosts,
-                    onLike: _togglePostLike,
+                    onLike: _toggleLike,
                     onDelete: _deletePost,
                     onCompose: _openComposePage,
                     emptyMessage: 'Tu n\'as encore rien partagé',

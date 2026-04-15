@@ -193,11 +193,30 @@ class LocalNotificationService {
   static Future<void> cancelAll() async => await _plugin.cancelAll();
   static Future<void> cancel(int id) async => await _plugin.cancel(id);
 
-  // ─── Demander la permission (Android 13+) ─────────────────────────────────
+ // ─── Demander la permission (Android 13+ et iOS) ─────────────────────────────────
   static Future<bool> requestPermission() async {
+    bool granted = false;
+    
+    // Pour Android
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
-    final granted = await android?.requestNotificationsPermission();
-    return granted ?? true;
+    if (android != null) {
+      final result = await android.requestNotificationsPermission();
+      granted = result ?? false;
+    }
+    
+    // Pour iOS
+    final ios = _plugin.resolvePlatformSpecificImplementation<
+        IOSFlutterLocalNotificationsPlugin>();
+    if (ios != null) {
+      final result = await ios.requestPermissions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      granted = result ?? false;
+    }
+    
+    return granted;
   }
 }

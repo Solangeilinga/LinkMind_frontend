@@ -3,11 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../utils/theme.dart';
-import '../../providers/auth_provider.dart';
 import '../../providers/content_provider.dart';
 import '../../models/challenge.dart';
 import '../../services/api.service.dart';
-import 'package:flutter/foundation.dart';
 
 class ChallengeDetailScreen extends ConsumerStatefulWidget {
   final String challengeId;
@@ -155,33 +153,47 @@ class _ChallengeDetailScreenState extends ConsumerState<ChallengeDetailScreen>
   }
 
   Future<void> _completeChallenge({String? reflection}) async {
-    if (_isCompleted || _isCompleting) return;
-    _stepTimer?.cancel();
-    setState(() => _isCompleting = true);
-    
-    try {
-      final apiService = ApiService();
-      final result = await apiService.completeChallenge(
-        widget.challengeId,
-        reflection: reflection,
-      );
-      if (result != null && mounted) {
-        setState(() { _isCompleted = true; _isCompleting = false; });
-        _checkController.forward();
-        await Future.delayed(const Duration(milliseconds: 600));
-        if (mounted) _showSuccessSheet(result);
-      } else {
-        setState(() => _isCompleting = false);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Erreur. Réessaie.'), backgroundColor: AppColors.accent),
-          );
-        }
-      }
-    } catch (e) {
-      setState(() => _isCompleting = false);
-    }
-  }
+  if (_isCompleted || _isCompleting) return;
+
+  _stepTimer?.cancel();
+  setState(() => _isCompleting = true);
+
+  try {
+  final apiService = ApiService();
+  final result = await apiService.completeChallenge(
+    widget.challengeId,
+    reflection: reflection,
+  );
+
+  if (!mounted) return;
+
+  setState(() {
+    _isCompleted = true;
+    _isCompleting = false;
+  });
+
+  _checkController.forward();
+
+  await Future.delayed(const Duration(milliseconds: 600));
+
+  if (!mounted) return;
+  _showSuccessSheet(result);
+
+} catch (e) {
+  if (!mounted) return;
+
+  setState(() => _isCompleting = false);
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Une erreur est survenue'),
+      backgroundColor: AppColors.accent,
+    ),
+  );
+}
+}
+
+ 
 
   void _showSuccessSheet(Map<String, dynamic> result) {
     showModalBottomSheet(
@@ -383,26 +395,26 @@ class _ChallengeDetailScreenState extends ConsumerState<ChallengeDetailScreen>
         )),
         const SizedBox(height: 16),
         TextField(
-          controller: _reflectionController,
-          maxLines: 6,
-          minLines: 4,
-          decoration: InputDecoration(
-            hintText: challenge.completionType.config['inputPlaceholder'] ?? 
-                'Écris ta réflexion ici...',
-            border: OutlineInputBorder(
-              borderRadius: AppRadius.md,
-              borderSide: const BorderSide(color: AppColors.divider),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: AppRadius.md,
-              borderSide: const BorderSide(color: AppColors.divider),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: AppRadius.md,
-              borderSide: const BorderSide(color: AppColors.primary),
-            ),
-          ),
-        ),
+  controller: _reflectionController,
+  maxLines: 6,
+  minLines: 4,
+  decoration: InputDecoration(
+    hintText: challenge.completionType.config['inputPlaceholder'] ?? 
+        'Écris ta réflexion ici...',
+    border: const OutlineInputBorder(
+      borderRadius: AppRadius.md,
+      borderSide: BorderSide(color: AppColors.divider),
+    ),
+    enabledBorder: const OutlineInputBorder(
+      borderRadius: AppRadius.md,
+      borderSide: BorderSide(color: AppColors.divider),
+    ),
+    focusedBorder: const OutlineInputBorder(
+      borderRadius: AppRadius.md,
+      borderSide: BorderSide(color: AppColors.primary),
+    ),
+  ),
+)
       ],
     );
   }

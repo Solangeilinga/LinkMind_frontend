@@ -221,13 +221,28 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (_step == 0) {
       if (_firstNameCtrl.text.trim().isEmpty) return 'Le prénom est obligatoire';
       if (_lastNameCtrl.text.trim().isEmpty)  return 'Le nom est obligatoire';
-      if (_emailCtrl.text.trim().isEmpty && _phoneCtrl.text.trim().isEmpty)
+      
+      final emailTxt = _emailCtrl.text.trim();
+      final phoneTxt = _phoneCtrl.text.trim();
+      
+      if (emailTxt.isEmpty && phoneTxt.isEmpty) {
         return 'Un email ou un numéro de téléphone est requis';
-      if (_emailError != null) return _emailError;
-      if (_phoneError != null) return _phoneError;
+      }
+      
+      // ✅ Validation en temps réel du texte des contrôleurs
+      if (emailTxt.isNotEmpty && !Validators.isValidEmail(emailTxt)) {
+        return "Format d'email invalide";
+      }
+      if (phoneTxt.isNotEmpty && !Validators.isValidPhone(Validators.normalizePhone(phoneTxt))) {
+        return "Format de téléphone invalide. Ex: +22661645069";
+      }
     }
     if (_step == 1) {
-      if (_ageError != null) return _ageError;
+      final ageTxt = _ageCtrl.text.trim();
+      // ✅ Validation en temps réel de l'âge
+      if (ageTxt.isNotEmpty && !Validators.isValidAge(ageTxt)) {
+        return "L'âge doit être entre 15 et 120 ans";
+      }
     }
     if (_step == 2) {
       if (!Validators.isValidPassword(_passCtrl.text)) return 'Le mot de passe doit faire au moins 6 caractères';

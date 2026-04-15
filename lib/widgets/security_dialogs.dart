@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../utils/theme.dart';
+import 'package:go_router/go_router.dart';
+
 
 class SecurityDialogs {
   static void showAccountLockedDialog(
@@ -85,9 +87,10 @@ class SecurityDialogs {
         actions: [
           TextButton(
             onPressed: () {
+              // 1. Fermer le dialogue d'abord
               Navigator.pop(context);
-              // Rediriger vers login
-              Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+              // ✅ CORRECTION : Utiliser GoRouter au lieu de pushNamedAndRemoveUntil
+              context.go('/auth/login');
             },
             child: const Text('Se reconnecter'),
           ),

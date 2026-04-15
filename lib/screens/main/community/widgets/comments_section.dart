@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../../../utils/theme.dart';
 import '../../../../services/api.service.dart';
 import 'comment_item.dart';
-import '../utils/helpers.dart';
 
 class CommentsSection extends StatefulWidget {
   final String postId;
