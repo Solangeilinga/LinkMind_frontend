@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:open_file/open_file.dart'; // ✅ Import correct ici
 import '../../utils/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api.service.dart';
@@ -50,21 +52,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       await dio.download(
         '$baseUrl/users/me/report',
         path,
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          responseType: ResponseType.bytes,
+        ),
       );
+
+      final file = File(path);
+      if (!await file.exists() || await file.length() == 0) {
+        throw Exception('Fichier PDF invalide ou vide');
+      }
 
       if (mounted) {
         setState(() {
           _exportingReport = false;
           _reportPath = path;
         });
-        
         _showSuccessDialog(path);
       }
     } catch (e) {
+      debugPrint('❌ Erreur export: $e');
       if (mounted) {
         setState(() => _exportingReport = false);
-        _showErrorSnackBar('Erreur lors de la génération du rapport');
+        _showErrorSnackBar('Erreur lors de la génération du rapport : ${e.toString()}');
       }
     }
   }
@@ -85,7 +95,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Ton rapport a été généré avec succès.'),
+            const Text('Ton rapport PDF a été généré avec succès.'),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
@@ -113,6 +123,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Fermer'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final result = await OpenFile.open(path);
+              if (result.type != ResultType.done) {
+                _showErrorSnackBar('Impossible d\'ouvrir le fichier : ${result.message}');
+              }
+            },
+            icon: const Icon(Icons.open_in_new, size: 16),
+            label: const Text('Ouvrir le PDF'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
           ),
         ],
       ),
@@ -187,10 +212,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
-            // Header réduit - moins d'espace en haut
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0), // Espace réduit
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -207,35 +231,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
               ),
             ),
-            
-            // Contenu principal
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ── Carte profil sans gradient, couleur unie ──
                     _buildProfileCard(user),
                     const SizedBox(height: 20),
-
-                    // ── Statistiques ──
                     _buildStatsSection(user),
                     const SizedBox(height: 24),
-
-                    // ── Infos de contact ──
                     if (user.email != null || user.phone != null)
                       _buildContactSection(user),
-                    
-                    // ── Progression ──
                     _buildProgressSection(user),
                     const SizedBox(height: 24),
-
-                    // ── Badges ──
                     _buildBadgesSection(),
                     const SizedBox(height: 24),
-
-                    // ── Actions ──
                     _buildActionsSection(user),
                     const SizedBox(height: 100),
                   ],
@@ -252,7 +263,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.primary, // Couleur unie comme avant
+        color: AppColors.primary,
         borderRadius: AppRadius.lg,
         boxShadow: [
           BoxShadow(
@@ -277,8 +288,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           ),
           const SizedBox(width: 20),
-          
-          // Infos utilisateur
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -317,7 +326,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                   ),
                 ],
-                
                 if (user.city != null || user.age != null) ...[
                   const SizedBox(height: 8),
                   Row(
@@ -351,7 +359,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ],
                   ),
                 ],
-                
                 if (user.isPremium) ...[
                   const SizedBox(height: 8),
                   Container(
@@ -532,10 +539,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Progression',
-                style: AppTextStyles.h4,
-              ),
+              Text('Progression', style: AppTextStyles.h4),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 8,
@@ -592,19 +596,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  bool _showAllBadges = false;
+  static const _badgesPreviewCount = 8;
+
   Widget _buildBadgesSection() {
+    final earnedBadges = _allBadges.where((b) => b['earned'] == true).toList();
+    final totalEarned = earnedBadges.length;
+    final totalAll = _allBadges.length;
+    final displayedBadges = _showAllBadges
+        ? earnedBadges
+        : earnedBadges.take(_badgesPreviewCount).toList();
+    final hasMore = earnedBadges.length > _badgesPreviewCount;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            Text('Mes badges', style: AppTextStyles.h3),
             Text(
-              'Mes badges',
-              style: AppTextStyles.h3,
-            ),
-            Text(
-              '${_allBadges.where((b) => b['earned'] == true).length}/${_allBadges.length}',
+              '$totalEarned/$totalAll débloqués',
               style: AppTextStyles.caption.copyWith(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w800,
@@ -613,21 +625,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        if (_allBadges.isEmpty)
+        if (earnedBadges.isEmpty)
           Container(
+            width: double.infinity,
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: AppColors.surfaceVariant,
               borderRadius: AppRadius.lg,
             ),
-            child: const Center(
-              child: Text(
-                'Aucun badge pour le moment',
-                style: AppTextStyles.body,
-              ),
+            child: Column(
+              children: [
+                const Text('🏅', style: TextStyle(fontSize: 36)),
+                const SizedBox(height: 8),
+                Text(
+                  'Aucun badge encore',
+                  style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Enregistre ton humeur, complète des défis\net participe à la communauté pour gagner tes premiers badges !',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.onSurfaceMuted,
+                    height: 1.4,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
           )
-        else
+        else ...[
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -637,20 +663,54 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               mainAxisSpacing: 8,
               childAspectRatio: 0.8,
             ),
-            itemCount: _allBadges.length,
+            itemCount: displayedBadges.length,
             itemBuilder: (ctx, index) {
-              final badge = _allBadges[index];
-              final earned = badge['earned'] == true;
-              return _buildBadgeItem(badge, earned);
+              return _buildBadgeItem(displayedBadges[index], true);
             },
           ),
+          if (hasMore) ...[
+            const SizedBox(height: 10),
+            GestureDetector(
+              onTap: () => setState(() => _showAllBadges = !_showAllBadges),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.06),
+                  borderRadius: AppRadius.md,
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _showAllBadges
+                          ? 'Voir moins'
+                          : 'Voir tous les badges (${earnedBadges.length - _badgesPreviewCount} de plus)',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      _showAllBadges ? Icons.expand_less : Icons.expand_more,
+                      color: AppColors.primary,
+                      size: 16,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
       ],
     );
   }
 
   Widget _buildBadgeItem(Map<String, dynamic> badge, bool earned) {
     return Opacity(
-      opacity: earned ? 1.0 : 0.4, // Badges non débloqués en grisé
+      opacity: earned ? 1.0 : 0.4,
       child: Container(
         decoration: BoxDecoration(
           color: earned
@@ -690,7 +750,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _buildActionsSection(UserModel user) {
     return Column(
       children: [
-        // Rapport PDF
         if (user.isPremium)
           Container(
             width: double.infinity,
@@ -744,27 +803,37 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
             ),
           ),
-        
         const SizedBox(height: 12),
-
-        // Dans _buildActionsSection, ajouter avant la déconnexion :
-if (!user.isPremium)
-  Container(
-    width: double.infinity,
-    height: 52,
-    margin: const EdgeInsets.only(bottom: 12),
-    child: ElevatedButton.icon(
-      onPressed: () => context.push('/premium'),
-      icon: const Text('👑', style: TextStyle(fontSize: 16)),
-      label: const Text('Passer en Premium'),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.secondary,
-        foregroundColor: Colors.white,
-      ),
-    ),
-  ),
-
-        // Déconnexion
+        if (!user.isPremium)
+          Container(
+            width: double.infinity,
+            height: 52,
+            margin: const EdgeInsets.only(bottom: 12),
+            child: ElevatedButton.icon(
+              onPressed: () => context.push('/premium'),
+              icon: const Text('👑', style: TextStyle(fontSize: 16)),
+              label: const Text('Passer en Premium'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.secondary,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ),
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: OutlinedButton.icon(
+            onPressed: () => context.push('/settings'),
+            icon: const Icon(Icons.settings_outlined),
+            label: const Text('Paramètres', style: AppTextStyles.button),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: AppColors.divider),
+              foregroundColor: AppColors.onSurface,
+              shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
         Container(
           width: double.infinity,
           height: 52,
@@ -855,7 +924,7 @@ if (!user.isPremium)
   }
 }
 
-// ─── Edit Profile Sheet (simplifié, sans stepper si tu préfères) ─────────────
+// ─── Edit Profile Sheet ──────────────────────────────────────────────────────
 class _EditProfileSheet extends StatefulWidget {
   final UserModel user;
   final Function(UserModel) onSaved;
@@ -1063,7 +1132,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Handle
               Center(
                 child: Container(
                   width: 40,
@@ -1075,8 +1143,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -1091,8 +1157,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ],
               ),
               const SizedBox(height: 16),
-
-              // Feedback
               if (_error != null) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -1119,7 +1183,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ),
                 const SizedBox(height: 12),
               ],
-              
               if (_success != null) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -1146,8 +1209,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ),
                 const SizedBox(height: 12),
               ],
-
-              // Identité
               Text('Identité', style: AppTextStyles.h4),
               const SizedBox(height: 12),
               Row(
@@ -1176,8 +1237,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ],
               ),
               const SizedBox(height: 16),
-
-              // Contact
               Text('Contact', style: AppTextStyles.h4),
               const SizedBox(height: 12),
               TextField(
@@ -1198,8 +1257,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // Infos personnelles
               Text('Infos personnelles', style: AppTextStyles.h4),
               const SizedBox(height: 12),
               TextField(
@@ -1231,8 +1288,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 contentPadding: EdgeInsets.zero,
               )),
               const SizedBox(height: 16),
-
-              // Communauté
               Text('Communauté', style: AppTextStyles.h4),
               const SizedBox(height: 12),
               TextField(
@@ -1245,8 +1300,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ),
               ),
               const SizedBox(height: 24),
-
-              // Bouton sauvegarder
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -1268,8 +1321,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-
-              // Mot de passe
               OutlinedButton.icon(
                 onPressed: () {
                   setState(() {
@@ -1285,7 +1336,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   minimumSize: const Size(double.infinity, 48),
                 ),
               ),
-
               if (_showPassSection) ...[
                 const SizedBox(height: 12),
                 TextField(

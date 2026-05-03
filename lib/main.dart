@@ -17,12 +17,11 @@ import 'services/security.service.dart';
 import 'services/api.service.dart';
 
 // Screens
-import 'screens/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
 import 'screens/auth/verify_email_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
-import 'screens/legal/legal_onboarding_screen.dart';
+// import 'screens/legal/legal_onboarding_screen.dart'; // ← Plus nécessaire
 import 'screens/main/home_shell.dart';
 import 'screens/main/mood_screen.dart';
 import 'screens/main/challenges_screen.dart';
@@ -34,6 +33,7 @@ import 'screens/main/settings_screen.dart';
 import 'screens/detail/challenge_detail_screen.dart';
 import 'screens/detail/mood_history_screen.dart';
 import 'screens/premium/premium_screen.dart';
+import 'screens/legal/legal_terms_screen.dart';
 
 // Providers
 import 'providers/auth_provider.dart';
@@ -151,10 +151,14 @@ class LinkMindApp extends ConsumerStatefulWidget {
 
 class _LinkMindAppState extends ConsumerState<LinkMindApp>
     with WidgetsBindingObserver {
+  
+  late final GoRouter _router;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _router = _buildRouter();
     
     // Initialiser SecurityService après le premier frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -191,35 +195,38 @@ class _LinkMindAppState extends ConsumerState<LinkMindApp>
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final authState = ref.watch(authProvider);
-    final settings = ref.watch(appSettingsProvider);
-    // Déclenche le préchargement des SharedPreferences (non bloquant)
-    final prefsAsync = ref.watch(sharedPrefsProvider);
-
-    final router = GoRouter(
-      initialLocation: '/splash',
+  GoRouter _buildRouter() {
+    return GoRouter(
+      initialLocation: '/init',
       debugLogDiagnostics: false,
       redirect: (context, state) async {
         final location = state.matchedLocation;
+        final authState = ref.read(authProvider);
         final isLoggedIn = authState.isAuthenticated;
         
         // Routes spéciales
-        final isSplash = location == '/splash';
+        final isInit = location == '/init';
         final isAuthRoute = location.startsWith('/auth');
         final isForgotPassword = location == '/auth/forgot-password';
         final isOnboarding = location == '/onboarding';
-        final isLegalOnboarding = location == '/legal-onboarding';
         final isVerifyEmail = location == '/verify-email';
-        
-        // 1. Écran Splash : toujours accessible
-        if (isSplash) return null;
+        final isLegalTerms = location == '/legal-terms'; // ← Ajout
+
+        // /init : point d'entrée — redirige immédiatement selon l'état
+        if (isInit) {
+          final prefs = await ref.read(sharedPrefsProvider.future);
+          final onboardingDone = prefs.getBool('onboarding_done') ?? false;
+          if (!isLoggedIn) {
+            return onboardingDone ? '/auth/login' : '/onboarding';
+          }
+          // Connecté : le reste du redirect gère home/onboarding
+          return null;
+        }
         
         // 2. Utilisateur NON connecté
         if (!isLoggedIn) {
           // Routes autorisées sans connexion
-          if (isAuthRoute || isOnboarding || isLegalOnboarding || isVerifyEmail) {
+          if (isAuthRoute || isOnboarding || isVerifyEmail || isLegalTerms) {
             return null;
           }
           
@@ -234,21 +241,26 @@ class _LinkMindAppState extends ConsumerState<LinkMindApp>
         // 3. Utilisateur connecté
         if (isLoggedIn) {
           // Ne pas rediriger sur ces écrans
-          if (isLegalOnboarding || isVerifyEmail) return null;
-          
-          // Vérifier si CGU acceptées
-          final user = authState.user;
-          debugPrint('🔍 [Redirect] legalAccepted = ${user?.legalAccepted}');
-          if (user != null && user.legalAccepted != true) {
-            debugPrint('➡️ Redirection vers legal-onboarding');
-            return '/legal-onboarding';
+          if (isVerifyEmail) return null;
+
+          // Autoriser l'onboarding si c'est un nouvel inscrit (flag SharedPrefs)
+          if (isOnboarding) {
+            final prefs = await ref.read(sharedPrefsProvider.future);
+            final needsOnboarding = prefs.getBool('needs_onboarding') ?? false;
+            if (needsOnboarding) return null; // laisser passer
+            return '/home'; // déjà fait
           }
-          
+
+          final user = ref.read(authProvider).user;
+
+          // Si l'email n'est pas encore vérifié → forcer /verify-email
+          if (user != null && user.isEmailVerified != true && user.email != null) {
+            return '/verify-email';
+          }
+
+          // Plus de vérification legalAccepted ici (faite à l'inscription)
           // Rediriger les routes d'auth (sauf forgot-password)
           if (isAuthRoute && !isForgotPassword) return '/home';
-          
-          // Rediriger onboarding si déjà connecté
-          if (isOnboarding) return '/home';
         }
         
         return null;
@@ -256,18 +268,14 @@ class _LinkMindAppState extends ConsumerState<LinkMindApp>
       routes: [
         // Écran de démarrage
         GoRoute(
-          path: '/splash',
-          builder: (_, __) => const SplashScreen(),
+          path: '/init',
+          builder: (_, __) => const _SplashLoader(),
         ),
         
         // Onboarding
         GoRoute(
           path: '/onboarding',
           builder: (_, __) => const OnboardingScreen(),
-        ),
-        GoRoute(
-          path: '/legal-onboarding',
-          builder: (_, __) => const LegalOnboardingScreen(),
         ),
         
         // Authentification
@@ -286,6 +294,12 @@ class _LinkMindAppState extends ConsumerState<LinkMindApp>
         GoRoute(
           path: '/verify-email',
           builder: (_, __) => const VerifyEmailScreen(),
+        ),
+        
+        // Conditions générales (accessible sans connexion)
+        GoRoute(
+          path: '/legal-terms',
+          builder: (_, __) => const LegalTermsScreen(),
         ),
         
         // Premium
@@ -342,6 +356,26 @@ class _LinkMindAppState extends ConsumerState<LinkMindApp>
         ),
       ],
     );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+    final settings = ref.watch(appSettingsProvider);
+
+    // Notifier le router que l'état auth a changé
+    _router.refresh();
+
+    // Pendant le chargement initial de l'auth, afficher le splash
+    if (authState.isLoading) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: settings.themeMode,
+        home: const _SplashLoader(),
+      );
+    }
 
     return MaterialApp.router(
       title: 'LinkMind',
@@ -359,16 +393,65 @@ class _LinkMindAppState extends ConsumerState<LinkMindApp>
       ],
       builder: (context, child) {
         if (child == null) return const SizedBox.shrink();
-        
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(
-            // Bloque le scaling du texte entre 0.8 et 1.5
             textScaler: TextScaler.linear(settings.textScale.clamp(0.8, 1.5)),
           ),
           child: child,
         );
       },
-      routerConfig: router,
+      routerConfig: _router,
+    );
+  }
+}
+
+// ─── Splash Loader (branding visuel, sans timer) ──────────────────────────────
+// Affiché uniquement pendant le chargement initial de l'auth (quelques ms)
+class _SplashLoader extends StatelessWidget {
+  const _SplashLoader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.primary,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: AppRadius.xl,
+              ),
+              child: ClipRRect(
+                borderRadius: AppRadius.xl,
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'LinkMind',
+              style: AppTextStyles.h1.copyWith(
+                color: Colors.white,
+                fontSize: 36,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Where Minds Connect',
+              style: AppTextStyles.body.copyWith(color: Colors.white70),
+            ),
+            const SizedBox(height: 60),
+            const CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+          ],
+        ),
+      ),
     );
   }
 }

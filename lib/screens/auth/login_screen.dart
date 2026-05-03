@@ -1,12 +1,14 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter/gestures.dart';
 import '../../utils/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/validators.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api.service.dart';
 
-// ─── Login Screen ─────────────────────────────────────────────────────────────
+// ─── Login Screen (inchangé) ─────────────────────────────────────────────────
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
   @override
@@ -21,10 +23,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   void dispose() { _identifierCtrl.dispose(); _passCtrl.dispose(); super.dispose(); }
 
+  String? _localError;
+
   Future<void> _login() async {
     final identifier = _identifierCtrl.text.trim();
     final password   = _passCtrl.text;
-    if (identifier.isEmpty || password.isEmpty) return;
+
+    if (identifier.isEmpty) {
+      setState(() => _localError = 'Saisis ton email ou numéro de téléphone.');
+      return;
+    }
+    if (password.isEmpty) {
+      setState(() => _localError = 'Saisis ton mot de passe.');
+      return;
+    }
+    setState(() => _localError = null);
+
     final isEmail = identifier.contains('@');
     final phone = isEmail ? null : Validators.normalizePhone(identifier);
     final success = await ref.read(authProvider.notifier).login(
@@ -60,21 +74,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ])),
             const SizedBox(height: 40),
 
-            if (state.error != null)
-              Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.1),
-                  borderRadius: AppRadius.md,
-                  border: Border.all(color: AppColors.accent.withValues(alpha: 0.3))),
-                child: Row(children: [
-                  const Icon(Icons.error_outline, color: AppColors.accent, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(state.error!,
-                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.accent))),
-                ]),
+            if (_localError != null) ...[
+              _ErrorBanner(message: _localError!, isNetwork: false),
+              const SizedBox(height: 12),
+            ],
+
+            if (state.error != null) ...[
+              _ErrorBanner(
+                message: state.error!,
+                isNetwork: state.error!.contains('internet') ||
+                    state.error!.contains('réseau') ||
+                    state.error!.contains('temps'),
               ),
+              const SizedBox(height: 12),
+            ],
 
             TextField(
               controller: _identifierCtrl,
@@ -142,7 +155,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
-// ─── Register Screen ──────────────────────────────────────────────────────────
+// ─── Register Screen (modifié avec vérification téléphone) ────────────────────
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
   @override
@@ -172,6 +185,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _obscurePass    = true;
   bool _obscureConfirm = true;
   int  _step           = 0;
+  bool _legalAccepted  = false;
 
   final _scrollCtrl = ScrollController();
 
@@ -229,7 +243,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         return 'Un email ou un numéro de téléphone est requis';
       }
       
-      // ✅ Validation en temps réel du texte des contrôleurs
       if (emailTxt.isNotEmpty && !Validators.isValidEmail(emailTxt)) {
         return "Format d'email invalide";
       }
@@ -239,7 +252,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
     if (_step == 1) {
       final ageTxt = _ageCtrl.text.trim();
-      // ✅ Validation en temps réel de l'âge
       if (ageTxt.isNotEmpty && !Validators.isValidAge(ageTxt)) {
         return "L'âge doit être entre 15 et 120 ans";
       }
@@ -247,6 +259,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (_step == 2) {
       if (!Validators.isValidPassword(_passCtrl.text)) return 'Le mot de passe doit faire au moins 6 caractères';
       if (_passCtrl.text != _confirmCtrl.text) return 'Les mots de passe ne correspondent pas';
+      if (!_legalAccepted) return 'Vous devez accepter les conditions générales.';
     }
     return null;
   }
@@ -278,6 +291,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         SnackBar(content: Text(error), backgroundColor: AppColors.accent));
       return;
     }
+    if (!_legalAccepted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Acceptez les CGU pour continuer'), backgroundColor: AppColors.accent));
+      return;
+    }
+
     final success = await ref.read(authProvider.notifier).register(
       firstName:      _firstNameCtrl.text.trim(),
       lastName:       _lastNameCtrl.text.trim(),
@@ -288,33 +307,34 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       gender:         _gender,
       password:       _passCtrl.text,
       anonymousAlias: _aliasCtrl.text.trim().isEmpty ? null : _aliasCtrl.text.trim(),
+      legalAccepted:  true,
     );
     
     if (success && mounted) {
       final user = ref.read(authProvider).user;
-      debugPrint('🔍 User après inscription: email=${user?.email}, isEmailVerified=${user?.isEmailVerified}');
-      
-      // ✅ Si l'utilisateur a un email et n'est pas vérifié
-      if (user?.email != null && user?.isEmailVerified != true) {
-        debugPrint('📧 Envoi du code de vérification...');
+      debugPrint('🔍 User après inscription: email=${user?.email}, phone=${user?.phone}, isEmailVerified=${user?.isEmailVerified}');
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('needs_onboarding', true);
+
+      // ✅ Logique améliorée : vérifier l'email s'il existe et non vérifié,
+      // sinon vérifier le téléphone s'il existe et non vérifié (si pas d'email ou email déjà vérifié)
+      final needsEmailVerif = user?.email != null && user?.isEmailVerified != true;
+      final needsPhoneVerif = !needsEmailVerif && user?.phone != null && user?.isPhoneVerified != true;
+
+      if (needsEmailVerif || needsPhoneVerif) {
+        debugPrint('📲 Redirection vers vérification (${needsEmailVerif ? "email" : "SMS"})...');
         try {
+          // L'API sendVerification choisira automatiquement le canal en fonction du premier non vérifié
           await ApiService().sendVerification();
-          debugPrint('📧 Redirection vers /verify-email');
-          if (mounted) {
-            context.go('/verify-email');
-          }
+          if (mounted) context.go('/verify-email');
         } catch (e) {
           debugPrint('❌ Erreur envoi code: $e');
-          if (mounted) {
-            context.go('/legal-onboarding');
-          }
+          if (mounted) context.go('/onboarding');
         }
       } else {
-        // Pas d'email ou déjà vérifié
-        debugPrint('➡️ Pas d\'email ou déjà vérifié, redirection vers legal-onboarding');
-        if (mounted) {
-          context.go('/legal-onboarding');
-        }
+        debugPrint('➡️ Nouvel inscrit → onboarding directement');
+        if (mounted) context.go('/onboarding');
       }
     }
   }
@@ -326,8 +346,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: BackButton(onPressed: () {
-          if (_step > 0) setState(() => _step--);
-          else context.pop();
+          if (_step > 0) {
+            setState(() => _step--);
+          } else {
+            if (Navigator.of(context).canPop()) {
+              context.pop();
+            } else {
+              context.go('/auth/login');
+            }
+          }
         }),
         title: Text('Étape ${_step + 1} / 3', style: AppTextStyles.bodySmall),
         bottom: PreferredSize(
@@ -343,7 +370,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           controller: _scrollCtrl,
           padding: const EdgeInsets.all(24),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-
             Center(
               child: Container(
                 margin: const EdgeInsets.only(bottom: 24),
@@ -492,7 +518,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ))).toList(),
             ],
 
-            // ── Étape 2 : Pseudo + Mot de passe ─────────────────────────────
+            // ── Étape 2 : Pseudo + Mot de passe + CGU ───────────────────────
             if (_step == 2) ...[
               Text('Sécurise ton compte', style: AppTextStyles.h2),
               const SizedBox(height: 4),
@@ -575,6 +601,45 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           onPressed: () =>
                               setState(() => _obscureConfirm = !_obscureConfirm))),
               ),
+
+              const SizedBox(height: 16),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Checkbox(
+                      value: _legalAccepted,
+                      onChanged: (value) => setState(() => _legalAccepted = value ?? false),
+                      activeColor: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        style: AppTextStyles.bodySmall,
+                        children: [
+                          const TextSpan(text: "J'accepte les "),
+                          TextSpan(
+                            text: "conditions générales d'utilisation",
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.primary,
+                              decoration: TextDecoration.underline,
+                            ),
+                            recognizer: TapGestureRecognizer()
+                              ..onTap = () {
+                                context.push('/legal-terms');
+                              },
+                          ),
+                          const TextSpan(text: " de LinkMind."),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
 
             const SizedBox(height: 32),
@@ -612,6 +677,42 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ]),
         ),
       ),
+    );
+  }
+}
+
+// ─── Error Banner ─────────────────────────────────────────────────────────────
+class _ErrorBanner extends StatelessWidget {
+  final String message;
+  final bool isNetwork;
+  const _ErrorBanner({required this.message, required this.isNetwork});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isNetwork ? AppColors.accentOrange : AppColors.accent;
+    final icon  = isNetwork ? Icons.wifi_off_rounded : Icons.error_outline;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: AppRadius.md,
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icon, color: color, size: 18),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            message,
+            style: AppTextStyles.bodySmall.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+              height: 1.4,
+            ),
+          ),
+        ),
+      ]),
     );
   }
 }

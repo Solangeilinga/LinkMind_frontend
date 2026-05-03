@@ -39,10 +39,9 @@ class _CommentItemState extends State<CommentItem> {
     super.didUpdateWidget(old);
     final newLiked = widget.comment['isLiked'] == true;
     final newCount = (widget.comment['likesCount'] ?? 0) as int;
-    if (newLiked != old.comment['isLiked'] || newCount != (old.comment['likesCount'] ?? 0)) {
-      _isLiked = newLiked;
-      _likesCount = newCount;
-    }
+    // Toujours synchroniser (l'optimistic update local peut diverger de la réponse serveur)
+    _isLiked = newLiked;
+    _likesCount = newCount;
     if (!identical(widget.comment['replies'], old.comment['replies'])) {
       _replies = _castReplies(widget.comment['replies']);
     }

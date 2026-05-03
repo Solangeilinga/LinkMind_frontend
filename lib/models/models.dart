@@ -15,8 +15,9 @@ class UserModel {
   final String  level;
   final int     streakDays;
   final bool    isPremium;
-  final bool    isEmailVerified;      // ✅ AJOUTÉ
-  final bool    legalAccepted;        // ✅ AJOUTÉ
+  final bool    isEmailVerified;      // ✅ Vérification email
+  final bool    isPhoneVerified;      // ✅ AJOUTÉ : vérification téléphone
+  final bool    legalAccepted;        // ✅ CGU acceptées
   final UserPreferences preferences;
   final List<UserBadge> badges;
 
@@ -36,8 +37,9 @@ class UserModel {
     required this.level,
     required this.streakDays,
     required this.isPremium,
-    this.isEmailVerified = false,     // ✅ AJOUTÉ
-    this.legalAccepted = false,       // ✅ AJOUTÉ
+    this.isEmailVerified = false,
+    this.isPhoneVerified = false,     // ✅ AJOUTÉ
+    this.legalAccepted = false,
     required this.preferences,
     this.badges = const [],
   });
@@ -58,8 +60,9 @@ class UserModel {
     level:       json['level'] ?? 'bronze',
     streakDays:  json['streakDays'] ?? 0,
     isPremium:   json['isPremium'] ?? false,
-    isEmailVerified: json['isEmailVerified'] ?? false,   // ✅ AJOUTÉ
-    legalAccepted:   json['legalAccepted'] ?? false,     // ✅ AJOUTÉ
+    isEmailVerified: json['isEmailVerified'] ?? false,
+    isPhoneVerified: json['isPhoneVerified'] ?? false,   // ✅ AJOUTÉ
+    legalAccepted:   json['legalAccepted'] ?? false,
     preferences: json['preferences'] != null
         ? UserPreferences.fromJson(json['preferences'])
         : const UserPreferences(),
@@ -84,8 +87,9 @@ class UserModel {
     'level': level,
     'streakDays': streakDays,
     'isPremium': isPremium,
-    'isEmailVerified': isEmailVerified,   // ✅ AJOUTÉ
-    'legalAccepted': legalAccepted,       // ✅ AJOUTÉ
+    'isEmailVerified': isEmailVerified,
+    'isPhoneVerified': isPhoneVerified,   // ✅ AJOUTÉ
+    'legalAccepted': legalAccepted,
     'preferences': preferences.toJson(),
     'badges': badges.map((b) => b.toJson()).toList(),
   };
@@ -121,6 +125,7 @@ class UserModel {
     int? streakDays,
     bool? isPremium,
     bool? isEmailVerified,
+    bool? isPhoneVerified,    // ✅ AJOUTÉ
     bool? legalAccepted,
     UserPreferences? preferences,
     List<UserBadge>? badges,
@@ -142,6 +147,7 @@ class UserModel {
       streakDays: streakDays ?? this.streakDays,
       isPremium: isPremium ?? this.isPremium,
       isEmailVerified: isEmailVerified ?? this.isEmailVerified,
+      isPhoneVerified: isPhoneVerified ?? this.isPhoneVerified,   // ✅ AJOUTÉ
       legalAccepted: legalAccepted ?? this.legalAccepted,
       preferences: preferences ?? this.preferences,
       badges: badges ?? this.badges,
@@ -149,6 +155,7 @@ class UserModel {
   }
 }
 
+// ─── Le reste du fichier (UserPreferences, UserBadge, MoodEntry, ChallengeModel, PostModel) est inchangé ───
 class UserPreferences {
   final bool notificationsEnabled;
   final String reminderTime;

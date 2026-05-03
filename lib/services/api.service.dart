@@ -192,51 +192,47 @@ class ApiService {
     throw ApiException(body['error'] ?? 'Une erreur est survenue', response.statusCode);
   }
 
+  // ─── Exécute une requête HTTP avec retry automatique après refresh de token ──
+  Future<dynamic> _execute(Future<http.Response> Function(Map<String, String> headers) fn) async {
+    final headers = await _getHeaders();
+    final response = await fn(headers);
+    try {
+      return _handleResponse(response);
+    } on ApiException catch (e) {
+      if (e.retryable) {
+        // Token expiré et refreshé — on réessaie UNE fois avec le nouveau token
+        final freshHeaders = await _getHeaders();
+        final retryResponse = await fn(freshHeaders);
+        return _handleResponse(retryResponse);
+      }
+      rethrow;
+    }
+  }
+
   Future<dynamic> get(String path, {Map<String, String>? queryParams}) async {
     final uri = Uri.parse('${AppConstants.baseUrl}$path')
         .replace(queryParameters: queryParams);
-    final headers = await _getHeaders();
-    final response = await http.get(uri, headers: headers);
-    return _handleResponse(response);
+    return _execute((h) => http.get(uri, headers: h));
   }
 
   Future<dynamic> post(String path, Map<String, dynamic> body) async {
-    final headers = await _getHeaders();
-    final response = await http.post(
-      Uri.parse('${AppConstants.baseUrl}$path'),
-      headers: headers,
-      body: jsonEncode(body),
-    );
-    return _handleResponse(response);
+    final uri = Uri.parse('${AppConstants.baseUrl}$path');
+    return _execute((h) => http.post(uri, headers: h, body: jsonEncode(body)));
   }
 
   Future<dynamic> put(String path, Map<String, dynamic> body) async {
-    final headers = await _getHeaders();
-    final response = await http.put(
-      Uri.parse('${AppConstants.baseUrl}$path'),
-      headers: headers,
-      body: jsonEncode(body),
-    );
-    return _handleResponse(response);
+    final uri = Uri.parse('${AppConstants.baseUrl}$path');
+    return _execute((h) => http.put(uri, headers: h, body: jsonEncode(body)));
   }
 
   Future<dynamic> patch(String path, Map<String, dynamic> body) async {
-    final headers = await _getHeaders();
-    final response = await http.patch(
-      Uri.parse('${AppConstants.baseUrl}$path'),
-      headers: headers,
-      body: jsonEncode(body),
-    );
-    return _handleResponse(response);
+    final uri = Uri.parse('${AppConstants.baseUrl}$path');
+    return _execute((h) => http.patch(uri, headers: h, body: jsonEncode(body)));
   }
 
   Future<dynamic> delete(String path) async {
-    final headers = await _getHeaders();
-    final response = await http.delete(
-      Uri.parse('${AppConstants.baseUrl}$path'),
-      headers: headers,
-    );
-    return _handleResponse(response);
+    final uri = Uri.parse('${AppConstants.baseUrl}$path');
+    return _execute((h) => http.delete(uri, headers: h));
   }
 
   // ─── Auth ──────────────────────────────────────────────────────────────────
@@ -250,6 +246,7 @@ class ApiService {
     String? gender,
     required String password,
     String? anonymousAlias,
+    bool legalAccepted = true, // ← AJOUT
   }) async {
     return await post('/auth/register', {
       'firstName': firstName,
@@ -261,6 +258,7 @@ class ApiService {
       if (gender != null) 'gender': gender,
       'password': password,
       if (anonymousAlias != null && anonymousAlias.isNotEmpty) 'anonymousAlias': anonymousAlias,
+      'legalAccepted': legalAccepted, // ← AJOUT
     });
   }
 
@@ -360,7 +358,6 @@ class ApiService {
   }
 
   // ─── Community ─────────────────────────────────────────────────────────────
-  // ✅ CORRECTION : getFeed avec page, limit et type (filtre)
   Future<Map<String, dynamic>> getFeed({int page = 1, int limit = 20, String? type}) async {
     final Map<String, String> params = {
       'page': page.toString(),
@@ -370,7 +367,6 @@ class ApiService {
     return await get('/community/feed', queryParams: params);
   }
 
-  // ✅ CORRECTION : getMyPosts avec page et limit
   Future<Map<String, dynamic>> getMyPosts({int page = 1, int limit = 20}) async {
     return await get('/community/my-posts', queryParams: {
       'page': page.toString(),
@@ -498,6 +494,7 @@ class ApiService {
   Future<Map<String, dynamic>> getBadgesConfig() async => await get('/content/badges');
   Future<Map<String, dynamic>> getAssistantStarters() async => await get('/content/assistant-starters');
   Future<Map<String, dynamic>> getMoodDefinitions() async => await get('/content/moods');
+  Future<Map<String, dynamic>> getLanguages() async => await get('/content/languages');
   Future<Map<String, dynamic>> getProfessionalTypes() async => await get('/content/professional-types');
   Future<Map<String, dynamic>> getChallengeCategories() async => await get('/content/challenge-categories');
   Future<Map<String, dynamic>> getChallengeDifficulties() async => await get('/content/challenge-difficulties');

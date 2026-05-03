@@ -1,4 +1,7 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../services/api.service.dart';
 import 'package:flutter/foundation.dart';
@@ -21,13 +24,16 @@ class AuthState {
     bool? isAuthenticated,
     bool? isLoading,
     UserModel? user,
-    String? error,
-  }) => AuthState(
-    isAuthenticated: isAuthenticated ?? this.isAuthenticated,
-    isLoading: isLoading ?? this.isLoading,
-    user: user ?? this.user,
-    error: error,
-  );
+    Object? error = _sentinel,
+  }) =>
+      AuthState(
+        isAuthenticated: isAuthenticated ?? this.isAuthenticated,
+        isLoading: isLoading ?? this.isLoading,
+        user: user ?? this.user,
+        error: identical(error, _sentinel) ? this.error : error as String?,
+      );
+
+  static const _sentinel = Object();
 }
 
 // ─── Mood State ───────────────────────────────────────────────────────────────
@@ -55,14 +61,15 @@ class MoodState {
     Map<String, dynamic>? stats,
     Map<String, dynamic>? recommendations,
     String? error,
-  }) => MoodState(
-    isLoading: isLoading ?? this.isLoading,
-    todayMood: todayMood ?? this.todayMood,
-    history: history ?? this.history,
-    stats: stats ?? this.stats,
-    recommendations: recommendations ?? this.recommendations,
-    error: error,
-  );
+  }) =>
+      MoodState(
+        isLoading: isLoading ?? this.isLoading,
+        todayMood: todayMood ?? this.todayMood,
+        history: history ?? this.history,
+        stats: stats ?? this.stats,
+        recommendations: recommendations ?? this.recommendations,
+        error: error ?? this.error,
+      );
 }
 
 // ─── Challenges State ─────────────────────────────────────────────────────────
@@ -81,11 +88,49 @@ class ChallengesState {
     bool? isLoading,
     List<Map<String, dynamic>>? daily,
     String? error,
-  }) => ChallengesState(
-    isLoading: isLoading ?? this.isLoading,
-    daily: daily ?? this.daily,
-    error: error,
-  );
+  }) =>
+      ChallengesState(
+        isLoading: isLoading ?? this.isLoading,
+        daily: daily ?? this.daily,
+        error: error ?? this.error,
+      );
+}
+
+// ─── Helper : message d'erreur human-readable ─────────────────────────────────
+String _errorMessage(Object e, {String fallback = 'Une erreur inattendue est survenue. Réessaie.'}) {
+  if (e is SecurityException) {
+    switch (e.type) {
+      case SecurityErrorType.accountLocked:
+        final mins = e.data?['remainingMinutes'] ?? 15;
+        return 'Compte verrouillé après trop de tentatives. Réessaie dans $mins min.';
+      case SecurityErrorType.accountRestricted:
+        return 'Ton compte est restreint. Contacte le support LinkMind.';
+      case SecurityErrorType.unauthorized:
+        return e.message.isNotEmpty
+            ? e.message
+            : 'Identifiants incorrects. Vérifie ton email/téléphone et mot de passe.';
+      case SecurityErrorType.rateLimited:
+        return 'Trop de requêtes. Attends un moment avant de réessayer.';
+      default:
+        return e.message.isNotEmpty ? e.message : fallback;
+    }
+  }
+  if (e is ApiException) {
+    if (e.statusCode == 401) {
+      return 'Identifiants incorrects. Vérifie ton email/téléphone et ton mot de passe.';
+    }
+    if (e.statusCode == 409) return e.message;
+    if (e.statusCode == 400) return e.message;
+    if (e.statusCode >= 500) return 'Serveur indisponible. Réessaie dans un moment.';
+    return e.message.isNotEmpty ? e.message : fallback;
+  }
+  if (e is SocketException) {
+    return 'Pas de connexion internet. Vérifie ton réseau.';
+  }
+  if (e is TimeoutException) {
+    return 'Le serveur met trop de temps à répondre. Réessaie.';
+  }
+  return fallback;
 }
 
 // ─── Auth Notifier ────────────────────────────────────────────────────────────
@@ -99,50 +144,49 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> _init() async {
     try {
-      // Timeout global de 5 secondes pour toute l'initialisation
-      await Future.wait([
-        _api.getAccessToken().timeout(const Duration(seconds: 5)),
-      ]);
-      final token = await _api.getAccessToken();
+      final token = await _api.getAccessToken().timeout(const Duration(seconds: 5));
       if (token != null) {
-        final data = await _api.getMe().timeout(const Duration(seconds: 5));
+        final data = await _api.getMe().timeout(const Duration(seconds: 8));
         final user = UserModel.fromJson(data['user']);
-        debugPrint('🔍 [AuthInit] legalAccepted = ${user.legalAccepted}');
-        state = AuthState(
-          isAuthenticated: true,
-          isLoading: false,
-          user: user,
-        );
+        debugPrint('🔍 [AuthInit] legalAccepted=${user.legalAccepted}');
+
+        if (user.legalAccepted == true) {
+          _saveLegalCache(user.id);
+        }
+
+        state = AuthState(isAuthenticated: true, isLoading: false, user: user);
       } else {
         state = const AuthState(isAuthenticated: false, isLoading: false);
       }
     } catch (e) {
-      debugPrint('⚠️ [AuthInit] Timeout ou erreur réseau : $e');
+      debugPrint('⚠️ [AuthInit] $e');
       state = const AuthState(isAuthenticated: false, isLoading: false);
     }
   }
 
+  // ─── Login ────────────────────────────────────────────────────────────────
   Future<bool> login({String? email, String? phone, required String password}) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final data = await _api.login(email: email, phone: phone, password: password);
       await _api.saveTokens(data['accessToken'], data['refreshToken']);
       final user = UserModel.fromJson(data['user']);
-      debugPrint('🔍 [Login] legalAccepted = ${user.legalAccepted}');
-      state = AuthState(
-        isAuthenticated: true,
-        isLoading: false,
-        user: user,
-      );
+      debugPrint('🔍 [Login] legalAccepted=${user.legalAccepted}');
+
+      state = AuthState(isAuthenticated: true, isLoading: false, user: user);
       _ref.read(challengesProvider.notifier).reset();
       _ref.read(moodProvider.notifier).reset();
+
+      if (user.legalAccepted == true) _saveLegalCache(user.id);
       return true;
-    } on ApiException catch (e) {
-      state = state.copyWith(isLoading: false, error: e.message);
+    } catch (e) {
+      debugPrint('❌ [Login] ${e.runtimeType}: $e');
+      state = state.copyWith(isLoading: false, error: _errorMessage(e));
       return false;
     }
   }
 
+  // ─── Register (avec legalAccepted) ─────────────────────────────────────────
   Future<bool> register({
     required String firstName,
     required String lastName,
@@ -153,6 +197,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     String? gender,
     required String password,
     String? anonymousAlias,
+    bool legalAccepted = true, // ← AJOUT
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
@@ -160,47 +205,45 @@ class AuthNotifier extends StateNotifier<AuthState> {
         firstName: firstName, lastName: lastName,
         email: email, phone: phone,
         age: age, city: city, gender: gender,
-        password: password,
-        anonymousAlias: anonymousAlias,
+        password: password, anonymousAlias: anonymousAlias,
+        legalAccepted: legalAccepted, // ← AJOUT
       );
       await _api.saveTokens(data['accessToken'], data['refreshToken']);
       final user = UserModel.fromJson(data['user']);
-      debugPrint('🔍 [Register] legalAccepted = ${user.legalAccepted}');
-      state = AuthState(
-        isAuthenticated: true,
-        isLoading: false,
-        user: user,
-      );
+      debugPrint('🔍 [Register] legalAccepted=${user.legalAccepted}');
+
+      state = AuthState(isAuthenticated: true, isLoading: false, user: user);
       _ref.read(challengesProvider.notifier).reset();
       _ref.read(moodProvider.notifier).reset();
       return true;
-    } on ApiException catch (e) {
-      state = state.copyWith(isLoading: false, error: e.message);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: _errorMessage(e,
+          fallback: 'Inscription échouée. Vérifie tes informations et réessaie.'));
       return false;
     }
   }
 
+  // ─── Logout ───────────────────────────────────────────────────────────────
   Future<void> logout() async {
-    await _api.logout();
+    try { await _api.logout(); } catch (_) {}
     _ref.read(challengesProvider.notifier).reset();
     _ref.read(moodProvider.notifier).reset();
     state = const AuthState(isAuthenticated: false, isLoading: false);
   }
 
-  void updateUser(UserModel user) {
-    state = state.copyWith(user: user);
-  }
+  void updateUser(UserModel user) => state = state.copyWith(user: user);
 
   Future<void> refreshUser() async {
     try {
       final data = await _api.getMe();
       if (data['user'] != null) {
-        final updatedUser = UserModel.fromJson(data['user']);
-        state = state.copyWith(user: updatedUser);
-        debugPrint('✅ Utilisateur rafraîchi: isPremium=${updatedUser.isPremium}, legalAccepted=${updatedUser.legalAccepted}');
+        final user = UserModel.fromJson(data['user']);
+        state = state.copyWith(user: user);
+        if (user.legalAccepted == true) _saveLegalCache(user.id);
+        debugPrint('✅ User rafraîchi: isPremium=${user.isPremium}, legalAccepted=${user.legalAccepted}');
       }
     } catch (e) {
-      debugPrint('❌ Erreur refreshUser: $e');
+      debugPrint('⚠️ refreshUser: $e');
     }
   }
 
@@ -208,54 +251,40 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _ref.read(challengesProvider.notifier).loadDaily(moodLabel: moodLabel);
   }
 
-  // ─── Mot de passe oublié & OTP ──────────────────────────────────────────────
-
+  // ─── Mot de passe oublié ──────────────────────────────────────────────────
   Future<Map<String, dynamic>> forgotPassword({String? email, String? phone}) async {
-    state = state.copyWith(isLoading: true, error: null);
     try {
       final data = await _api.post('/auth/forgot-password', {
         if (email != null) 'email': email,
         if (phone != null) 'phone': phone,
       });
-      state = state.copyWith(isLoading: false);
-      return data;
-    } on ApiException catch (e) {
-      state = state.copyWith(isLoading: false, error: e.message);
-      rethrow;
-    } catch (e, stack) {
-      debugPrint('❌ Erreur forgotPassword: $e\n$stack');
-      state = state.copyWith(isLoading: false, error: 'Une erreur est survenue');
-      rethrow;
+      return Map<String, dynamic>.from(data ?? {});
+    } catch (e) {
+      final msg = _errorMessage(e, fallback: 'Impossible d\'envoyer le code. Réessaie.');
+      throw Exception(msg);
     }
   }
 
   Future<String?> verifyOtp({String? email, String? phone, required String code}) async {
-    state = state.copyWith(isLoading: true, error: null);
     try {
       final data = await _api.post('/auth/verify-otp', {
         if (email != null) 'email': email,
         if (phone != null) 'phone': phone,
         'code': code,
       });
-      state = state.copyWith(isLoading: false);
       return data['resetToken'] as String?;
-    } on ApiException catch (e) {
-      state = state.copyWith(isLoading: false, error: e.message);
-      rethrow;
-    } catch (e, stack) {
-      debugPrint('❌ Erreur verifyOtp: $e\n$stack');
-      state = state.copyWith(isLoading: false, error: 'Une erreur est survenue');
-      rethrow;
+    } catch (e) {
+      final msg = _errorMessage(e, fallback: 'Code incorrect ou expiré.');
+      throw Exception(msg);
     }
   }
 
   Future<void> resetPassword({
-    String? email, 
-    String? phone, 
-    required String resetToken, 
-    required String newPassword
+    String? email,
+    String? phone,
+    required String resetToken,
+    required String newPassword,
   }) async {
-    state = state.copyWith(isLoading: true, error: null);
     try {
       await _api.post('/auth/reset-password', {
         if (email != null) 'email': email,
@@ -263,35 +292,46 @@ class AuthNotifier extends StateNotifier<AuthState> {
         'resetToken': resetToken,
         'newPassword': newPassword,
       });
-      state = state.copyWith(isLoading: false);
-    } on ApiException catch (e) {
-      state = state.copyWith(isLoading: false, error: e.message);
-      rethrow;
-    } catch (e, stack) {
-      debugPrint('❌ Erreur resetPassword: $e\n$stack');
-      state = state.copyWith(isLoading: false, error: 'Une erreur est survenue');
-      rethrow;
+    } catch (e) {
+      final msg = _errorMessage(e, fallback: 'Réinitialisation échouée. Recommence depuis le début.');
+      throw Exception(msg);
     }
   }
 
-  // ─── Vérification Email / Téléphone ─────────────────────────────────────────
-
+  // ─── Vérification Email / Téléphone ───────────────────────────────────────
   Future<Map<String, dynamic>> sendVerification() async {
     try {
       return await _api.sendVerification();
-    } catch (e, stack) {
-      debugPrint('❌ Erreur sendVerification: $e\n$stack');
+    } catch (e) {
+      debugPrint('⚠️ sendVerification: $e');
       rethrow;
     }
   }
 
   Future<bool> verifyEmail(String code) async {
     try {
-      return await _api.verifyEmail(code);
-    } catch (e, stack) {
-      debugPrint('❌ Erreur verifyEmail: $e\n$stack');
+      final result = await _api.verifyEmail(code);
+      if (result == true) {
+        // Mise à jour locale de l'utilisateur pour éviter d'attendre refreshUser
+        final currentUser = state.user;
+        if (currentUser != null) {
+          final updatedUser = currentUser.copyWith(isEmailVerified: true);
+          state = state.copyWith(user: updatedUser);
+          debugPrint('✅ verifyEmail: utilisateur mis à jour localement (isEmailVerified=true)');
+        }
+      }
+      return result;
+    } catch (e) {
+      debugPrint('⚠️ verifyEmail: $e');
       rethrow;
     }
+  }
+
+  // ─── Private helpers ──────────────────────────────────────────────────────
+  void _saveLegalCache(String userId) {
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setBool('legal_accepted_$userId', true);
+    }).catchError((_) {});
   }
 }
 
@@ -323,7 +363,7 @@ class MoodNotifier extends StateNotifier<MoodState> {
       final data = await _api.getMoodHistory(days: days);
       state = state.copyWith(
         isLoading: false,
-        history: List<Map<String, dynamic>>.from(data['history']),
+        history: List<Map<String, dynamic>>.from(data['history'] ?? []),
         stats: data['stats'],
       );
     } catch (e) {
@@ -375,7 +415,7 @@ class ChallengesNotifier extends StateNotifier<ChallengesState> {
       final data = await _api.getDailyChallenges(moodLabel: moodLabel);
       state = state.copyWith(
         isLoading: false,
-        daily: List<Map<String, dynamic>>.from(data['challenges']),
+        daily: List<Map<String, dynamic>>.from(data['challenges'] ?? []),
       );
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -386,14 +426,12 @@ class ChallengesNotifier extends StateNotifier<ChallengesState> {
     try {
       final data = await _api.completeChallenge(challengeId, durationSeconds: durationSeconds);
       final updated = state.daily.map((c) {
-        if ((c['_id'] ?? c['id']) == challengeId) {
-          return {...c, 'isCompleted': true};
-        }
+        if ((c['_id'] ?? c['id']) == challengeId) return {...c, 'isCompleted': true};
         return c;
       }).toList();
       state = state.copyWith(daily: updated);
       return data;
-    } catch (e) {
+    } catch (_) {
       return null;
     }
   }

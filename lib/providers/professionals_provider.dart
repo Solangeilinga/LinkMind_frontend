@@ -46,20 +46,36 @@ class ProfessionalsNotifier extends StateNotifier<ProfessionalsState> {
   final ApiService _api = ApiService();
   String _currentSearch = '';
   String _currentType = 'all';
+  String _currentCity = '';
 
   ProfessionalsNotifier() : super(ProfessionalsState()) {
     loadProfessionals();
     loadBookings();
   }
 
-  Future<void> loadProfessionals({String? search, String? type}) async {
+  String _buildQuery(int page) {
+    final params = <String, String>{
+      'page': '$page',
+      'limit': '20',
+    };
+    if (_currentSearch.isNotEmpty) params['search'] = _currentSearch;
+    if (_currentType != 'all') params['type'] = _currentType;
+    if (_currentCity.isNotEmpty) params['city'] = _currentCity;
+
+    final query = params.entries.map((e) =>
+        '\${Uri.encodeQueryComponent(e.key)}=\${Uri.encodeQueryComponent(e.value)}'
+    ).join('&');
+    return '/professionals?$query';
+  }
+
+  Future<void> loadProfessionals({String? search, String? type, String? city}) async {
     if (search != null) _currentSearch = search;
     if (type != null) _currentType = type;
+    if (city != null) _currentCity = city;
 
     state = state.copyWith(isLoadingPros: true, page: 1, error: null);
     try {
-      final typeQuery = _currentType == 'all' ? '' : '&type=$_currentType';
-      final data = await _api.get('/professionals?search=$_currentSearch$typeQuery&page=1&limit=20');
+      final data = await _api.get(_buildQuery(1));
       final pros = List<Map<String, dynamic>>.from(data['professionals'] ?? []);
       
       state = state.copyWith(
@@ -79,8 +95,7 @@ class ProfessionalsNotifier extends StateNotifier<ProfessionalsState> {
     final nextPage = state.page + 1;
     
     try {
-      final typeQuery = _currentType == 'all' ? '' : '&type=$_currentType';
-      final data = await _api.get('/professionals?search=$_currentSearch$typeQuery&page=$nextPage&limit=20');
+      final data = await _api.get(_buildQuery(nextPage));
       final newPros = List<Map<String, dynamic>>.from(data['professionals'] ?? []);
       
       state = state.copyWith(

@@ -17,12 +17,10 @@ class ComposePage extends StatefulWidget {
 class _ComposePageState extends State<ComposePage> {
   final _ctrl = TextEditingController();
   String _type = 'feeling';
-  String? _moodEmoji;
   int _charCount = 0;
   bool _isPosting = false;
   static const _maxChars = 1500;
   static const _types = ['feeling', 'question', 'support', 'success', 'tip'];
-  static const _moodEmojis = ['😔', '😰', '😴', '😟', '😐', '🙂', '😄', '😤', '😢', '😊'];
 
   @override
   void initState() {
@@ -42,7 +40,7 @@ class _ComposePageState extends State<ComposePage> {
     if (_charCount == 0 || _isPosting || widget.onSubmit == null) return;
     setState(() => _isPosting = true);
     try {
-      await widget.onSubmit!(_ctrl.text.trim(), _type, _moodEmoji);
+      await widget.onSubmit!(_ctrl.text.trim(), _type, null);
       if (mounted) Navigator.of(context).pop();
     } catch (_) {
       if (mounted) setState(() => _isPosting = false);
@@ -153,42 +151,6 @@ class _ComposePageState extends State<ComposePage> {
                   );
                 }).toList(),
               ),
-            ),
-          ]),
-        ),
-        // Emoji humeur (optionnel)
-        Container(
-          color: AppColors.surface,
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(
-              'Comment tu te sens ? (optionnel)',
-              style: AppTextStyles.caption.copyWith(
-                  color: AppColors.onSurfaceMuted, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: _moodEmojis.map((e) {
-                final sel = _moodEmoji == e;
-                return GestureDetector(
-                  onTap: () => setState(() => _moodEmoji = sel ? null : e),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: sel
-                          ? AppColors.primary.withValues(alpha: 0.12)
-                          : AppColors.surfaceVariant,
-                      borderRadius: AppRadius.full,
-                      border: Border.all(
-                          color: sel ? AppColors.primary : Colors.transparent, width: 1.5),
-                    ),
-                    child: Text(e, style: const TextStyle(fontSize: 22)),
-                  ),
-                );
-              }).toList(),
             ),
           ]),
         ),

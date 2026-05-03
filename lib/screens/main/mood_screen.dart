@@ -115,7 +115,6 @@ class _MoodScreenState extends ConsumerState<MoodScreen> with SingleTickerProvid
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnim,
-          // ✅ AJOUT DU REFRESH INDICATOR ICI
           child: RefreshIndicator(
             color: AppColors.primary,
             onRefresh: () async {
@@ -123,7 +122,6 @@ class _MoodScreenState extends ConsumerState<MoodScreen> with SingleTickerProvid
               await _loadContent();
             },
             child: CustomScrollView(
-              // ✅ OBLIGATOIRE POUR QUE LE REFRESH FONCTIONNE TOUT LE TEMPS
               physics: const AlwaysScrollableScrollPhysics(), 
               slivers: [
                 SliverToBoxAdapter(child: Padding(
@@ -439,7 +437,7 @@ class _MoodEmoji extends StatelessWidget {
   );
 }
 
-// ─── Weekly Chart ─────────────────────────────────────────────────────────────
+// ─── Weekly Chart (CORRIGÉ : plus d'overflow) ─────────────────────────────────
 class _WeeklyMoodChart extends StatelessWidget {
   final List<Map<String, dynamic>> history;
   final Map<String, dynamic>? stats;
@@ -462,8 +460,7 @@ class _WeeklyMoodChart extends StatelessWidget {
     final dayMap = _buildDayMap();
     final today  = DateTime.now();
     const dayLabels = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-    const barAreaHeight = 100.0;
-    const maxBarHeight  = 58.0;
+    const maxBarHeight = 58.0;
 
     final days7 = List.generate(7, (i) {
       final d   = today.subtract(Duration(days: 6 - i));
@@ -482,11 +479,11 @@ class _WeeklyMoodChart extends StatelessWidget {
 
     Color scoreColor(double s) {
       if (s == 0) return AppColors.surfaceVariant;
-      if (s <= 1.5) return const Color(0xFFFF7675); // Sad
-      if (s <= 2.5) return const Color(0xFFFFB347); // Anxious/Tired
-      if (s <= 3.5) return const Color(0xFFFFD93D); // Neutral
-      if (s <= 4.5) return const Color(0xFF6BCF7F); // Good
-      return const Color(0xFF2ECC71); // Great
+      if (s <= 1.5) return const Color(0xFFFF7675);
+      if (s <= 2.5) return const Color(0xFFFFB347);
+      if (s <= 3.5) return const Color(0xFFFFD93D);
+      if (s <= 4.5) return const Color(0xFF6BCF7F);
+      return const Color(0xFF2ECC71);
     }
 
     return Container(
@@ -501,14 +498,14 @@ class _WeeklyMoodChart extends StatelessWidget {
         children: [
           Text('Ton évolution', style: AppTextStyles.h4),
           const SizedBox(height: 16),
-          SizedBox(
-            height: barAreaHeight,
+          // Utilisation d'IntrinsicHeight pour éviter l'overflow
+          IntrinsicHeight(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: days7.map((d) {
                 final s = d.score;
-                final height = s == 0 ? 8.0 : (s / 5.0) * maxBarHeight;
+                final barHeight = s == 0 ? 8.0 : (s / 5.0) * maxBarHeight;
                 return Column(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -518,7 +515,7 @@ class _WeeklyMoodChart extends StatelessWidget {
                       duration: const Duration(milliseconds: 500),
                       curve: Curves.easeOut,
                       width: 24, 
-                      height: height,
+                      height: barHeight,
                       decoration: BoxDecoration(
                         color: scoreColor(s),
                         borderRadius: BorderRadius.circular(6)
@@ -561,35 +558,38 @@ class _WellnessTipsSection extends StatelessWidget {
       children: [
         Text('Recommandé pour toi', style: AppTextStyles.h4),
         const SizedBox(height: 12),
-        ...tips.map((t) => Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: moodColor.withValues(alpha: 0.08),
-            borderRadius: AppRadius.md,
-            border: Border.all(color: moodColor.withValues(alpha: 0.2))
-          ),
-          child: Row(
-            children: [
-              Text(t.icon, style: const TextStyle(fontSize: 24)),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(t.title, style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 2),
-                    Text(t.desc, style: AppTextStyles.caption.copyWith(
-                      color: AppColors.onSurfaceMuted, height: 1.3))
-                  ]
-                )
-              ),
-              if (t.route != null) ...[
-                const SizedBox(width: 8),
-                Icon(Icons.chevron_right, color: moodColor, size: 20)
+        ...tips.map((t) => GestureDetector(
+          onTap: t.route != null ? () => context.push(t.route!) : null,
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: moodColor.withValues(alpha: 0.08),
+              borderRadius: AppRadius.md,
+              border: Border.all(color: moodColor.withValues(alpha: 0.2))
+            ),
+            child: Row(
+              children: [
+                Text(t.icon, style: const TextStyle(fontSize: 24)),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(t.title, style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 2),
+                      Text(t.desc, style: AppTextStyles.caption.copyWith(
+                        color: AppColors.onSurfaceMuted, height: 1.3))
+                    ]
+                  )
+                ),
+                if (t.route != null) ...[
+                  const SizedBox(width: 8),
+                  Icon(Icons.chevron_right, color: moodColor, size: 20)
+                ]
               ]
-            ]
-          )
+            ),
+          ),
         )).toList()
       ]
     );

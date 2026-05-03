@@ -23,7 +23,6 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   @override
   void initState() {
     super.initState();
-    // ✅ CORRECTION : Ne pas appeler de setState avant que le widget soit monté
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _sendInitialCode();
     });
@@ -69,23 +68,24 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
     setState(() {
       _isLoading = true;
       _error = null;
+      _success = null;
     });
 
     try {
       final verified = await ref.read(authProvider.notifier).verifyEmail(code);
+      debugPrint('✅ verifyEmail retourné: $verified');
+
       if (verified && mounted) {
-        await ref.read(authProvider.notifier).refreshUser();
-        if (mounted) {
-          context.go('/legal-onboarding');
-        }
+        // Redirection vers l'onboarding classique (le routeur gère la suite)
+        context.go('/onboarding');
       } else {
         if (mounted) setState(() => _error = 'Code invalide');
       }
     } catch (e, stack) {
-      debugPrint('Erreur _verifyCode: $e\n$stack');
-      if (mounted) setState(() => _error = 'Erreur, réessaie plus tard');
+      debugPrint('❌ Erreur _verifyCode: $e\n$stack');
+      if (mounted) setState(() => _error = 'Erreur lors de la vérification. Réessaie plus tard.');
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted && _isLoading) setState(() => _isLoading = false);
     }
   }
 
@@ -138,16 +138,16 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
         automaticallyImplyLeading: false,
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 40),
+              const SizedBox(height: 20),
               Center(
-                child: Text(icon, style: const TextStyle(fontSize: 56)),
+                child: Text(icon, style: const TextStyle(fontSize: 48)),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               Text(
                 title,
                 style: AppTextStyles.h2,
@@ -159,14 +159,14 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                 style: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               if (_destinationMasked != null)
                 Text(
                   _destinationMasked!,
                   style: AppTextStyles.h4.copyWith(color: AppColors.primary),
                   textAlign: TextAlign.center,
                 ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               if (_error != null)
                 Container(
@@ -200,7 +200,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                   ),
                 ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               TextField(
                 controller: _codeController,
@@ -208,7 +208,6 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                 maxLength: 6,
                 textAlign: TextAlign.center,
                 onChanged: (val) {
-                  // ✅ Auto-submit quand 6 chiffres sont entrés
                   if (val.length == 6) {
                     _verifyCode();
                   }
@@ -223,7 +222,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                 ),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               SizedBox(
                 width: double.infinity,
@@ -241,7 +240,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,

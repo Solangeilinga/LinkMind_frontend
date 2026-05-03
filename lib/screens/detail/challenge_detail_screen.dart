@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../utils/theme.dart';
 import '../../providers/content_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../models/challenge.dart';
 import '../../services/api.service.dart';
 
@@ -153,45 +154,43 @@ class _ChallengeDetailScreenState extends ConsumerState<ChallengeDetailScreen>
   }
 
   Future<void> _completeChallenge({String? reflection}) async {
-  if (_isCompleted || _isCompleting) return;
+    if (_isCompleted || _isCompleting) return;
 
-  _stepTimer?.cancel();
-  setState(() => _isCompleting = true);
+    _stepTimer?.cancel();
+    setState(() => _isCompleting = true);
 
-  try {
-  final apiService = ApiService();
-  final result = await apiService.completeChallenge(
-    widget.challengeId,
-    reflection: reflection,
-  );
+    try {
+      final result = await ApiService().completeChallenge(
+        widget.challengeId,
+        reflection: reflection,
+      );
 
-  if (!mounted) return;
+      if (!mounted) return;
 
-  setState(() {
-    _isCompleted = true;
-    _isCompleting = false;
-  });
+      // Rafraîchit le provider pour que la liste des défis se mette à jour
+      ref.read(challengesProvider.notifier).loadDaily();
 
-  _checkController.forward();
+      setState(() {
+        _isCompleted = true;
+        _isCompleting = false;
+      });
 
-  await Future.delayed(const Duration(milliseconds: 600));
+      _checkController.forward();
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (!mounted) return;
 
-  if (!mounted) return;
-  _showSuccessSheet(result);
-
-} catch (e) {
-  if (!mounted) return;
-
-  setState(() => _isCompleting = false);
-
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text('Une erreur est survenue'),
-      backgroundColor: AppColors.accent,
-    ),
-  );
-}
-}
+      _showSuccessSheet(result);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isCompleting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Une erreur est survenue'),
+          backgroundColor: AppColors.accent,
+        ),
+      );
+    }
+  }
 
  
 
@@ -470,9 +469,11 @@ class _ChallengeDetailScreenState extends ConsumerState<ChallengeDetailScreen>
 
   Widget _buildTimerButtons(Challenge challenge) {
     final instructions = challenge.instructions;
-    
+    final isLastStep = _currentStep >= instructions.length - 1;
+
     return Column(
       children: [
+        // Barre de progression
         if (instructions.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 14),
@@ -493,7 +494,7 @@ class _ChallengeDetailScreenState extends ConsumerState<ChallengeDetailScreen>
                 Text(
                   '${_currentStep + 1}/${instructions.length}',
                   style: AppTextStyles.caption.copyWith(
-                    color: _getCategoryColor(), 
+                    color: _getCategoryColor(),
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -501,56 +502,37 @@ class _ChallengeDetailScreenState extends ConsumerState<ChallengeDetailScreen>
             ),
           ),
 
-        if (_currentStep < instructions.length - 1)
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: (_secondsLeft == 0 && !_timerRunning)
-                  ? () => _nextStep(instructions.length)
-                  : null,
-              icon: const Icon(Icons.arrow_forward_rounded, size: 20),
-              label: Text(_secondsLeft > 0
-                  ? 'Attends la fin du timer...'
-                  : 'Étape suivante (${_currentStep + 2}/${instructions.length})'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _getCategoryColor(),
-                minimumSize: const Size.fromHeight(54),
-              ),
-            ),
-          )
-        else
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: (_allStepsDone && !_timerRunning && !_isCompleting)
-                  ? () => _completeChallenge()
-                  : null,
-              icon: _isCompleting
-                  ? const SizedBox(
-                      width: 18, height: 18,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Icon(Icons.check_circle_rounded, size: 22),
-              label: Text(
-                _isCompleting
-                    ? 'Enregistrement...'
-                    : !_allStepsDone
-                        ? (_secondsLeft > 0 ? 'Attends... (${_secondsLeft}s)' : 'Complète toutes les étapes')
-                        : 'Terminer le défi ✅',
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.secondary,
-                minimumSize: const Size.fromHeight(54),
-              ),
-            ),
-          ),
-
-        const SizedBox(height: 10),
-        TextButton(
-          onPressed: _resetChallenge,
-          child: Text(
-            'Recommencer depuis le début',
-            style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted),
-          ),
+        SizedBox(
+          width: double.infinity,
+          child: isLastStep
+              // Bouton Terminer — visible seulement quand toutes les étapes sont faites
+              ? (_allStepsDone
+                  ? ElevatedButton.icon(
+                      onPressed: _isCompleting ? null : () => _completeChallenge(),
+                      icon: _isCompleting
+                          ? const SizedBox(
+                              width: 18, height: 18,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Icon(Icons.check_circle_rounded, size: 22),
+                      label: Text(_isCompleting ? 'Enregistrement...' : 'Terminer le défi ✅'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.secondary,
+                        minimumSize: const Size.fromHeight(54),
+                      ),
+                    )
+                  : const SizedBox.shrink())
+              // Bouton Étape suivante — visible seulement quand le timer est terminé
+              : (_secondsLeft == 0 && !_timerRunning
+                  ? ElevatedButton.icon(
+                      onPressed: () => _nextStep(instructions.length),
+                      icon: const Icon(Icons.arrow_forward_rounded, size: 20),
+                      label: Text('Étape suivante (${_currentStep + 2}/${instructions.length})'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _getCategoryColor(),
+                        minimumSize: const Size.fromHeight(54),
+                      ),
+                    )
+                  : const SizedBox.shrink()),
         ),
       ],
     );
@@ -566,7 +548,7 @@ class _ChallengeDetailScreenState extends ConsumerState<ChallengeDetailScreen>
                 width: 18, height: 18,
                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
             : const Icon(Icons.check_circle_rounded, size: 22),
-        label: Text(_isCompleting ? 'Enregistrement...' : 'Marquer comme terminé ✅'),
+        label: Text(_isCompleting ? 'Enregistrement...' : 'Terminer le défi ✅'),
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.secondary,
           minimumSize: const Size.fromHeight(54),

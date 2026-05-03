@@ -1,6 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:open_file/open_file.dart';
 import '../../utils/theme.dart';
 import '../../providers/app_settings_provider.dart';
 import '../../services/local_notification_service.dart';
@@ -17,18 +21,37 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _notifEnabled = true;
   String _reminderTime = '20:00';
+  List<Map<String, dynamic>> _languages = [];
+  bool _loadingLanguages = false;
+  bool _exporting = false; // ← Ajout
 
   @override
   void initState() {
     super.initState();
     _loadPrefs();
+    _loadLanguages();
+  }
+
+  Future<void> _loadLanguages() async {
+    setState(() => _loadingLanguages = true);
+    try {
+      final data = await ApiService().getLanguages();
+      if (mounted) {
+        setState(() {
+          _languages = List<Map<String, dynamic>>.from(data['languages'] ?? []);
+          _loadingLanguages = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingLanguages = false);
+    }
   }
 
   Future<void> _loadPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _notifEnabled  = prefs.getBool('notifications_enabled') ?? true;
-      _reminderTime  = prefs.getString('reminder_time') ?? '20:00';
+      _notifEnabled = prefs.getBool('notifications_enabled') ?? true;
+      _reminderTime = prefs.getString('reminder_time') ?? '20:00';
     });
   }
 
@@ -62,8 +85,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           onPressed: () => context.pop()),
       ),
       body: ListView(children: [
-
-        // ── Apparence ────────────────────────────────────────────────────────
         _SectionHeader('Apparence'),
         _SettingCard(children: [
           _SettingRow(
@@ -97,23 +118,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ])),
         ]),
 
-        // ── Langue ──────────────────────────────────────────────────────────
         _SectionHeader('Langue'),
         _SettingCard(children: [
-          ...[
-            ('fr', '🇫🇷', 'Français'),
-            ('en', '🇬🇧', 'English'),
-            ('ar', '🇸🇦', 'العربية'),
-            ('es', '🇪🇸', 'Español'),
-            ('pt', '🇧🇷', 'Português'),
-          ].map((lang) => _LanguageTile(
-            code: lang.$1, flag: lang.$2, label: lang.$3,
-            selected: settings.language == lang.$1,
-            onTap: () => notifier.setLanguage(lang.$1),
-          )),
+          if (_loadingLanguages)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: SizedBox(
+                  width: 20, height: 20,
+                  child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
+                ),
+              ),
+            )
+          else if (_languages.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text('Langues indisponibles',
+                  style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
+            )
+          else
+            ..._languages.map((lang) => _LanguageTile(
+              code: lang['code'] as String,
+              flag: lang['flag'] as String? ?? '🏳️',
+              label: lang['nativeLabel'] as String? ?? lang['label'] as String? ?? lang['code'] as String,
+              selected: settings.language == (lang['code'] as String),
+              onTap: () => notifier.setLanguage(lang['code'] as String),
+            )),
         ]),
 
-        // ── Notifications ────────────────────────────────────────────────────
         _SectionHeader('Notifications'),
         _SettingCard(children: [
           SwitchListTile(
@@ -146,29 +178,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ],
         ]),
 
-        // ── Compte ──────────────────────────────────────────────────────────
         _SectionHeader('Compte'),
         _SettingCard(children: [
           _SettingRow(
             icon: Icons.download_outlined,
             title: 'Exporter mes données',
-            subtitle: 'Télécharge toutes tes données (RGPD)',
-            onTap: () => _exportData(context),
-          ),
-          const Divider(height: 1),
-          _SettingRow(
-            icon: Icons.logout_outlined,
-            title: 'Se déconnecter',
-            onTap: () => _logout(context),
-          ),
-          const Divider(height: 1),
-          _SettingRow(
-            icon: Icons.delete_forever_outlined,
-            title: 'Supprimer mon compte',
-            subtitle: 'Irréversible — toutes tes données seront supprimées',
-            titleColor: AppColors.accent,
-            iconColor: AppColors.accent,
-            onTap: () => _deleteAccount(context),
+            subtitle: _exporting ? 'Export en cours...' : 'Télécharge toutes tes données (RGPD)',
+            onTap: _exporting ? null : () => _exportData(context),
           ),
         ]),
 
@@ -207,54 +223,108 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _exportData(BuildContext context) async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Export en cours…')));
+    setState(() => _exporting = true);
     try {
-      await ApiService().exportMyData();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Données exportées ✅'),
-            backgroundColor: AppColors.secondary));
+      final token = await ApiService().getAccessToken();
+      final baseUrl = AppConstants.baseUrl;
+      final dio = Dio();
+      final dir = await getTemporaryDirectory();
+      final date = DateTime.now().toIso8601String().split('T')[0];
+      final path = '${dir.path}/linkmind-data-$date.json';
+
+      await dio.download(
+        '$baseUrl/users/me/export',
+        path,
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          responseType: ResponseType.bytes,
+        ),
+      );
+
+      final file = File(path);
+      if (!await file.exists() || await file.length() == 0) {
+        throw Exception('Fichier exporté invalide');
       }
-    } catch (_) {
+
       if (mounted) {
+        setState(() => _exporting = false);
+        _showExportSuccessDialog(path);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _exporting = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erreur lors de l\'export')));
+          SnackBar(content: Text('Erreur export : $e'), backgroundColor: AppColors.accent),
+        );
       }
     }
   }
 
-  Future<void> _logout(BuildContext context) async {
-    await ApiService().logout();
-    if (mounted) context.go('/login');
-  }
-
-  Future<void> _deleteAccount(BuildContext context) async {
-    final confirm = await showDialog<bool>(
+  void _showExportSuccessDialog(String path) {
+    showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Supprimer mon compte'),
-        content: const Text(
-          'Cette action est irréversible. Ton compte et toutes tes données personnelles seront supprimés.\n\nTes posts dans la communauté seront anonymisés.'),
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.lg),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: AppColors.secondary, size: 28),
+            SizedBox(width: 8),
+            Text('Export terminé !'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Vos données ont été exportées avec succès.'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                borderRadius: AppRadius.md,
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.data_usage, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      path.split('/').last,
+                      style: AppTextStyles.caption,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
           TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.accent),
-            child: const Text('Supprimer définitivement')),
-        ]));
-    if (confirm != true || !mounted) return;
-    try {
-      await ApiService().deleteAccount();
-      await LocalNotificationService.cancelAll();
-      if (mounted) context.go('/login');
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Erreur. Réessaie.')));
-      }
-    }
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Fermer'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final result = await OpenFile.open(path);
+              if (result.type != ResultType.done) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Impossible d\'ouvrir : ${result.message}')),
+                );
+              }
+            },
+            icon: const Icon(Icons.open_in_new, size: 16),
+            label: const Text('Ouvrir'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
