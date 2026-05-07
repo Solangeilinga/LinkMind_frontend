@@ -1,24 +1,174 @@
-CONDITIONS GÉNÉRALES D'UTILISATION
+# Conditions Générales d'Utilisation — LinkMind
 
-Dernière mise à jour : 20 avril 2026
+---
 
-1. Acceptation des conditions
-En utilisant l'application LinkMind, vous acceptez pleinement et sans réserve les présentes conditions générales d'utilisation. Si vous n'acceptez pas ces conditions, veuillez ne pas utiliser l'application.
+## Préambule
 
-2. Description du service
-LinkMind est une application de bien-être mental qui propose des outils de suivi d'humeur, des défis personnalisés, une communauté d'entraide et des ressources pour améliorer votre santé mentale.
+Les présentes Conditions Générales d'Utilisation (ci-après "CGU") régissent l'accès et l'utilisation de l'application mobile LinkMind (ci-après "l'Application"), développée et exploitée par l'équipe LinkMind (ci-après "Nous" ou "LinkMind").
 
-3. Compte utilisateur
-Vous êtes responsable de la confidentialité de votre compte et de votre mot de passe. Vous vous engagez à fournir des informations exactes et à les mettre à jour si nécessaire.
+En créant un compte et en utilisant l'Application, vous reconnaissez avoir lu, compris et accepté sans réserve les présentes CGU. Si vous n'acceptez pas ces conditions, vous ne devez pas utiliser l'Application.
 
-4. Protection des données (RGPD)
-LinkMind collecte et traite vos données personnelles conformément à notre Politique de confidentialité. Vous disposez d'un droit d'accès, de rectification et de suppression de vos données.
+---
 
-5. Limitation de responsabilité
-LinkMind est un outil d'aide et non un service médical d'urgence. En cas de crise, contactez immédiatement les services d'urgence adaptés.
+## Article 1 — Objet
 
-6. Modification des conditions
-LinkMind se réserve le droit de modifier ces conditions à tout moment. Les modifications entrent en vigueur dès leur publication.
+LinkMind est une application mobile de bien-être mental destinée aux jeunes âgés de 15 ans et plus. Elle propose des outils de suivi d'humeur, un assistant conversationnel basé sur l'intelligence artificielle, des défis de bien-être, une communauté d'entraide anonyme, et un accès à des professionnels de santé mentale partenaires.
 
-7. Loi applicable
-Les présentes conditions sont régies par le droit français.
+LinkMind est un outil de soutien au bien-être et ne constitue en aucun cas un service médical, un dispositif de diagnostic, ni un substitut à une consultation professionnelle.
+
+---
+
+## Article 2 — Conditions d'accès
+
+**2.1 Âge minimum**
+L'utilisation de LinkMind est réservée aux personnes âgées d'au moins 15 ans. En créant un compte, vous certifiez avoir atteint cet âge. LinkMind se réserve le droit de suspendre tout compte dont l'utilisateur s'avèrerait être mineur en dessous de cet âge, sans préavis.
+
+**2.2 Création de compte**
+L'accès à l'Application requiert la création d'un compte via une adresse email valide ou un numéro de téléphone. Vous vous engagez à fournir des informations exactes lors de l'inscription et à les maintenir à jour. Chaque utilisateur ne peut détenir qu'un seul compte actif.
+
+**2.3 Sécurité du compte**
+Vous êtes seul responsable de la confidentialité de vos identifiants de connexion. Toute activité réalisée depuis votre compte est réputée effectuée par vous. En cas de suspicion de compromission, vous devez en informer immédiatement LinkMind.
+
+**2.4 Vérification de l'identité**
+Un code de vérification est envoyé par email ou SMS lors de la création du compte. La validation de ce code est obligatoire pour accéder à l'ensemble des fonctionnalités de l'Application.
+
+---
+
+## Article 3 — Description des services
+
+**3.1 Suivi d'humeur**
+L'Application permet à l'utilisateur d'enregistrer son état émotionnel quotidiennement, de visualiser son évolution sur plusieurs jours et d'accéder à des recommandations personnalisées basées sur ses données.
+
+**3.2 Assistant Mindo**
+Mindo est un assistant conversationnel propulsé par l'intelligence artificielle. Il est conçu pour offrir une écoute, des suggestions de bien-être et orienter l'utilisateur vers des ressources appropriées. Mindo n'est pas un professionnel de santé et ses réponses ne constituent pas un avis médical ou psychologique. En version gratuite, son utilisation est limitée à 10 messages par jour.
+
+**3.3 Défis bien-être**
+Des défis quotidiens sont proposés à l'utilisateur en fonction de son humeur. Leur réalisation génère des points et contribue à la progression dans le système de gamification de l'Application.
+
+**3.4 Communauté anonyme**
+L'Application propose un espace communautaire où les utilisateurs peuvent partager leurs ressentis de manière anonyme, interagir avec les publications d'autres membres et apporter leur soutien. Chaque utilisateur est identifié dans la communauté par un pseudonyme généré automatiquement.
+
+**3.5 Accès aux professionnels**
+LinkMind propose un annuaire de professionnels de santé mentale partenaires. La mise en relation avec ces professionnels est facilitée par l'Application, mais LinkMind n'est pas partie au contrat de prestation entre l'utilisateur et le professionnel, et ne saurait être tenu responsable du contenu des consultations.
+
+**3.6 Fonctionnalités Premium**
+Certaines fonctionnalités avancées sont réservées aux abonnés Premium, notamment l'accès illimité à Mindo, la génération de rapports PDF mensuels et la suppression des publicités. Les conditions tarifaires sont précisées dans l'Application.
+
+---
+
+## Article 4 — Règles de conduite et contenu interdit
+
+En utilisant l'Application, et notamment la fonctionnalité communautaire, vous vous engagez à respecter les règles suivantes.
+
+**4.1 Contenus interdits**
+Il est strictement interdit de publier, diffuser ou partager tout contenu qui :
+
+- incite à la haine, à la discrimination ou à la violence fondées sur l'origine, le sexe, la religion, l'orientation sexuelle, le handicap ou toute autre caractéristique personnelle ;
+- constitue du harcèlement, de l'intimidation ou des menaces envers un autre utilisateur ;
+- fait l'apologie du suicide, de l'automutilation ou de tout comportement dangereux pour soi ou pour autrui ;
+- contient des informations personnelles identifiables sur des tiers sans leur consentement ;
+- diffuse des contenus à caractère sexuel explicite ou violent ;
+- constitue de la publicité, du spam ou de la sollicitation commerciale non autorisée ;
+- porte atteinte aux droits de propriété intellectuelle de tiers.
+
+**4.2 Comportements interdits**
+Il est également interdit de :
+
+- tenter de contourner les mécanismes d'anonymat pour identifier d'autres utilisateurs ;
+- utiliser l'Application à des fins de collecte de données sur d'autres utilisateurs ;
+- usurper l'identité d'un autre utilisateur, d'un professionnel ou d'un membre de l'équipe LinkMind ;
+- tenter d'accéder de façon non autorisée aux systèmes informatiques de l'Application.
+
+**4.3 Modération**
+LinkMind se réserve le droit de supprimer tout contenu contrevenant aux présentes règles et de suspendre ou clôturer tout compte dont le comportement serait incompatible avec les valeurs de bienveillance et de respect qui fondent la communauté LinkMind, sans préavis ni indemnité.
+
+---
+
+## Article 5 — Avertissement médical et limites de l'Application
+
+**5.1 Pas un service médical**
+LinkMind est un outil de soutien au bien-être général. L'Application, ses contenus, son assistant IA et les informations qu'elle fournit ne constituent en aucun cas un diagnostic médical, un traitement psychiatrique, ni un avis psychologique professionnel.
+
+**5.2 Situations d'urgence**
+Si vous êtes en situation de détresse grave, de crise suicidaire ou si votre vie ou celle d'autrui est en danger, ne vous fiez pas à l'Application. Contactez immédiatement les services d'urgence de votre pays (SAMU : 15, Police : 17, Pompiers : 18 au Burkina Faso).
+
+**5.3 Consultation professionnelle**
+LinkMind encourage fortement ses utilisateurs à consulter un professionnel de santé mentale qualifié pour toute préoccupation sérieuse concernant leur santé psychologique.
+
+---
+
+## Article 6 — Données personnelles et confidentialité
+
+**6.1 Collecte des données**
+LinkMind collecte les données nécessaires au fonctionnement de l'Application, notamment les informations de compte (email, téléphone, âge, ville), les données d'humeur, les interactions avec l'assistant, et les contenus publiés dans la communauté.
+
+**6.2 Anonymat dans la communauté**
+Les publications dans l'espace communautaire sont associées à un pseudonyme anonyme et non à votre identité réelle. LinkMind s'engage à ne pas divulguer votre identité réelle aux autres utilisateurs.
+
+**6.3 Droits des utilisateurs**
+Conformément aux principes du Règlement Général sur la Protection des Données (RGPD) et aux lois locales applicables, vous disposez d'un droit d'accès, de rectification, de portabilité et de suppression de vos données personnelles. Vous pouvez exercer ces droits directement depuis votre profil dans l'Application (export JSON, suppression de compte).
+
+**6.4 Conservation des données**
+Vos données sont conservées pendant toute la durée de votre utilisation de l'Application et pendant une période de 30 jours suivant la suppression de votre compte, à l'exception des données rendues anonymes dans le cadre de la suppression de compte.
+
+**6.5 Sécurité**
+LinkMind met en œuvre des mesures techniques et organisationnelles appropriées pour protéger vos données contre tout accès non autorisé, toute divulgation, modification ou destruction. Les mots de passe sont chiffrés et les communications sont sécurisées par protocole HTTPS.
+
+---
+
+## Article 7 — Propriété intellectuelle
+
+L'ensemble des éléments constituant l'Application — design, textes, illustrations, logos, code source, architecture et contenus générés par LinkMind — sont la propriété exclusive de LinkMind et sont protégés par les lois applicables en matière de propriété intellectuelle.
+
+Toute reproduction, représentation, modification ou exploitation non autorisée de ces éléments est strictement interdite. Les contenus publiés par les utilisateurs dans la communauté restent leur propriété. En les publiant, l'utilisateur accorde à LinkMind une licence non exclusive d'utilisation à des fins de fonctionnement et d'amélioration de l'Application.
+
+---
+
+## Article 8 — Disponibilité et modifications du service
+
+**8.1 Disponibilité**
+LinkMind s'efforce d'assurer la disponibilité permanente de l'Application mais ne peut garantir une disponibilité sans interruption. Des maintenances, mises à jour ou incidents techniques peuvent temporairement rendre l'Application inaccessible.
+
+**8.2 Évolution du service**
+LinkMind se réserve le droit de modifier, suspendre ou interrompre tout ou partie des fonctionnalités de l'Application à tout moment, avec ou sans préavis, notamment pour des raisons techniques, de sécurité ou commerciales.
+
+**8.3 Modification des CGU**
+Les présentes CGU peuvent être modifiées à tout moment. Les utilisateurs seront informés de toute modification substantielle via l'Application. La poursuite de l'utilisation de l'Application après notification vaut acceptation des nouvelles conditions.
+
+---
+
+## Article 9 — Résiliation
+
+**9.1 Résiliation par l'utilisateur**
+Vous pouvez supprimer votre compte à tout moment depuis votre profil dans l'Application. La suppression entraîne l'anonymisation de vos publications communautaires et la suppression de vos données personnelles dans les délais prévus à l'article 6.4.
+
+**9.2 Résiliation par LinkMind**
+LinkMind se réserve le droit de suspendre ou supprimer tout compte en cas de violation des présentes CGU, d'activité frauduleuse ou de comportement portant atteinte à l'intégrité de la communauté, sans préavis ni indemnité.
+
+---
+
+## Article 10 — Limitation de responsabilité
+
+Dans les limites permises par la loi applicable, LinkMind ne saurait être tenu responsable des dommages directs ou indirects résultant de l'utilisation ou de l'impossibilité d'utiliser l'Application, des informations fournies par l'assistant IA, des interactions entre utilisateurs dans la communauté, ou des prestations des professionnels partenaires.
+
+L'utilisateur reconnaît utiliser l'Application sous sa propre responsabilité et à ses risques.
+
+---
+
+## Article 11 — Droit applicable et juridiction
+
+Les présentes CGU sont soumises au droit burkinabè. En cas de litige relatif à leur interprétation ou à leur exécution, les parties s'engagent à rechercher une résolution amiable avant tout recours judiciaire. À défaut d'accord amiable, le litige sera soumis aux juridictions compétentes de Ouagadougou, Burkina Faso.
+
+---
+
+## Article 12 — Contact
+
+Pour toute question relative aux présentes CGU, à la protection de vos données ou au fonctionnement de l'Application, vous pouvez nous contacter à l'adresse suivante :
+
+**LinkMind**
+contact@linkmind.app
+
+---
+
+*Dernière mise à jour : Mai 2026*
+*Version : 2025-01*

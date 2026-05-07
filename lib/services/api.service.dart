@@ -21,9 +21,9 @@ class SecurityException implements Exception {
   final String message;
   final SecurityErrorType type;
   final Map<String, dynamic>? data;
-  
+
   SecurityException(this.message, this.type, {this.data});
-  
+
   @override
   String toString() => message;
 }
@@ -63,7 +63,9 @@ class ApiService {
     try {
       _accessToken = await _storage.read(key: 'access_token');
     } catch (_) {
-      try { await _storage.deleteAll(); } catch (_) {}
+      try {
+        await _storage.deleteAll();
+      } catch (_) {}
       _accessToken = null;
     }
     return _accessToken;
@@ -75,7 +77,9 @@ class ApiService {
       try {
         refresh = await _storage.read(key: 'refresh_token');
       } catch (_) {
-        try { await _storage.deleteAll(); } catch (_) {}
+        try {
+          await _storage.deleteAll();
+        } catch (_) {}
         return false;
       }
       if (refresh == null) return false;
@@ -139,61 +143,55 @@ class ApiService {
 
   Future<dynamic> _handleResponse(http.Response response) async {
     final body = jsonDecode(response.body);
-    
+
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return _cleanPosts(body);
     }
-    
+
     if (response.statusCode == 401) {
       if (body['code'] == 'SESSION_EXPIRED') {
-        throw SecurityException('Session expirée', SecurityErrorType.sessionExpired);
+        throw SecurityException(
+            'Session expirée', SecurityErrorType.sessionExpired);
       }
       if (body['code'] == 'TOKEN_EXPIRED') {
         final refreshed = await refreshAccessToken();
         if (!refreshed) {
-          throw SecurityException('Session expirée', SecurityErrorType.sessionExpired);
+          throw SecurityException(
+              'Session expirée', SecurityErrorType.sessionExpired);
         }
         throw ApiException('retry', 401, retryable: true);
       }
       throw SecurityException(
-        body['error'] ?? 'Non authentifié', 
-        SecurityErrorType.unauthorized
-      );
+          body['error'] ?? 'Non authentifié', SecurityErrorType.unauthorized);
     }
-    
+
     if (response.statusCode == 429) {
       if (body['code'] == 'ACCOUNT_LOCKED') {
-        throw SecurityException(
-          body['message'] ?? 'Compte verrouillé',
-          SecurityErrorType.accountLocked,
-          data: {'remainingMinutes': body['remainingMinutes']}
-        );
+        throw SecurityException(body['message'] ?? 'Compte verrouillé',
+            SecurityErrorType.accountLocked,
+            data: {'remainingMinutes': body['remainingMinutes']});
       }
       if (body['code'] == 'ACCOUNT_RESTRICTED') {
-        throw SecurityException(
-          body['message'] ?? 'Compte restreint',
-          SecurityErrorType.accountRestricted,
-          data: {'until': body['until']}
-        );
+        throw SecurityException(body['message'] ?? 'Compte restreint',
+            SecurityErrorType.accountRestricted,
+            data: {'until': body['until']});
       }
       throw SecurityException(
-        body['error'] ?? 'Trop de requêtes', 
-        SecurityErrorType.rateLimited
-      );
+          body['error'] ?? 'Trop de requêtes', SecurityErrorType.rateLimited);
     }
-    
+
     if (response.statusCode == 403) {
       throw SecurityException(
-        body['error'] ?? 'Accès interdit', 
-        SecurityErrorType.forbidden
-      );
+          body['error'] ?? 'Accès interdit', SecurityErrorType.forbidden);
     }
-    
-    throw ApiException(body['error'] ?? 'Une erreur est survenue', response.statusCode);
+
+    throw ApiException(
+        body['error'] ?? 'Une erreur est survenue', response.statusCode);
   }
 
   // ─── Exécute une requête HTTP avec retry automatique après refresh de token ──
-  Future<dynamic> _execute(Future<http.Response> Function(Map<String, String> headers) fn) async {
+  Future<dynamic> _execute(
+      Future<http.Response> Function(Map<String, String> headers) fn) async {
     final headers = await _getHeaders();
     final response = await fn(headers);
     try {
@@ -212,27 +210,35 @@ class ApiService {
   Future<dynamic> get(String path, {Map<String, String>? queryParams}) async {
     final uri = Uri.parse('${AppConstants.baseUrl}$path')
         .replace(queryParameters: queryParams);
-    return _execute((h) => http.get(uri, headers: h));
+    return _execute(
+        (h) => http.get(uri, headers: h).timeout(const Duration(seconds: 15)));
   }
 
   Future<dynamic> post(String path, Map<String, dynamic> body) async {
     final uri = Uri.parse('${AppConstants.baseUrl}$path');
-    return _execute((h) => http.post(uri, headers: h, body: jsonEncode(body)));
+    return _execute((h) => http
+        .post(uri, headers: h, body: jsonEncode(body))
+        .timeout(const Duration(seconds: 15)));
   }
 
   Future<dynamic> put(String path, Map<String, dynamic> body) async {
     final uri = Uri.parse('${AppConstants.baseUrl}$path');
-    return _execute((h) => http.put(uri, headers: h, body: jsonEncode(body)));
+    return _execute((h) => http
+        .put(uri, headers: h, body: jsonEncode(body))
+        .timeout(const Duration(seconds: 15)));
   }
 
   Future<dynamic> patch(String path, Map<String, dynamic> body) async {
     final uri = Uri.parse('${AppConstants.baseUrl}$path');
-    return _execute((h) => http.patch(uri, headers: h, body: jsonEncode(body)));
+    return _execute((h) => http
+        .patch(uri, headers: h, body: jsonEncode(body))
+        .timeout(const Duration(seconds: 15)));
   }
 
   Future<dynamic> delete(String path) async {
     final uri = Uri.parse('${AppConstants.baseUrl}$path');
-    return _execute((h) => http.delete(uri, headers: h));
+    return _execute((h) =>
+        http.delete(uri, headers: h).timeout(const Duration(seconds: 15)));
   }
 
   // ─── Auth ──────────────────────────────────────────────────────────────────
@@ -257,12 +263,14 @@ class ApiService {
       if (city != null && city.isNotEmpty) 'city': city,
       if (gender != null) 'gender': gender,
       'password': password,
-      if (anonymousAlias != null && anonymousAlias.isNotEmpty) 'anonymousAlias': anonymousAlias,
+      if (anonymousAlias != null && anonymousAlias.isNotEmpty)
+        'anonymousAlias': anonymousAlias,
       'legalAccepted': legalAccepted, // ← AJOUT
     });
   }
 
-  Future<Map<String, dynamic>> login({String? email, String? phone, required String password}) async {
+  Future<Map<String, dynamic>> login(
+      {String? email, String? phone, required String password}) async {
     return await post('/auth/login', {
       if (email != null && email.isNotEmpty) 'email': email,
       if (phone != null && phone.isNotEmpty) 'phone': phone,
@@ -271,7 +279,9 @@ class ApiService {
   }
 
   Future<void> logout() async {
-    try { await post('/auth/logout', {}); } catch (_) {}
+    try {
+      await post('/auth/logout', {});
+    } catch (_) {}
     await clearTokens();
   }
 
@@ -325,11 +335,13 @@ class ApiService {
   Future<Map<String, dynamic>> getTodayMood() async => await get('/mood/today');
   Future<Map<String, dynamic>> getMoodHistory({int days = 7}) async =>
       await get('/mood/history', queryParams: {'days': days.toString()});
-  Future<Map<String, dynamic>> getMoodInsights() async => await get('/mood/insights');
+  Future<Map<String, dynamic>> getMoodInsights() async =>
+      await get('/mood/insights');
 
   // ─── Challenges ────────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> getDailyChallenges({String? moodLabel}) async =>
-      await get('/challenges/daily', queryParams: moodLabel != null ? {'moodLabel': moodLabel} : null);
+      await get('/challenges/daily',
+          queryParams: moodLabel != null ? {'moodLabel': moodLabel} : null);
 
   Future<Map<String, dynamic>> completeChallenge(
     String challengeId, {
@@ -358,7 +370,8 @@ class ApiService {
   }
 
   // ─── Community ─────────────────────────────────────────────────────────────
-  Future<Map<String, dynamic>> getFeed({int page = 1, int limit = 20, String? type}) async {
+  Future<Map<String, dynamic>> getFeed(
+      {int page = 1, int limit = 20, String? type}) async {
     final Map<String, String> params = {
       'page': page.toString(),
       'limit': limit.toString(),
@@ -367,7 +380,8 @@ class ApiService {
     return await get('/community/feed', queryParams: params);
   }
 
-  Future<Map<String, dynamic>> getMyPosts({int page = 1, int limit = 20}) async {
+  Future<Map<String, dynamic>> getMyPosts(
+      {int page = 1, int limit = 20}) async {
     return await get('/community/my-posts', queryParams: {
       'page': page.toString(),
       'limit': limit.toString(),
@@ -402,11 +416,14 @@ class ApiService {
   Future<void> deletePost(String postId) async =>
       await delete('/community/posts/$postId');
 
-  Future<Map<String, dynamic>> toggleReaction(String postId, String type) async =>
+  Future<Map<String, dynamic>> toggleReaction(
+          String postId, String type) async =>
       await post('/community/posts/$postId/react', {'type': type});
 
-  Future<Map<String, dynamic>> searchPosts(String query, {String? postType}) async =>
-      await get('/community/search', queryParams: {'q': query, if (postType != null) 'type': postType});
+  Future<Map<String, dynamic>> searchPosts(String query,
+          {String? postType}) async =>
+      await get('/community/search',
+          queryParams: {'q': query, if (postType != null) 'type': postType});
 
   Future<Map<String, dynamic>> getGroupChallenges() async =>
       await get('/community/group-challenges');
@@ -414,26 +431,36 @@ class ApiService {
   // ─── Notifications ─────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> getNotifications({int page = 1}) async =>
       await get('/notifications', queryParams: {'page': page.toString()});
-  Future<void> markNotificationRead(String id) async => await patch('/notifications/$id/read', {});
-  Future<void> markAllNotificationsRead() async => await patch('/notifications/read-all', {});
-  Future<void> deleteNotification(String id) async => await delete('/notifications/$id');
+  Future<void> markNotificationRead(String id) async =>
+      await patch('/notifications/$id/read', {});
+  Future<void> markAllNotificationsRead() async =>
+      await patch('/notifications/read-all', {});
+  Future<void> deleteNotification(String id) async =>
+      await delete('/notifications/$id');
   Future<void> clearAllNotifications() async => await delete('/notifications');
-  Future<void> registerFcmToken(String token) async => await post('/notifications/fcm-token', {'token': token});
+  Future<void> registerFcmToken(String token) async =>
+      await post('/notifications/fcm-token', {'token': token});
 
   // ─── Professionals ─────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> getProfessionals({
-    String? type, String? city, String? search,
-    int page = 1, int limit = 20,
+    String? type,
+    String? city,
+    String? search,
+    int page = 1,
+    int limit = 20,
   }) async {
     final Map<String, String> params = {
-      'page': page.toString(), 'limit': limit.toString()};
+      'page': page.toString(),
+      'limit': limit.toString()
+    };
     if (type != null) params['type'] = type;
     if (city != null) params['city'] = city;
     if (search != null) params['search'] = search;
     return await get('/professionals', queryParams: params);
   }
 
-  Future<Map<String, dynamic>> getProfessional(String id) async => await get('/professionals/$id');
+  Future<Map<String, dynamic>> getProfessional(String id) async =>
+      await get('/professionals/$id');
   Future<Map<String, dynamic>> bookProfessional({
     required String professionalId,
     required String message,
@@ -446,7 +473,9 @@ class ApiService {
       if (consultationType != null) 'consultationType': consultationType,
     });
   }
-  Future<Map<String, dynamic>> getMyBookings() async => await get('/professionals/bookings/me');
+
+  Future<Map<String, dynamic>> getMyBookings() async =>
+      await get('/professionals/bookings/me');
   Future<Map<String, dynamic>> updateBooking({
     required String bookingId,
     String? consultationType,
@@ -459,12 +488,16 @@ class ApiService {
     if (message != null) data['message'] = message;
     return await put('/professionals/bookings/$bookingId', data);
   }
-  Future<void> cancelBooking(String bookingId) async => await delete('/professionals/bookings/$bookingId');
+
+  Future<void> cancelBooking(String bookingId) async =>
+      await delete('/professionals/bookings/$bookingId');
 
   // ─── User ──────────────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> getMe() async => await get('/users/me');
-  Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async => await patch('/users/me', data);
-  Future<Map<String, dynamic>> getLeaderboard() async => await get('/users/leaderboard');
+  Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async =>
+      await patch('/users/me', data);
+  Future<Map<String, dynamic>> getLeaderboard() async =>
+      await get('/users/leaderboard');
 
   // ─── Assistant ─────────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> chatWithAssistant({
@@ -476,6 +509,7 @@ class ApiService {
       if (context != null) 'context': context,
     });
   }
+
   Future<void> clearAssistantSession() async {
     try {
       final headers = await _getHeaders();
@@ -487,16 +521,27 @@ class ApiService {
   }
 
   // ─── Content (from DB) ────────────────────────────────────────────────────
-  Future<Map<String, dynamic>> getDailyMessage() async => await get('/content/daily-message');
+  Future<Map<String, dynamic>> getDailyMessage() async =>
+      await get('/content/daily-message');
   Future<Map<String, dynamic>> getWellnessTips({String? mood}) async =>
-      await get('/content/wellness-tips', queryParams: mood != null ? {'mood': mood} : null);
-  Future<Map<String, dynamic>> getStressFactors() async => await get('/content/stress-factors');
-  Future<Map<String, dynamic>> getBadgesConfig() async => await get('/content/badges');
-  Future<Map<String, dynamic>> getAssistantStarters() async => await get('/content/assistant-starters');
-  Future<Map<String, dynamic>> getMoodDefinitions() async => await get('/content/moods');
-  Future<Map<String, dynamic>> getLanguages() async => await get('/content/languages');
-  Future<Map<String, dynamic>> getProfessionalTypes() async => await get('/content/professional-types');
-  Future<Map<String, dynamic>> getChallengeCategories() async => await get('/content/challenge-categories');
-  Future<Map<String, dynamic>> getChallengeDifficulties() async => await get('/content/challenge-difficulties');
-  Future<Map<String, dynamic>> getPostTypes() async => await get('/content/post-types');
+      await get('/content/wellness-tips',
+          queryParams: mood != null ? {'mood': mood} : null);
+  Future<Map<String, dynamic>> getStressFactors() async =>
+      await get('/content/stress-factors');
+  Future<Map<String, dynamic>> getBadgesConfig() async =>
+      await get('/content/badges');
+  Future<Map<String, dynamic>> getAssistantStarters() async =>
+      await get('/content/assistant-starters');
+  Future<Map<String, dynamic>> getMoodDefinitions() async =>
+      await get('/content/moods');
+  Future<Map<String, dynamic>> getLanguages() async =>
+      await get('/content/languages');
+  Future<Map<String, dynamic>> getProfessionalTypes() async =>
+      await get('/content/professional-types');
+  Future<Map<String, dynamic>> getChallengeCategories() async =>
+      await get('/content/challenge-categories');
+  Future<Map<String, dynamic>> getChallengeDifficulties() async =>
+      await get('/content/challenge-difficulties');
+  Future<Map<String, dynamic>> getPostTypes() async =>
+      await get('/content/post-types');
 }

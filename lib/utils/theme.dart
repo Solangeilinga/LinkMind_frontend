@@ -163,99 +163,133 @@ class AppTheme {
     ),
   );
 
-  // ─── Dark theme complet ─────────────────────────────────────────────────────
-  static ThemeData get dark => ThemeData(
-    useMaterial3: true,
+  // ─── Dark theme complet ─────────────────────────────────────────────────────// ─── Dark theme amélioré (contraste + lisibilité) ────────────────────────────
+static ThemeData get dark => ThemeData(
+  useMaterial3: true,
+  brightness: Brightness.dark,
+  colorScheme: ColorScheme.fromSeed(
+    seedColor: AppColors.primary,
+    surface: AppColors.surfaceDark,
+    primary: AppColors.primaryLight,
+    secondary: AppColors.secondaryLight,
+    error: AppColors.accent,
     brightness: Brightness.dark,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: AppColors.primary,
-      surface: AppColors.surfaceDark,
-      primary: AppColors.primaryLight,
-      secondary: AppColors.secondaryLight,
-      error: AppColors.accent,
-      brightness: Brightness.dark,
+  ),
+  fontFamily: AppTextStyles.fontFamily,
+  scaffoldBackgroundColor: AppColors.backgroundDark,
+  
+  appBarTheme: const AppBarTheme(
+    backgroundColor: AppColors.surfaceDark,
+    elevation: 0,
+    scrolledUnderElevation: 0,
+    titleTextStyle: TextStyle(
+      fontSize: 20,
+      fontWeight: FontWeight.w800,
+      fontFamily: AppTextStyles.fontFamily,
+      color: Colors.white, // Titre blanc vif
     ),
-    fontFamily: AppTextStyles.fontFamily,
-    scaffoldBackgroundColor: AppColors.backgroundDark,
-    appBarTheme: const AppBarTheme(
-      backgroundColor: AppColors.surfaceDark,
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      titleTextStyle: TextStyle(
-        fontSize: 20, fontWeight: FontWeight.w800,
-        fontFamily: AppTextStyles.fontFamily,
-        color: AppColors.onSurfaceDark,
-      ),
-      iconTheme: IconThemeData(color: AppColors.onSurfaceDark),
-    ),
-    cardTheme: CardThemeData(
-      color: AppColors.surfaceDark,
-      elevation: 0,
+    iconTheme: IconThemeData(color: Colors.white),
+  ),
+  
+  cardTheme: CardThemeData(
+    color: AppColors.surfaceDark,
+    elevation: 2, // Légère ombre pour démarquer
+    shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
+    margin: EdgeInsets.zero,
+  ),
+  
+  elevatedButtonTheme: ElevatedButtonThemeData(
+    style: ElevatedButton.styleFrom(
+      backgroundColor: AppColors.primaryLight,
+      foregroundColor: Colors.white,
+      textStyle: AppTextStyles.button,
       shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
-      margin: EdgeInsets.zero,
+      minimumSize: const Size.fromHeight(52),
+      elevation: 1,
     ),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primaryLight,
-        foregroundColor: Colors.white,
-        textStyle: AppTextStyles.button,
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
-        minimumSize: const Size.fromHeight(52),
-        elevation: 0,
-      ),
+  ),
+  
+  inputDecorationTheme: InputDecorationTheme(
+    filled: true,
+    fillColor: AppColors.surfaceVariantDark,
+    border: OutlineInputBorder(
+      borderRadius: AppRadius.md,
+      borderSide: const BorderSide(color: Colors.grey, width: 1),
     ),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: AppColors.surfaceVariantDark,
-      border: OutlineInputBorder(borderRadius: AppRadius.md, borderSide: BorderSide.none),
-      enabledBorder: OutlineInputBorder(borderRadius: AppRadius.md, borderSide: BorderSide.none),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: AppRadius.md,
-        borderSide: const BorderSide(color: AppColors.primaryLight, width: 2),
-      ),
-      hintStyle: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMutedDark),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: AppRadius.md,
+      borderSide: const BorderSide(color: Color(0xFF5A3A3A), width: 1),
     ),
-    dividerTheme: const DividerThemeData(color: AppColors.dividerDark, thickness: 1),
-    checkboxTheme: CheckboxThemeData(
-      fillColor: WidgetStateProperty.resolveWith((s) =>
-          s.contains(WidgetState.selected) ? AppColors.primaryLight : Colors.transparent),
-      checkColor: WidgetStateProperty.all(Colors.white),
-      side: const BorderSide(color: AppColors.dividerDark),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: AppRadius.md,
+      borderSide: const BorderSide(color: AppColors.primaryLight, width: 2),
     ),
-    sliderTheme: const SliderThemeData(
-      activeTrackColor: AppColors.primaryLight,
-      thumbColor: AppColors.primaryLight,
-      inactiveTrackColor: AppColors.dividerDark,
-      overlayColor: Color(0x229E1530),
-    ),
-    switchTheme: SwitchThemeData(
-      thumbColor: WidgetStateProperty.resolveWith((s) =>
-          s.contains(WidgetState.selected) ? AppColors.primaryLight : AppColors.onSurfaceMutedDark),
-      trackColor: WidgetStateProperty.resolveWith((s) =>
-          s.contains(WidgetState.selected)
-              ? AppColors.primaryLight.withValues(alpha: 0.4)
-              : AppColors.dividerDark),
-    ),
-    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-      backgroundColor: AppColors.surfaceDark,
-      selectedItemColor: AppColors.primaryLight,
-      unselectedItemColor: AppColors.onSurfaceMutedDark,
-      elevation: 0,
-    ),
-    tabBarTheme: TabBarThemeData(
-      labelColor: AppColors.primaryLight,
-      unselectedLabelColor: AppColors.onSurfaceMutedDark,
-      indicatorColor: AppColors.primaryLight,
-      dividerColor: Colors.transparent,
-    ),
-    textTheme: const TextTheme(
-      bodyLarge:   TextStyle(color: AppColors.onSurfaceDark, fontFamily: AppTextStyles.fontFamily),
-      bodyMedium:  TextStyle(color: AppColors.onSurfaceDark, fontFamily: AppTextStyles.fontFamily),
-      bodySmall:   TextStyle(color: AppColors.onSurfaceMutedDark, fontFamily: AppTextStyles.fontFamily),
-      titleLarge:  TextStyle(color: AppColors.onSurfaceDark, fontFamily: AppTextStyles.fontFamily, fontWeight: FontWeight.w800),
-      titleMedium: TextStyle(color: AppColors.onSurfaceDark, fontFamily: AppTextStyles.fontFamily, fontWeight: FontWeight.w700),
-    ),
-  );
+    hintStyle: AppTextStyles.body.copyWith(color: Color(0xFFB0A0A0)), // Plus clair
+    labelStyle: AppTextStyles.body.copyWith(color: Colors.white70),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+  ),
+  
+  dividerTheme: const DividerThemeData(color: Color(0xFF4A2A2A), thickness: 1),
+  
+  checkboxTheme: CheckboxThemeData(
+    fillColor: WidgetStateProperty.resolveWith((states) =>
+      states.contains(WidgetState.selected) ? AppColors.primaryLight : Colors.transparent),
+    checkColor: WidgetStateProperty.all(Colors.white),
+    side: const BorderSide(color: Color(0xFF8A6A6A)),
+  ),
+  
+  sliderTheme: SliderThemeData(
+    activeTrackColor: AppColors.primaryLight,
+    thumbColor: AppColors.primaryLight,
+    inactiveTrackColor: const Color(0xFF5A3A3A),
+    overlayColor: AppColors.primaryLight.withValues(alpha: 0.2),
+  ),
+  
+  switchTheme: SwitchThemeData(
+    thumbColor: WidgetStateProperty.resolveWith((states) =>
+      states.contains(WidgetState.selected) ? AppColors.primaryLight : Colors.white70),
+    trackColor: WidgetStateProperty.resolveWith((states) =>
+      states.contains(WidgetState.selected)
+          ? AppColors.primaryLight.withValues(alpha: 0.5)
+          : const Color(0xFF5A3A3A)),
+  ),
+  
+  bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+    backgroundColor: AppColors.surfaceDark,
+    selectedItemColor: AppColors.primaryLight,
+    unselectedItemColor: Color(0xFFB0A0A0),
+    elevation: 8,
+    type: BottomNavigationBarType.fixed,
+  ),
+  
+  tabBarTheme: TabBarThemeData(
+    labelColor: AppColors.primaryLight,
+    unselectedLabelColor: const Color(0xFFB0A0A0),
+    indicatorColor: AppColors.primaryLight,
+    dividerColor: Colors.transparent,
+    labelStyle: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700),
+    unselectedLabelStyle: AppTextStyles.body,
+  ),
+  
+  // Texte global (très clair pour lisibilité)
+  textTheme: const TextTheme(
+    bodyLarge: TextStyle(color: Colors.white, fontFamily: AppTextStyles.fontFamily, fontSize: 16),
+    bodyMedium: TextStyle(color: Color(0xFFE0E0E0), fontFamily: AppTextStyles.fontFamily, fontSize: 14),
+    bodySmall: TextStyle(color: Color(0xFFC0C0C0), fontFamily: AppTextStyles.fontFamily, fontSize: 12),
+    titleLarge: TextStyle(color: Colors.white, fontFamily: AppTextStyles.fontFamily, fontSize: 22, fontWeight: FontWeight.w800),
+    titleMedium: TextStyle(color: Colors.white, fontFamily: AppTextStyles.fontFamily, fontSize: 18, fontWeight: FontWeight.w700),
+    labelLarge: TextStyle(color: Colors.white, fontFamily: AppTextStyles.fontFamily, fontSize: 14, fontWeight: FontWeight.w600),
+  ),
+  
+  // Pour les ListTile, etc. – hérite du textTheme
+  listTileTheme: const ListTileThemeData(
+    textColor: Colors.white,
+    titleTextStyle: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+    subtitleTextStyle: TextStyle(color: Color(0xFFC0C0C0), fontSize: 14),
+  ),
+  
+  iconTheme: const IconThemeData(color: Color(0xFFE0E0E0)),
+);
 }
 
 // ─── Mood Definitions ────────────────────────────────────────────────────────

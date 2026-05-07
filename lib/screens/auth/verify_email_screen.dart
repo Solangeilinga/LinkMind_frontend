@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -45,12 +46,41 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
           _destinationMasked = response['destination'];
           _isLoading = false;
         });
+        debugPrint(
+            '✅ Code envoyé par ${response['channel'] == 'email' ? 'email' : 'SMS'}');
       }
-    } catch (e, stack) {
-      debugPrint('Erreur _sendInitialCode: $e\n$stack');
+    } on TimeoutException catch (e) {
+      debugPrint('⏱️ Timeout lors de l\'envoi du code: $e');
       if (mounted) {
         setState(() {
-          _error = 'Impossible d\'envoyer le code de vérification';
+          _error =
+              'Délai d\'attente dépassé. Vérifiez votre connexion et réessayez.';
+          _isLoading = false;
+        });
+      }
+    } catch (e, stack) {
+      debugPrint('❌ Erreur _sendInitialCode: $e\n$stack');
+      if (mounted) {
+        // Message d'erreur plus spécifique selon le type d'erreur
+        String errorMsg = 'Impossible d\'envoyer le code de vérification';
+        final errorStr = e.toString().toLowerCase();
+
+        if (errorStr.contains('429') || errorStr.contains('rate')) {
+          errorMsg =
+              'Trop de tentatives. Attends 2 minutes avant de réessayer.';
+        } else if (errorStr.contains('timeout')) {
+          errorMsg = 'Délai d\'attente dépassé. Réessaie.';
+        } else if (errorStr.contains('configuration') ||
+            errorStr.contains('credentials')) {
+          errorMsg = 'Service SMS non configuré. Contacte le support.';
+        } else if (errorStr.contains('lafricamobile') ||
+            errorStr.contains('sms')) {
+          errorMsg = 'Problème d\'envoi SMS. Réessaie ou utilise un email.';
+        } else if (errorStr.contains('not properly configured')) {
+          errorMsg = 'Service non disponible. Réessaie plus tard.';
+        }
+        setState(() {
+          _error = errorMsg;
           _isLoading = false;
         });
       }
@@ -83,7 +113,9 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
       }
     } catch (e, stack) {
       debugPrint('❌ Erreur _verifyCode: $e\n$stack');
-      if (mounted) setState(() => _error = 'Erreur lors de la vérification. Réessaie plus tard.');
+      if (mounted)
+        setState(() =>
+            _error = 'Erreur lors de la vérification. Réessaie plus tard.');
     } finally {
       if (mounted && _isLoading) setState(() => _isLoading = false);
     }
@@ -100,7 +132,8 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
       final response = await ref.read(authProvider.notifier).sendVerification();
       if (mounted) {
         setState(() {
-          _success = 'Nouveau code envoyé par ${response['channel'] == 'email' ? 'email' : 'SMS'}';
+          _success =
+              'Nouveau code envoyé par ${response['channel'] == 'email' ? 'email' : 'SMS'}';
           _isResending = false;
         });
       }
@@ -119,13 +152,15 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   Widget build(BuildContext context) {
     if (_isLoading && _channel == null) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        body:
+            Center(child: CircularProgressIndicator(color: AppColors.primary)),
       );
     }
 
     final icon = _channel == 'email' ? '📧' : '📱';
-    final title = _channel == 'email' ? 'Vérifie ton email' : 'Vérifie ton téléphone';
-    final subtitle = _channel == 'email' 
+    final title =
+        _channel == 'email' ? 'Vérifie ton email' : 'Vérifie ton téléphone';
+    final subtitle = _channel == 'email'
         ? 'Un code de vérification a été envoyé à ton adresse email'
         : 'Un code de vérification a été envoyé par SMS à ton numéro';
 
@@ -156,7 +191,8 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
               const SizedBox(height: 8),
               Text(
                 subtitle,
-                style: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted),
+                style: AppTextStyles.body
+                    .copyWith(color: AppColors.onSurfaceMuted),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 4),
@@ -167,7 +203,6 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                   textAlign: TextAlign.center,
                 ),
               const SizedBox(height: 20),
-
               if (_error != null)
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -179,11 +214,11 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                     children: [
                       const Icon(Icons.error_outline, color: AppColors.accent),
                       const SizedBox(width: 8),
-                      Expanded(child: Text(_error!, style: AppTextStyles.bodySmall)),
+                      Expanded(
+                          child: Text(_error!, style: AppTextStyles.bodySmall)),
                     ],
                   ),
                 ),
-
               if (_success != null)
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -193,15 +228,16 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.check_circle_outline, color: AppColors.secondary),
+                      const Icon(Icons.check_circle_outline,
+                          color: AppColors.secondary),
                       const SizedBox(width: 8),
-                      Expanded(child: Text(_success!, style: AppTextStyles.bodySmall)),
+                      Expanded(
+                          child:
+                              Text(_success!, style: AppTextStyles.bodySmall)),
                     ],
                   ),
                 ),
-
               const SizedBox(height: 20),
-
               TextField(
                 controller: _codeController,
                 keyboardType: TextInputType.number,
@@ -221,9 +257,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 20),
-
               SizedBox(
                 width: double.infinity,
                 height: 52,
@@ -234,26 +268,28 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                   ),
                   child: _isLoading
                       ? const SizedBox(
-                          width: 20, height: 20,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2))
                       : const Text('Vérifier'),
                 ),
               ),
-
               const SizedBox(height: 12),
-
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
                     'Tu n\'as pas reçu le code ?',
-                    style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted),
+                    style: AppTextStyles.caption
+                        .copyWith(color: AppColors.onSurfaceMuted),
                   ),
                   TextButton(
                     onPressed: _isResending ? null : _resendCode,
                     child: _isResending
                         ? const SizedBox(
-                            width: 16, height: 16,
+                            width: 16,
+                            height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2))
                         : const Text('Renvoyer'),
                   ),

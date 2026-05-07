@@ -82,47 +82,13 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     await Future.wait([_loadFeed(), _loadMyPosts()]);
   }
 
+  // Les réactions sont désormais gérées entièrement dans PostCard.
+  // Cette méthode est conservée pour la compatibilité avec FeedList,
+  // mais elle ne fait rien car PostCard ne l'appelle plus.
   Future<void> _toggleLike(String postId) async {
-    void optimistic(List<Map<String, dynamic>> list) {
-      final idx = list.indexWhere((p) => (p['_id'] ?? p['id'])?.toString() == postId);
-      if (idx == -1) return;
-      final liked = list[idx]['isLiked'] == true;
-      list[idx] = {
-        ...list[idx],
-        'isLiked': !liked,
-        'likesCount': ((list[idx]['likesCount'] ?? 0) as int) + (liked ? -1 : 1),
-      };
-    }
-
-    if (mounted) {
-      setState(() {
-        optimistic(_allPosts);
-        optimistic(_myPosts);
-      });
-    }
-
+    // Aucune action nécessaire – PostCard gère lui-même ses réactions.
+    // On garde juste l'enregistrement d'activité si souhaité.
     SecurityService.recordActivity(type: 'like', metadata: {'postId': postId});
-
-    try {
-      final r = await ApiService().toggleLike(postId);
-      if (mounted) {
-        setState(() {
-          for (final list in [_allPosts, _myPosts]) {
-            final idx = list.indexWhere((p) => (p['_id'] ?? p['id'])?.toString() == postId);
-            if (idx != -1) {
-              list[idx] = {...list[idx], 'isLiked': r['liked'], 'likesCount': r['likesCount']};
-            }
-          }
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          optimistic(_allPosts);
-          optimistic(_myPosts);
-        });
-      }
-    }
   }
 
   Future<void> _deletePost(String postId) async {
@@ -285,7 +251,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                     posts: _filtered(_allPosts),
                     isLoading: _isLoadingAll,
                     onRefresh: _loadFeed,
-                    onLike: _toggleLike,
+                    onLike: _toggleLike,   // conservé mais ne fait rien
                     onDelete: _deletePost,
                     onCompose: _openComposePage,
                     emptyMessage: _activeFilter != null
@@ -296,7 +262,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                     posts: _filtered(_myPosts),
                     isLoading: _isLoadingMine,
                     onRefresh: _loadMyPosts,
-                    onLike: _toggleLike,
+                    onLike: _toggleLike,   // conservé mais ne fait rien
                     onDelete: _deletePost,
                     onCompose: _openComposePage,
                     emptyMessage: 'Tu n\'as encore rien partagé',

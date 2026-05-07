@@ -21,30 +21,12 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _notifEnabled = true;
   String _reminderTime = '20:00';
-  List<Map<String, dynamic>> _languages = [];
-  bool _loadingLanguages = false;
-  bool _exporting = false; // ← Ajout
+  bool _exporting = false;
 
   @override
   void initState() {
     super.initState();
     _loadPrefs();
-    _loadLanguages();
-  }
-
-  Future<void> _loadLanguages() async {
-    setState(() => _loadingLanguages = true);
-    try {
-      final data = await ApiService().getLanguages();
-      if (mounted) {
-        setState(() {
-          _languages = List<Map<String, dynamic>>.from(data['languages'] ?? []);
-          _loadingLanguages = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _loadingLanguages = false);
-    }
   }
 
   Future<void> _loadPrefs() async {
@@ -118,33 +100,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ])),
         ]),
 
-        _SectionHeader('Langue'),
-        _SettingCard(children: [
-          if (_loadingLanguages)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: Center(
-                child: SizedBox(
-                  width: 20, height: 20,
-                  child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
-                ),
-              ),
-            )
-          else if (_languages.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text('Langues indisponibles',
-                  style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
-            )
-          else
-            ..._languages.map((lang) => _LanguageTile(
-              code: lang['code'] as String,
-              flag: lang['flag'] as String? ?? '🏳️',
-              label: lang['nativeLabel'] as String? ?? lang['label'] as String? ?? lang['code'] as String,
-              selected: settings.language == (lang['code'] as String),
-              onTap: () => notifier.setLanguage(lang['code'] as String),
-            )),
-        ]),
+        // Section Langue SUPPRIMÉE
 
         _SectionHeader('Notifications'),
         _SettingCard(children: [
@@ -376,22 +332,5 @@ class _SettingRow extends StatelessWidget {
         ? const Icon(Icons.chevron_right, size: 18, color: AppColors.onSurfaceMuted) : null,
     onTap: onTap,
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-  );
-}
-
-class _LanguageTile extends StatelessWidget {
-  final String code, flag, label;
-  final bool selected;
-  final VoidCallback? onTap;
-  const _LanguageTile({required this.code, required this.flag,
-      required this.label, required this.selected, this.onTap});
-
-  @override
-  Widget build(BuildContext context) => ListTile(
-    leading: Text(flag, style: const TextStyle(fontSize: 24)),
-    title: Text(label, style: AppTextStyles.body),
-    trailing: selected
-        ? const Icon(Icons.check, color: AppColors.primary) : null,
-    onTap: onTap,
   );
 }
