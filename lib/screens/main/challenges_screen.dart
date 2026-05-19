@@ -397,7 +397,7 @@ class _EmptyState extends StatelessWidget {
           children: [
             const Text('😴', style: TextStyle(fontSize: 56)),
             const SizedBox(height: 16),
-            Text('Aucun défi disponible', style: AppTextStyles.h3),
+            const Text('Aucun défi disponible', style: AppTextStyles.h3),
             const SizedBox(height: 8),
             Text('Enregistre ton humeur pour obtenir des défis personnalisés',
                 style: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted),

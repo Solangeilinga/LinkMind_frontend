@@ -98,7 +98,7 @@ class SecurityService {
           'Votre session a expiré pour des raisons de sécurité. '
           'Veuillez vous reconnecter pour continuer.'
         ),
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.lg),
+        shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
         actions: [
           TextButton(
             onPressed: () async {
@@ -282,7 +282,7 @@ class SecurityService {
             ),
           ],
         ),
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.lg),
+        shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
         actions: [
           TextButton(
             onPressed: () {

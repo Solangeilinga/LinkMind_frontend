@@ -13,8 +13,8 @@ class SecurityDialogs {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: Row(
-          children: const [
+        title: const Row(
+          children: [
             Icon(Icons.lock, color: Colors.red, size: 28),
             SizedBox(width: 8),
             Text('Compte verrouillé'),
@@ -40,7 +40,7 @@ class SecurityDialogs {
             ),
           ],
         ),
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.lg),
+        shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
         actions: [
           TextButton(
             onPressed: () {
@@ -63,7 +63,7 @@ class SecurityDialogs {
           'Vous avez effectué trop d\'actions récemment. '
           'Veuillez patienter quelques minutes avant de réessayer.',
         ),
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.lg),
+        shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -83,7 +83,7 @@ class SecurityDialogs {
         content: const Text(
           'Votre session a expiré pour des raisons de sécurité. Veuillez vous reconnecter.',
         ),
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.lg),
+        shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
         actions: [
           TextButton(
             onPressed: () {

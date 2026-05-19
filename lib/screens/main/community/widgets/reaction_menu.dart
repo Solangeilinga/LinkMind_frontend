@@ -273,9 +273,9 @@ class _LikeButtonState extends State<LikeButton> {
                     key: ValueKey(widget.myReactionType ?? 'liked'),
                     style: const TextStyle(fontSize: 18),
                   )
-                : Icon(
+                : const Icon(
                     Icons.favorite_border,
-                    key: const ValueKey('not_liked'),
+                    key: ValueKey('not_liked'),
                     size: 20,
                     color: AppColors.onSurfaceMuted,
                   ),

@@ -156,7 +156,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     minimumSize: const Size.fromHeight(52),
                     backgroundColor: _slides[_step].color,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: AppRadius.md)),
+                    shape: const RoundedRectangleBorder(borderRadius: AppRadius.md)),
                   child: Text(
                     _step < _slides.length - 1 ? 'Suivant →' : 'Personnaliser mon expérience',
                     style: AppTextStyles.button.copyWith(color: Colors.white)),
@@ -170,7 +170,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       minimumSize: const Size.fromHeight(52),
                       backgroundColor: AppColors.primary,
                       disabledBackgroundColor: AppColors.divider,
-                      shape: RoundedRectangleBorder(borderRadius: AppRadius.md)),
+                      shape: const RoundedRectangleBorder(borderRadius: AppRadius.md)),
                     child: Text(
                       _selectedGoals.isEmpty
                         ? 'Choisis au moins un objectif'
@@ -185,7 +185,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       style: ElevatedButton.styleFrom(
                         minimumSize: const Size.fromHeight(52),
                         backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(borderRadius: AppRadius.md)),
+                        shape: const RoundedRectangleBorder(borderRadius: AppRadius.md)),
                       child: _isSaving
                         ? const SizedBox(width: 20, height: 20,
                             child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
@@ -245,7 +245,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Quels sont tes objectifs ?', style: AppTextStyles.h2),
+        const Text('Quels sont tes objectifs ?', style: AppTextStyles.h2),
         const SizedBox(height: 8),
         Text('On personnalisera ton expérience selon tes choix. Sélectionne tout ce qui te correspond.',
           style: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted, height: 1.5)),
@@ -256,7 +256,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             final sel = _selectedGoals.contains(g.$2);
             return GestureDetector(
               onTap: () => setState(() {
-                if (sel) _selectedGoals.remove(g.$2); else _selectedGoals.add(g.$2);
+                if (sel) {
+                  _selectedGoals.remove(g.$2);
+                } else {
+                  _selectedGoals.add(g.$2);
+                }
               }),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
@@ -285,7 +289,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Ton rappel quotidien', style: AppTextStyles.h2),
+        const Text('Ton rappel quotidien', style: AppTextStyles.h2),
         const SizedBox(height: 8),
         Text('On te rappellera de noter ton humeur chaque jour. Modifiable à tout moment dans les paramètres.',
           style: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted, height: 1.5)),
@@ -299,14 +303,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           child: Column(children: [
             const Text('⏰', style: TextStyle(fontSize: 44)),
             const SizedBox(height: 14),
-            Text('À quelle heure ?', style: AppTextStyles.h4),
+            const Text('À quelle heure ?', style: AppTextStyles.h4),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
-              value: _reminderTime,
-              decoration: InputDecoration(
+              initialValue: _reminderTime,
+              decoration: const InputDecoration(
                 filled: true, fillColor: AppColors.surfaceVariant,
                 border: OutlineInputBorder(borderRadius: AppRadius.md, borderSide: BorderSide.none),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12)),
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12)),
               items: hours.map((h) => DropdownMenuItem(value: h, child: Text(h, style: AppTextStyles.body))).toList(),
               onChanged: (v) => setState(() => _reminderTime = v ?? '20:00')),
           ])),

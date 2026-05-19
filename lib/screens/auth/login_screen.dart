@@ -68,7 +68,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               Container(
                 width: 80,
                 height: 80,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                     color: AppColors.primary, borderRadius: AppRadius.lg),
                 child: ClipRRect(
                     borderRadius: AppRadius.lg,
@@ -270,8 +270,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   String? _validateStep() {
     if (_step == 0) {
-      if (_firstNameCtrl.text.trim().isEmpty)
+      if (_firstNameCtrl.text.trim().isEmpty) {
         return 'Le prénom est obligatoire';
+      }
       if (_lastNameCtrl.text.trim().isEmpty) return 'Le nom est obligatoire';
 
       final emailTxt = _emailCtrl.text.trim();
@@ -296,12 +297,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       }
     }
     if (_step == 2) {
-      if (!Validators.isValidPassword(_passCtrl.text))
+      if (!Validators.isValidPassword(_passCtrl.text)) {
         return 'Le mot de passe doit faire au moins 6 caractères';
-      if (_passCtrl.text != _confirmCtrl.text)
+      }
+      if (_passCtrl.text != _confirmCtrl.text) {
         return 'Les mots de passe ne correspondent pas';
-      if (!_legalAccepted)
+      }
+      if (!_legalAccepted) {
         return 'Vous devez accepter les conditions générales.';
+      }
     }
     return null;
   }
@@ -334,7 +338,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       return;
     }
     if (!_legalAccepted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Acceptez les CGU pour continuer'),
           backgroundColor: AppColors.accent));
       return;
@@ -420,7 +424,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 margin: const EdgeInsets.only(bottom: 24),
                 width: 60,
                 height: 60,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                     color: AppColors.primary, borderRadius: AppRadius.md),
                 child: ClipRRect(
                     borderRadius: AppRadius.md,
@@ -451,7 +455,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
             // ── Étape 0 : Identité ──────────────────────────────────────────
             if (_step == 0) ...[
-              Text('Qui es-tu ?', style: AppTextStyles.h2),
+              const Text('Qui es-tu ?', style: AppTextStyles.h2),
               const SizedBox(height: 4),
               Text("Tes infos de base pour créer ton compte",
                   style: AppTextStyles.body
@@ -534,7 +538,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
             // ── Étape 1 : Infos personnelles ────────────────────────────────
             if (_step == 1) ...[
-              Text('À propos de toi', style: AppTextStyles.h2),
+              const Text('À propos de toi', style: AppTextStyles.h2),
               const SizedBox(height: 4),
               Text(
                   "Ces infos restent privées et t'aident à personnaliser l'expérience",
@@ -547,7 +551,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 textInputAction: TextInputAction.next,
                 onEditingComplete: _validateAge,
                 onChanged: (_) {
-                  if (_ageCtrl.text.length >= 1) _validateAge();
+                  if (_ageCtrl.text.isNotEmpty) _validateAge();
                 },
                 decoration: InputDecoration(
                     labelText: 'Âge (optionnel)',
@@ -592,12 +596,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     dense: true,
                     activeColor: AppColors.primary,
                     contentPadding: EdgeInsets.zero,
-                  ))).toList(),
+                  ))),
             ],
 
             // ── Étape 2 : Pseudo + Mot de passe + CGU (CORRIGÉ) ─────────────
             if (_step == 2) ...[
-              Text('Sécurise ton compte', style: AppTextStyles.h2),
+              const Text('Sécurise ton compte', style: AppTextStyles.h2),
               const SizedBox(height: 4),
               Text('Choisis ton pseudo communauté et ton mot de passe',
                   style: AppTextStyles.body
@@ -760,10 +764,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 onPressed: state.isLoading
                     ? null
                     : () {
-                        if (_step < 2)
+                        if (_step < 2) {
                           _nextStep();
-                        else
+                        } else {
                           _register();
+                        }
                       },
                 style: ElevatedButton.styleFrom(
                     minimumSize: const Size.fromHeight(54)),

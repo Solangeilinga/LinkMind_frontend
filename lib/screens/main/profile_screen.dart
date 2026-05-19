@@ -5,10 +5,11 @@ import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:open_file/open_file.dart'; // ✅ Import correct ici
+import 'package:open_file/open_file.dart';
 import '../../utils/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api.service.dart';
+import '../../services/report_service.dart';
 import '../../models/models.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -39,42 +40,86 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     } catch (_) {}
   }
 
+  /// Nettoie l'historique d'humeur pour éviter les nulls
+  List<Map<String, dynamic>> _cleanMoodHistory(List<Map<String, dynamic>> raw) {
+    return raw.map((entry) {
+      return {
+        'score': (entry['score'] as num?)?.toInt() ?? 3,
+        'date': entry['date'] ?? DateTime.now().toIso8601String(),
+      };
+    }).toList();
+  }
+
+  /// Nettoie la liste des défis complétés
+  List<Map<String, dynamic>> _cleanChallenges(List<Map<String, dynamic>> raw) {
+    return raw.map((challengeEntry) {
+      final challengeMap =
+          challengeEntry['challenge'] as Map<String, dynamic>? ?? {};
+      return {
+        'challenge': {
+          'category': (challengeMap['category'] as String?) ?? 'Général',
+        },
+      };
+    }).toList();
+  }
+
+  /// Nettoie la liste des badges
+  List<UserBadge> _cleanBadges(List<dynamic> raw) {
+    return raw.map((json) {
+      // Convertit en Map sécurisée
+      final map = json is Map<String, dynamic> ? json : {};
+      return UserBadge(
+        badgeId: (map['badgeId'] as String?) ?? 'inconnu',
+        earnedAt: map['earnedAt'] != null
+            ? DateTime.tryParse(map['earnedAt'].toString())
+            : null,
+      );
+    }).toList();
+  }
+
   Future<void> _exportReport() async {
     setState(() => _exportingReport = true);
     try {
-      final token = await ApiService().getAccessToken();
-      final baseUrl = AppConstants.baseUrl;
-      final dio = Dio();
-      final dir = await getTemporaryDirectory();
-      final date = DateTime.now().toIso8601String().split('T')[0];
-      final path = '${dir.path}/linkmind-rapport-$date.pdf';
+      final user = ref.read(authProvider).user;
+      if (user == null) throw Exception('Utilisateur non trouvé');
 
-      await dio.download(
-        '$baseUrl/users/me/report',
-        path,
-        options: Options(
-          headers: {'Authorization': 'Bearer $token'},
-          responseType: ResponseType.bytes,
-        ),
-      );
+      // Récupérer les données depuis l'API
+      final api = ApiService();
+      final userData = await api.getMe();
 
-      final file = File(path);
-      if (!await file.exists() || await file.length() == 0) {
-        throw Exception('Fichier PDF invalide ou vide');
-      }
+      // Nettoyer les données
+      final rawMoodHistory =
+          List<Map<String, dynamic>>.from(userData['moodHistory'] ?? []);
+      final rawChallenges = List<Map<String, dynamic>>.from(
+          userData['completedChallenges'] ?? []);
+      final rawBadges = userData['badges'] as List? ?? [];
 
-      if (mounted) {
-        setState(() {
-          _exportingReport = false;
-          _reportPath = path;
-        });
-        _showSuccessDialog(path);
-      }
-    } catch (e) {
-      debugPrint('❌ Erreur export: $e');
+      final moodHistory = _cleanMoodHistory(rawMoodHistory);
+      final challenges = _cleanChallenges(rawChallenges);
+      final badges = _cleanBadges(rawBadges);
+
       if (mounted) {
         setState(() => _exportingReport = false);
-        _showErrorSnackBar('Erreur lors de la génération du rapport : ${e.toString()}');
+      }
+
+      // Appel au service de rapport (normalement robuste, mais on a déjà nettoyé)
+      await ReportService.generateAndShowReport(
+        user: user,
+        moodHistory: moodHistory,
+        challenges: challenges,
+        badges: badges,
+        personalizedMessage: userData['wellnessMessage'] as String?,
+      );
+
+      if (mounted) {
+        _showSuccessSnackBar('Rapport généré et prêt à partager!');
+      }
+    } catch (e, stack) {
+      debugPrint('❌ Erreur export: $e');
+      debugPrint(stack.toString());
+      if (mounted) {
+        setState(() => _exportingReport = false);
+        _showErrorSnackBar('Erreur : ${e.toString()}');
       }
     }
   }
@@ -83,61 +128,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.lg),
+        shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
         title: const Row(
           children: [
             Icon(Icons.check_circle, color: AppColors.secondary, size: 28),
             SizedBox(width: 8),
-            Text('Rapport prêt !'),
+            Text('Rapport généré avec succès!'),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Ton rapport PDF a été généré avec succès.'),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
-                borderRadius: AppRadius.md,
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.picture_as_pdf, color: AppColors.primary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      path.split('/').last,
-                      style: AppTextStyles.caption,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        content: const Text(
+          'Ton rapport PDF a été généré et est prêt à être partagé ou imprimé.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Fermer'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final result = await OpenFile.open(path);
-              if (result.type != ResultType.done) {
-                _showErrorSnackBar('Impossible d\'ouvrir le fichier : ${result.message}');
-              }
-            },
-            icon: const Icon(Icons.open_in_new, size: 16),
-            label: const Text('Ouvrir le PDF'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-            ),
           ),
         ],
       ),
@@ -156,7 +161,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
         backgroundColor: AppColors.accent,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
+        shape: const RoundedRectangleBorder(borderRadius: AppRadius.md),
         margin: const EdgeInsets.all(16),
       ),
     );
@@ -174,7 +179,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
         backgroundColor: AppColors.secondary,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
+        shape: const RoundedRectangleBorder(borderRadius: AppRadius.md),
         margin: const EdgeInsets.all(16),
       ),
     );
@@ -218,12 +223,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Mon profil', style: AppTextStyles.h2),
+                    const Text('Mon profil', style: AppTextStyles.h2),
                     IconButton(
                       onPressed: _showEditSheet,
                       icon: const Icon(Icons.edit_outlined),
                       style: IconButton.styleFrom(
-                        backgroundColor: AppColors.primary.withValues(alpha: 0.08),
+                        backgroundColor:
+                            AppColors.primary.withValues(alpha: 0.08),
                         foregroundColor: AppColors.primary,
                       ),
                     ),
@@ -347,7 +353,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       if (user.city != null && user.age != null)
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 4),
-                          child: Text('•', style: TextStyle(color: Colors.white54)),
+                          child: Text('•',
+                              style: TextStyle(color: Colors.white54)),
                         ),
                       if (user.age != null)
                         Text(
@@ -366,7 +373,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       horizontal: 8,
                       vertical: 2,
                     ),
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       color: Colors.amber,
                       borderRadius: AppRadius.full,
                     ),
@@ -539,7 +546,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Progression', style: AppTextStyles.h4),
+              const Text('Progression', style: AppTextStyles.h4),
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 8,
@@ -614,7 +621,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Mes badges', style: AppTextStyles.h3),
+            const Text('Mes badges', style: AppTextStyles.h3),
             Text(
               '$totalEarned/$totalAll débloqués',
               style: AppTextStyles.caption.copyWith(
@@ -629,7 +636,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: AppColors.surfaceVariant,
               borderRadius: AppRadius.lg,
             ),
@@ -639,7 +646,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'Aucun badge encore',
-                  style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700),
+                  style:
+                      AppTextStyles.body.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -678,7 +686,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.primary.withValues(alpha: 0.06),
                   borderRadius: AppRadius.md,
-                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                  border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -750,75 +759,58 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _buildActionsSection(UserModel user) {
     return Column(
       children: [
-        if (user.isPremium)
-          Container(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton.icon(
-              onPressed: _exportingReport ? null : _exportReport,
-              icon: _exportingReport
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.picture_as_pdf_outlined),
-              label: Text(
-                _exportingReport
-                    ? 'Génération en cours...'
-                    : 'Exporter mon rapport PDF',
-                style: AppTextStyles.button,
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppRadius.md,
-                ),
-              ),
+        // 🔴 COMMENTÉ POUR PHASE DE TEST - Toutes les fonctionnalités accessibles
+        // if (user.isPremium)
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton.icon(
+            onPressed: _exportingReport ? null : _exportReport,
+            icon: _exportingReport
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.picture_as_pdf_outlined),
+            label: Text(
+              _exportingReport
+                  ? 'Génération en cours...'
+                  : 'Exporter mon rapport PDF',
+              style: AppTextStyles.button,
             ),
-          )
-        else
-          Container(
-            width: double.infinity,
-            height: 52,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                _showPremiumDialog();
-              },
-              icon: const Text('👑', style: TextStyle(fontSize: 16)),
-              label: const Text(
-                'Débloquer les rapports PDF',
-                style: AppTextStyles.button,
-              ),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.primary),
-                foregroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppRadius.md,
-                ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: const RoundedRectangleBorder(
+                borderRadius: AppRadius.md,
               ),
             ),
           ),
+        )
+        // else
+        //   const SizedBox.shrink(),
+        ,
         const SizedBox(height: 12),
-        if (!user.isPremium)
-          Container(
-            width: double.infinity,
-            height: 52,
-            margin: const EdgeInsets.only(bottom: 12),
-            child: ElevatedButton.icon(
-              onPressed: () => context.push('/premium'),
-              icon: const Text('👑', style: TextStyle(fontSize: 16)),
-              label: const Text('Passer en Premium'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.secondary,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ),
+        // 🔴 COMMENTÉ POUR PHASE DE TEST - Toutes les fonctionnalités accessibles
+        // if (!user.isPremium)
+        //   Container(
+        //     width: double.infinity,
+        //     height: 52,
+        //     margin: const EdgeInsets.only(bottom: 12),
+        //     child: ElevatedButton.icon(
+        //       onPressed: () => context.push('/premium'),
+        //       icon: const Text('👑', style: TextStyle(fontSize: 16)),
+        //       label: const Text('Passer en Premium'),
+        //       style: ElevatedButton.styleFrom(
+        //         backgroundColor: AppColors.secondary,
+        //         foregroundColor: Colors.white,
+        //       ),
+        //     ),
+        //   ),
         SizedBox(
           width: double.infinity,
           height: 52,
@@ -829,12 +821,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: AppColors.divider),
               foregroundColor: AppColors.onSurface,
-              shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
+              shape: const RoundedRectangleBorder(borderRadius: AppRadius.md),
             ),
           ),
         ),
         const SizedBox(height: 12),
-        Container(
+        SizedBox(
           width: double.infinity,
           height: 52,
           child: OutlinedButton.icon(
@@ -847,7 +839,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: AppColors.accent),
               foregroundColor: AppColors.accent,
-              shape: RoundedRectangleBorder(
+              shape: const RoundedRectangleBorder(
                 borderRadius: AppRadius.md,
               ),
             ),
@@ -861,7 +853,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.lg),
+        shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
         title: const Row(
           children: [
             Text('👑', style: TextStyle(fontSize: 24)),
@@ -897,7 +889,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.lg),
+        shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
         title: const Text('Déconnexion'),
         content: const Text('Es-tu sûr de vouloir te déconnecter ?'),
         actions: [
@@ -924,7 +916,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 }
 
-// ─── Edit Profile Sheet ──────────────────────────────────────────────────────
+// ─── Edit Profile Sheet (inchangé) ──────────────────────────────────────────
 class _EditProfileSheet extends StatefulWidget {
   final UserModel user;
   final Function(UserModel) onSaved;
@@ -996,7 +988,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   Future<void> _save() async {
     final firstName = _firstNameCtrl.text.trim();
     final lastName = _lastNameCtrl.text.trim();
-    
+
     if (firstName.isEmpty || lastName.isEmpty) {
       setState(() => _error = 'Prénom et nom sont obligatoires');
       return;
@@ -1025,13 +1017,13 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
 
       final updated = UserModel.fromJson(data['user']);
       widget.onSaved(updated);
-      
+
       if (mounted) {
         setState(() {
           _saving = false;
           _success = 'Profil mis à jour avec succès !';
         });
-        
+
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {
             Navigator.pop(context);
@@ -1058,12 +1050,12 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   Future<void> _changePassword() async {
     final current = _currentPassCtrl.text;
     final newPass = _newPassCtrl.text;
-    
+
     if (current.isEmpty || newPass.isEmpty) {
       setState(() => _error = 'Remplis les deux champs');
       return;
     }
-    
+
     if (newPass.length < 6) {
       setState(() =>
           _error = 'Le nouveau mot de passe doit faire au moins 6 caractères');
@@ -1084,14 +1076,14 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
 
       _currentPassCtrl.clear();
       _newPassCtrl.clear();
-      
+
       if (mounted) {
         setState(() {
           _saving = false;
           _success = 'Mot de passe modifié avec succès !';
           _showPassSection = false;
         });
-        
+
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {
             setState(() {
@@ -1120,7 +1112,8 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
         decoration: const BoxDecoration(
@@ -1136,7 +1129,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 child: Container(
                   width: 40,
                   height: 4,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: AppColors.divider,
                     borderRadius: AppRadius.full,
                   ),
@@ -1146,7 +1139,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
+                  const Text(
                     'Modifier le profil',
                     style: AppTextStyles.h3,
                   ),
@@ -1163,11 +1156,13 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   decoration: BoxDecoration(
                     color: AppColors.accent.withValues(alpha: 0.1),
                     borderRadius: AppRadius.md,
-                    border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+                    border: Border.all(
+                        color: AppColors.accent.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline, color: AppColors.accent, size: 20),
+                      const Icon(Icons.error_outline,
+                          color: AppColors.accent, size: 20),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -1189,11 +1184,13 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   decoration: BoxDecoration(
                     color: AppColors.secondary.withValues(alpha: 0.1),
                     borderRadius: AppRadius.md,
-                    border: Border.all(color: AppColors.secondary.withValues(alpha: 0.3)),
+                    border: Border.all(
+                        color: AppColors.secondary.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.check_circle_outline, color: AppColors.secondary, size: 20),
+                      const Icon(Icons.check_circle_outline,
+                          color: AppColors.secondary, size: 20),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -1209,7 +1206,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ),
                 const SizedBox(height: 12),
               ],
-              Text('Identité', style: AppTextStyles.h4),
+              const Text('Identité', style: AppTextStyles.h4),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -1237,7 +1234,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ],
               ),
               const SizedBox(height: 16),
-              Text('Contact', style: AppTextStyles.h4),
+              const Text('Contact', style: AppTextStyles.h4),
               const SizedBox(height: 12),
               TextField(
                 controller: _emailCtrl,
@@ -1257,7 +1254,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-              Text('Infos personnelles', style: AppTextStyles.h4),
+              const Text('Infos personnelles', style: AppTextStyles.h4),
               const SizedBox(height: 12),
               TextField(
                 controller: _cityCtrl,
@@ -1277,18 +1274,18 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ),
               ),
               const SizedBox(height: 12),
-              Text('Genre', style: AppTextStyles.body),
+              const Text('Genre', style: AppTextStyles.body),
               ..._genders.map((g) => RadioListTile<String>(
-                value: g.$1,
-                groupValue: _gender,
-                onChanged: (v) => setState(() => _gender = v),
-                title: Text(g.$2),
-                dense: true,
-                activeColor: AppColors.primary,
-                contentPadding: EdgeInsets.zero,
-              )),
+                    value: g.$1,
+                    groupValue: _gender,
+                    onChanged: (v) => setState(() => _gender = v),
+                    title: Text(g.$2),
+                    dense: true,
+                    activeColor: AppColors.primary,
+                    contentPadding: EdgeInsets.zero,
+                  )),
               const SizedBox(height: 16),
-              Text('Communauté', style: AppTextStyles.h4),
+              const Text('Communauté', style: AppTextStyles.h4),
               const SizedBox(height: 12),
               TextField(
                 controller: _aliasCtrl,
@@ -1328,7 +1325,8 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                     _error = null;
                   });
                 },
-                icon: Icon(_showPassSection ? Icons.expand_less : Icons.expand_more),
+                icon: Icon(
+                    _showPassSection ? Icons.expand_less : Icons.expand_more),
                 label: Text(
                   _showPassSection ? 'Masquer' : 'Changer le mot de passe',
                 ),
@@ -1368,7 +1366,8 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                             ? Icons.visibility_outlined
                             : Icons.visibility_off_outlined,
                       ),
-                      onPressed: () => setState(() => _obscureNew = !_obscureNew),
+                      onPressed: () =>
+                          setState(() => _obscureNew = !_obscureNew),
                     ),
                   ),
                 ),

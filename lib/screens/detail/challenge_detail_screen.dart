@@ -569,13 +569,13 @@ class _ChallengeDetailScreenState extends ConsumerState<ChallengeDetailScreen>
       child: const Column(
         children: [
           Text('✅', style: TextStyle(fontSize: 32)),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(
             'Défi accompli aujourd\'hui !',
             style: AppTextStyles.h4,
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
             'Reviens demain pour le refaire',
             style: AppTextStyles.caption,
@@ -857,7 +857,7 @@ class _SuccessSheet extends StatelessWidget {
           Center(
             child: Container(
               width: 40, height: 4,
-              decoration: BoxDecoration(color: AppColors.divider, borderRadius: AppRadius.full),
+              decoration: const BoxDecoration(color: AppColors.divider, borderRadius: AppRadius.full),
             ),
           ),
           const SizedBox(height: 20),
@@ -873,7 +873,7 @@ class _SuccessSheet extends StatelessWidget {
           const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: AppColors.primary,
               borderRadius: AppRadius.full,
             ),

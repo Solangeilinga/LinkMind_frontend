@@ -1,10 +1,10 @@
 name: linkmind
 description: LinkMind - Student Mental Health & Wellbeing App
-publish_to: 'none'
+publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
   flutter:
@@ -15,7 +15,7 @@ dependencies:
   firebase_core: ^2.24.0
   firebase_messaging: ^14.7.0
   open_file: ^3.3.2
-  
+  file_save_directory: ^1.0.0
 
   # State management
   flutter_riverpod: ^2.4.9
@@ -29,6 +29,10 @@ dependencies:
   path_provider: ^2.1.2
   url_launcher: ^6.3.2
   retrofit: ^4.1.0
+
+  # PDF Generation
+  pdf: ^3.10.0
+  printing: ^5.11.0
 
   # Local storage
   flutter_secure_storage: ^9.0.0
@@ -64,6 +68,7 @@ dev_dependencies:
   json_serializable: ^6.7.1
   retrofit_generator: ^8.1.0
   riverpod_generator: ^2.3.9
+  flutter_launcher_icons: ^0.14.1   # Pour générer l'icône de l'application
 
 flutter:
   uses-material-design: true
@@ -81,3 +86,12 @@ flutter:
           weight: 700
         - asset: assets/fonts/Nunito-ExtraBold.ttf
           weight: 800
+
+# Configuration pour remplacer l'icône par défaut par votre logo
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "assets/images/logo.png"
+  image_path_ios: "assets/images/logo.png"
+  remove_alpha_ios: true
+  min_sdk_android: 21

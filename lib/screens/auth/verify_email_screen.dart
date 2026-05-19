@@ -113,9 +113,10 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
       }
     } catch (e, stack) {
       debugPrint('❌ Erreur _verifyCode: $e\n$stack');
-      if (mounted)
+      if (mounted) {
         setState(() =>
             _error = 'Erreur lors de la vérification. Réessaie plus tard.');
+      }
     } finally {
       if (mounted && _isLoading) setState(() => _isLoading = false);
     }
@@ -249,7 +250,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
                   }
                 },
                 style: const TextStyle(fontSize: 24, letterSpacing: 8),
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   hintText: '000000',
                   counterText: '',
                   border: OutlineInputBorder(

@@ -23,10 +23,12 @@ class _AdBannerState extends State<AdBanner> {
     try {
       final data = await ApiService().get('/ads',
           queryParams: {'placement': widget.placement});
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _ad      = data['ad'] as Map<String, dynamic>?;
         _loading = false;
       });
+      }
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
@@ -102,7 +104,7 @@ class _AdBannerState extends State<AdBanner> {
               onTap: () => _trackClick(adId),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: AppColors.secondary,
                   borderRadius: AppRadius.full),
                 child: Text(ctaLabel,

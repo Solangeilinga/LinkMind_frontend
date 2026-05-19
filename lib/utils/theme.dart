@@ -100,7 +100,7 @@ class AppTheme {
       ),
       iconTheme: IconThemeData(color: AppColors.onSurface),
     ),
-    cardTheme: CardThemeData(
+    cardTheme: const CardThemeData(
       color: AppColors.surface,
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
@@ -111,7 +111,7 @@ class AppTheme {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         textStyle: AppTextStyles.button,
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
+        shape: const RoundedRectangleBorder(borderRadius: AppRadius.md),
         minimumSize: const Size.fromHeight(52),
         elevation: 0,
       ),
@@ -119,11 +119,11 @@ class AppTheme {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: AppColors.surfaceVariant,
-      border: OutlineInputBorder(borderRadius: AppRadius.md, borderSide: BorderSide.none),
-      enabledBorder: OutlineInputBorder(borderRadius: AppRadius.md, borderSide: BorderSide.none),
-      focusedBorder: OutlineInputBorder(
+      border: const OutlineInputBorder(borderRadius: AppRadius.md, borderSide: BorderSide.none),
+      enabledBorder: const OutlineInputBorder(borderRadius: AppRadius.md, borderSide: BorderSide.none),
+      focusedBorder: const OutlineInputBorder(
         borderRadius: AppRadius.md,
-        borderSide: const BorderSide(color: AppColors.primary, width: 2),
+        borderSide: BorderSide(color: AppColors.primary, width: 2),
       ),
       hintStyle: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -155,7 +155,7 @@ class AppTheme {
       unselectedItemColor: AppColors.onSurfaceMuted,
       elevation: 0,
     ),
-    tabBarTheme: TabBarThemeData(
+    tabBarTheme: const TabBarThemeData(
       labelColor: AppColors.primary,
       unselectedLabelColor: AppColors.onSurfaceMuted,
       indicatorColor: AppColors.primary,
@@ -191,7 +191,7 @@ static ThemeData get dark => ThemeData(
     iconTheme: IconThemeData(color: Colors.white),
   ),
   
-  cardTheme: CardThemeData(
+  cardTheme: const CardThemeData(
     color: AppColors.surfaceDark,
     elevation: 2, // Légère ombre pour démarquer
     shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
@@ -203,7 +203,7 @@ static ThemeData get dark => ThemeData(
       backgroundColor: AppColors.primaryLight,
       foregroundColor: Colors.white,
       textStyle: AppTextStyles.button,
-      shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
+      shape: const RoundedRectangleBorder(borderRadius: AppRadius.md),
       minimumSize: const Size.fromHeight(52),
       elevation: 1,
     ),
@@ -212,19 +212,19 @@ static ThemeData get dark => ThemeData(
   inputDecorationTheme: InputDecorationTheme(
     filled: true,
     fillColor: AppColors.surfaceVariantDark,
-    border: OutlineInputBorder(
+    border: const OutlineInputBorder(
       borderRadius: AppRadius.md,
-      borderSide: const BorderSide(color: Colors.grey, width: 1),
+      borderSide: BorderSide(color: Colors.grey, width: 1),
     ),
-    enabledBorder: OutlineInputBorder(
+    enabledBorder: const OutlineInputBorder(
       borderRadius: AppRadius.md,
-      borderSide: const BorderSide(color: Color(0xFF5A3A3A), width: 1),
+      borderSide: BorderSide(color: Color(0xFF5A3A3A), width: 1),
     ),
-    focusedBorder: OutlineInputBorder(
+    focusedBorder: const OutlineInputBorder(
       borderRadius: AppRadius.md,
-      borderSide: const BorderSide(color: AppColors.primaryLight, width: 2),
+      borderSide: BorderSide(color: AppColors.primaryLight, width: 2),
     ),
-    hintStyle: AppTextStyles.body.copyWith(color: Color(0xFFB0A0A0)), // Plus clair
+    hintStyle: AppTextStyles.body.copyWith(color: const Color(0xFFB0A0A0)), // Plus clair
     labelStyle: AppTextStyles.body.copyWith(color: Colors.white70),
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
   ),

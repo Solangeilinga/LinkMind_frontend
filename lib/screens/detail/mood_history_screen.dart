@@ -16,7 +16,7 @@ class MoodHistoryScreen extends ConsumerWidget {
         leading: const BackButton(),
       ),
       body: history.isEmpty
-          ? Center(
+          ? const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [

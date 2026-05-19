@@ -18,10 +18,10 @@ import 'services/api.service.dart';
 
 // Screens
 import 'screens/auth/login_screen.dart';
+// ✅ IMPORT AJOUTÉ
 import 'screens/auth/forgot_password_screen.dart';
 import 'screens/auth/verify_email_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
-// import 'screens/legal/legal_onboarding_screen.dart'; // ← Plus nécessaire
 import 'screens/main/home_shell.dart';
 import 'screens/main/mood_screen.dart';
 import 'screens/main/challenges_screen.dart';
@@ -42,6 +42,9 @@ import 'providers/app_settings_provider.dart';
 // Firebase
 import 'firebase_options.dart';
 
+// Services
+import 'services/lazy_init_service.dart';
+
 // ✅ Provider pour SharedPreferences (préchargé une fois)
 final sharedPrefsProvider = FutureProvider<SharedPreferences>((ref) async {
   return await SharedPreferences.getInstance();
@@ -50,96 +53,41 @@ final sharedPrefsProvider = FutureProvider<SharedPreferences>((ref) async {
 // ✅ Handler pour messages background FCM
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
   debugPrint('📨 Message background: ${message.notification?.title}');
 }
 
 void main() async {
-  // ✅ 1. Initialisation Flutter
+  // ✅ 1. Initialisation Flutter (obligatoire avant tout)
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ✅ 2. Configuration orientation (portrait uniquement)
+  // ✅ 2. Configuration orientation (portrait uniquement) - rapide
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // ✅ 3. Style de la barre d'état
+  // ✅ 3. Style de la barre d'état - très rapide
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
   ));
 
-  // ✅ 4. Initialisation Firebase
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    debugPrint('✅ Firebase initialisé');
-  } catch (e) {
-    debugPrint('❌ Erreur Firebase: $e');
-  }
-
-  // ✅ 5. Configuration Firebase Messaging
-  try {
-    await _setupFirebaseMessaging();
-  } catch (e) {
-    debugPrint('❌ Erreur FCM: $e');
-  }
-
-  // ✅ 6. Initialisation notifications locales
-  try {
-    await LocalNotificationService.init();
-    await LocalNotificationService.setupAllReminders();
+  // ✅ 4. Initialisation notifications locales (asynchrone, non-bloquante)
+  LocalNotificationService.init().then((_) {
+    LocalNotificationService.setupAllReminders();
     debugPrint('✅ Notifications locales initialisées');
-  } catch (e) {
-    debugPrint('❌ Erreur notifications: $e');
-  }
+  }).catchError((e) {
+    debugPrint('⚠️ Erreur notifications: $e');
+  });
 
-  // ✅ 7. Lancement de l'app
+  // ✅ 5. LANCER L'APP IMMÉDIATEMENT (sans attendre Firebase!)
   runApp(const ProviderScope(child: LinkMindApp()));
-}
 
-Future<void> _setupFirebaseMessaging() async {
-  final messaging = FirebaseMessaging.instance;
-
-  // Demander les permissions
-  NotificationSettings settings = await messaging.requestPermission(
-    alert: true,
-    badge: true,
-    sound: true,
-  );
-
-  if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-    debugPrint('✅ Permission FCM accordée');
-
-    // Récupérer et enregistrer le token
-    String? token = await messaging.getToken();
-    debugPrint('📱 FCM Token: $token');
-
-    if (token != null) {
-      await ApiService().registerFcmToken(token);
-    }
-  } else {
-    debugPrint('❌ Permission FCM refusée');
-  }
-
-  // Écouter les messages en premier plan
-  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    debugPrint('📨 Message reçu: ${message.notification?.title}');
-    LocalNotificationService.showNotification(
-      title: message.notification?.title ?? '',
-      body: message.notification?.body ?? '',
-    );
+  // ✅ 6. Initialiser Firebase en BACKGROUND (après affichage de l'app)
+  Future.delayed(const Duration(milliseconds: 500), () async {
+    debugPrint('🚀 Starting background Firebase initialization...');
+    await LazyInitService().initializeFirebase();
   });
-
-  // Écouter les clics sur notifications
-  FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-    debugPrint('📨 Notification cliquée: ${message.notification?.title}');
-  });
-
-  // Handler background
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 }
 
 class LinkMindApp extends ConsumerStatefulWidget {
@@ -151,7 +99,6 @@ class LinkMindApp extends ConsumerStatefulWidget {
 
 class _LinkMindAppState extends ConsumerState<LinkMindApp>
     with WidgetsBindingObserver {
-  
   late final GoRouter _router;
 
   @override
@@ -159,7 +106,7 @@ class _LinkMindAppState extends ConsumerState<LinkMindApp>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _router = _buildRouter();
-    
+
     // Initialiser SecurityService après le premier frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -203,14 +150,14 @@ class _LinkMindAppState extends ConsumerState<LinkMindApp>
         final location = state.matchedLocation;
         final authState = ref.read(authProvider);
         final isLoggedIn = authState.isAuthenticated;
-        
+
         // Routes spéciales
         final isInit = location == '/init';
         final isAuthRoute = location.startsWith('/auth');
         final isForgotPassword = location == '/auth/forgot-password';
         final isOnboarding = location == '/onboarding';
         final isVerifyEmail = location == '/verify-email';
-        final isLegalTerms = location == '/legal-terms'; // ← Ajout
+        final isLegalTerms = location == '/legal-terms';
 
         // /init : point d'entrée — redirige immédiatement selon l'état
         if (isInit) {
@@ -222,47 +169,38 @@ class _LinkMindAppState extends ConsumerState<LinkMindApp>
           // Connecté : le reste du redirect gère home/onboarding
           return null;
         }
-        
+
         // 2. Utilisateur NON connecté
         if (!isLoggedIn) {
           // Routes autorisées sans connexion
           if (isAuthRoute || isOnboarding || isVerifyEmail || isLegalTerms) {
             return null;
           }
-          
-          // Utiliser les préférences préchargées (une seule attente)
+
           final prefs = await ref.read(sharedPrefsProvider.future);
           final onboardingDone = prefs.getBool('onboarding_done') ?? false;
 
           if (!onboardingDone) return '/onboarding';
           return '/auth/login';
         }
-        
+
         // 3. Utilisateur connecté
         if (isLoggedIn) {
-          // Ne pas rediriger sur ces écrans
+          // Ne pas rediriger sur ces écrans — jamais
           if (isVerifyEmail) return null;
 
           // Autoriser l'onboarding si c'est un nouvel inscrit (flag SharedPrefs)
           if (isOnboarding) {
             final prefs = await ref.read(sharedPrefsProvider.future);
             final needsOnboarding = prefs.getBool('needs_onboarding') ?? false;
-            if (needsOnboarding) return null; // laisser passer
-            return '/home'; // déjà fait
+            if (needsOnboarding) return null;
+            return '/home';
           }
 
-          final user = ref.read(authProvider).user;
-
-          // Si l'email n'est pas encore vérifié → forcer /verify-email
-          if (user != null && user.isEmailVerified != true && user.email != null) {
-            return '/verify-email';
-          }
-
-          // Plus de vérification legalAccepted ici (faite à l'inscription)
           // Rediriger les routes d'auth (sauf forgot-password)
           if (isAuthRoute && !isForgotPassword) return '/home';
         }
-        
+
         return null;
       },
       routes: [
@@ -271,13 +209,13 @@ class _LinkMindAppState extends ConsumerState<LinkMindApp>
           path: '/init',
           builder: (_, __) => const _SplashLoader(),
         ),
-        
+
         // Onboarding
         GoRoute(
           path: '/onboarding',
           builder: (_, __) => const OnboardingScreen(),
         ),
-        
+
         // Authentification
         GoRoute(
           path: '/auth/login',
@@ -295,19 +233,19 @@ class _LinkMindAppState extends ConsumerState<LinkMindApp>
           path: '/verify-email',
           builder: (_, __) => const VerifyEmailScreen(),
         ),
-        
+
         // Conditions générales (accessible sans connexion)
         GoRoute(
           path: '/legal-terms',
           builder: (_, __) => const LegalTermsScreen(),
         ),
-        
+
         // Premium
         GoRoute(
           path: '/premium',
           builder: (_, __) => const PremiumScreen(),
         ),
-        
+
         // Structure principale avec BottomNavigationBar
         ShellRoute(
           builder: (context, state, child) => HomeShell(child: child),
@@ -338,7 +276,7 @@ class _LinkMindAppState extends ConsumerState<LinkMindApp>
             ),
           ],
         ),
-        
+
         // Écrans de détail
         GoRoute(
           path: '/challenges/:id',
@@ -358,13 +296,20 @@ class _LinkMindAppState extends ConsumerState<LinkMindApp>
     );
   }
 
+  bool _lastAuthenticated = false;
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final settings = ref.watch(appSettingsProvider);
 
-    // Notifier le router que l'état auth a changé
-    _router.refresh();
+    // Rafraîchir le router UNIQUEMENT quand l'état d'authentification change
+    if (authState.isAuthenticated != _lastAuthenticated) {
+      _lastAuthenticated = authState.isAuthenticated;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _router.refresh();
+      });
+    }
 
     // Pendant le chargement initial de l'auth, afficher le splash
     if (authState.isLoading) {
@@ -406,7 +351,6 @@ class _LinkMindAppState extends ConsumerState<LinkMindApp>
 }
 
 // ─── Splash Loader (branding visuel, sans timer) ──────────────────────────────
-// Affiché uniquement pendant le chargement initial de l'auth (quelques ms)
 class _SplashLoader extends StatelessWidget {
   const _SplashLoader();
 
@@ -448,7 +392,8 @@ class _SplashLoader extends StatelessWidget {
               style: AppTextStyles.body.copyWith(color: Colors.white70),
             ),
             const SizedBox(height: 60),
-            const CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+            const CircularProgressIndicator(
+                color: Colors.white, strokeWidth: 2),
           ],
         ),
       ),

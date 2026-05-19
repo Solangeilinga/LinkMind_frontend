@@ -3,11 +3,18 @@ import '../../../../utils/theme.dart';
 import '../models/post_type_config.dart';
 
 class ComposePage extends StatefulWidget {
-  final Future<void> Function(String content, String type, String? moodEmoji)? onSubmit;
+  final Future<void> Function(String content, String type, String? moodEmoji)?
+      onSubmit;
+  final String? initialContent;
+  final String? initialType;
+  final bool isEditing;
 
   const ComposePage({
     super.key,
     this.onSubmit,
+    this.initialContent,
+    this.initialType,
+    this.isEditing = false,
   });
 
   @override
@@ -25,6 +32,13 @@ class _ComposePageState extends State<ComposePage> {
   @override
   void initState() {
     super.initState();
+    if (widget.isEditing && widget.initialContent != null) {
+      _ctrl.text = widget.initialContent!;
+      _charCount = _ctrl.text.length;
+    }
+    if (widget.isEditing && widget.initialType != null) {
+      _type = widget.initialType!;
+    }
     _ctrl.addListener(() {
       if (mounted) setState(() => _charCount = _ctrl.text.length);
     });
@@ -50,7 +64,10 @@ class _ComposePageState extends State<ComposePage> {
   @override
   Widget build(BuildContext context) {
     final typeConf = postTypeConfig[_type] ?? postTypeConfig['feeling']!;
-    final canSubmit = _charCount > 0 && _charCount <= _maxChars && !_isPosting && widget.onSubmit != null;
+    final canSubmit = _charCount > 0 &&
+        _charCount <= _maxChars &&
+        !_isPosting &&
+        widget.onSubmit != null;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -64,7 +81,7 @@ class _ComposePageState extends State<ComposePage> {
         title: Row(children: [
           Flexible(
             child: Text(
-              'Nouveau partage',
+              widget.isEditing ? 'Modifier le partage' : 'Nouveau partage',
               style: AppTextStyles.h4,
               overflow: TextOverflow.ellipsis,
             ),
@@ -75,7 +92,8 @@ class _ComposePageState extends State<ComposePage> {
             decoration: BoxDecoration(
               color: AppColors.secondary.withValues(alpha: 0.1),
               borderRadius: AppRadius.full,
-              border: Border.all(color: AppColors.secondary.withValues(alpha: 0.3)),
+              border:
+                  Border.all(color: AppColors.secondary.withValues(alpha: 0.3)),
             ),
             child: const Row(mainAxisSize: MainAxisSize.min, children: [
               Text('🔒', style: TextStyle(fontSize: 11)),
@@ -83,7 +101,9 @@ class _ComposePageState extends State<ComposePage> {
               Text(
                 'Anon',
                 style: TextStyle(
-                    color: AppColors.secondary, fontWeight: FontWeight.w800, fontSize: 11),
+                    color: AppColors.secondary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 11),
               ),
             ]),
           ),
@@ -103,58 +123,69 @@ class _ComposePageState extends State<ComposePage> {
                   ? const SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Text('Publier'),
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2))
+                  : Text(widget.isEditing ? 'Enregistrer' : 'Publier'),
             ),
           ),
         ],
       ),
       body: Column(children: [
-        // Type selector
-        Container(
-          color: AppColors.surface,
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(
-              'Type de partage',
-              style: AppTextStyles.caption.copyWith(
-                  color: AppColors.onSurfaceMuted, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: _types.map((id) {
-                  final e = postTypeConfig[id]!;
-                  final sel = _type == id;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: GestureDetector(
-                      onTap: () => setState(() => _type = id),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: sel ? e.color.withValues(alpha: 0.15) : AppColors.surfaceVariant,
-                          borderRadius: AppRadius.full,
-                          border: Border.all(color: sel ? e.color : Colors.transparent, width: 1.5),
-                        ),
-                        child: Text(
-                          '${e.emoji} ${e.label}',
-                          style: AppTextStyles.caption.copyWith(
-                            color: sel ? e.color : AppColors.onSurfaceMuted,
-                            fontWeight: sel ? FontWeight.w900 : FontWeight.w600,
+        // Type selector (disabled in edit mode)
+        if (!widget.isEditing)
+          Container(
+            color: AppColors.surface,
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(
+                'Type de partage',
+                style: AppTextStyles.caption.copyWith(
+                    color: AppColors.onSurfaceMuted,
+                    fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: _types.map((id) {
+                    final e = postTypeConfig[id]!;
+                    final sel = _type == id;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: GestureDetector(
+                        onTap: () => setState(() => _type = id),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: sel
+                                ? e.color.withValues(alpha: 0.15)
+                                : AppColors.surfaceVariant,
+                            borderRadius: AppRadius.full,
+                            border: Border.all(
+                                color: sel ? e.color : Colors.transparent,
+                                width: 1.5),
+                          ),
+                          child: Text(
+                            '${e.emoji} ${e.label}',
+                            style: AppTextStyles.caption.copyWith(
+                              color: sel ? e.color : AppColors.onSurfaceMuted,
+                              fontWeight:
+                                  sel ? FontWeight.w900 : FontWeight.w600,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  );
-                }).toList(),
+                    );
+                  }).toList(),
+                ),
               ),
-            ),
-          ]),
-        ),
-        const Divider(height: 1, color: AppColors.divider),
+            ]),
+          ),
+        if (!widget.isEditing)
+          const Divider(height: 1, color: AppColors.divider),
 
         // Zone de texte
         Expanded(
@@ -171,7 +202,8 @@ class _ComposePageState extends State<ComposePage> {
               decoration: InputDecoration(
                 hintText: 'Partage ce que tu ressens… Tout est anonyme ici.',
                 hintStyle: AppTextStyles.body.copyWith(
-                    color: AppColors.onSurfaceMuted.withValues(alpha: 0.5), height: 1.7),
+                    color: AppColors.onSurfaceMuted.withValues(alpha: 0.5),
+                    height: 1.7),
                 border: InputBorder.none,
                 counterStyle: AppTextStyles.caption.copyWith(
                     color: _charCount > _maxChars * 0.9
@@ -184,24 +216,29 @@ class _ComposePageState extends State<ComposePage> {
 
         // Barre info bas
         Container(
-          padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).padding.bottom + 8),
-          decoration: BoxDecoration(
+          padding: EdgeInsets.fromLTRB(
+              16, 8, 16, MediaQuery.of(context).padding.bottom + 8),
+          decoration: const BoxDecoration(
             color: AppColors.surface,
-            border: const Border(top: BorderSide(color: AppColors.divider)),
+            border: Border(top: BorderSide(color: AppColors.divider)),
           ),
           child: Row(children: [
-            const Icon(Icons.lock_outline, size: 14, color: AppColors.onSurfaceMuted),
+            const Icon(Icons.lock_outline,
+                size: 14, color: AppColors.onSurfaceMuted),
             const SizedBox(width: 6),
             Expanded(
               child: Text(
                 "Personne ne verra ton identité.",
-                style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted),
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.onSurfaceMuted),
               ),
             ),
             Text(
               '$_charCount / $_maxChars',
               style: AppTextStyles.caption.copyWith(
-                color: _charCount > _maxChars * 0.9 ? AppColors.accent : AppColors.onSurfaceMuted,
+                color: _charCount > _maxChars * 0.9
+                    ? AppColors.accent
+                    : AppColors.onSurfaceMuted,
               ),
             ),
           ]),

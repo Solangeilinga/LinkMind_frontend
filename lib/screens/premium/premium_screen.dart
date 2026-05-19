@@ -157,7 +157,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.lg),
+        shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
         title: const Row(
           children: [
             Icon(Icons.check_circle, color: AppColors.secondary, size: 32),
@@ -194,7 +194,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.lg),
+        shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
         title: const Text('Paiement en cours'),
         content: const Column(
           mainAxisSize: MainAxisSize.min,
@@ -519,7 +519,7 @@ class _PopularBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: AppColors.secondary,
         borderRadius: AppRadius.full,
       ),

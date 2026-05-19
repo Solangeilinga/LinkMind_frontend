@@ -171,7 +171,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Communauté 🌍', style: AppTextStyles.h2),
+                          const Text('Communauté 🌍', style: AppTextStyles.h2),
                           Text('Espace sécurisé · Tout est anonyme',
                               style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
                         ],
@@ -193,10 +193,10 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                   const SizedBox(height: 14),
                   Container(
                     height: 38,
-                    decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: AppRadius.full),
+                    decoration: const BoxDecoration(color: AppColors.surfaceVariant, borderRadius: AppRadius.full),
                     child: TabBar(
                       controller: _tabController,
-                      indicator: BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.full),
+                      indicator: const BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.full),
                       indicatorSize: TabBarIndicatorSize.tab,
                       labelColor: Colors.white,
                       unselectedLabelColor: AppColors.onSurfaceMuted,

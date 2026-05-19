@@ -162,7 +162,9 @@ class ContentState {
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 class ContentNotifier extends StateNotifier<ContentState> {
-  ContentNotifier() : super(const ContentState());
+  ContentNotifier() : super(const ContentState()) {
+    load(); // Chargement automatique au démarrage
+  }
 
   Future<void> load() async {
     try {

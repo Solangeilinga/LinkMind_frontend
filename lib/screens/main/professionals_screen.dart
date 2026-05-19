@@ -180,17 +180,17 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Professionnels 🩺', style: AppTextStyles.h2),
+            const Text('Professionnels 🩺', style: AppTextStyles.h2),
             Text('Psychologues, coachs et médecins partenaires',
                 style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
             const SizedBox(height: 14),
 
             Container(
               height: 38,
-              decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: AppRadius.full),
+              decoration: const BoxDecoration(color: AppColors.surfaceVariant, borderRadius: AppRadius.full),
               child: TabBar(
                 controller: _tabCtrl,
-                indicator: BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.full),
+                indicator: const BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.full),
                 indicatorSize: TabBarIndicatorSize.tab,
                 labelColor: Colors.white,
                 unselectedLabelColor: AppColors.onSurfaceMuted,
@@ -305,7 +305,7 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
                         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                           const Text('📋', style: TextStyle(fontSize: 48)),
                           const SizedBox(height: 16),
-                          Text('Aucune demande pour l\'instant', style: AppTextStyles.h3, textAlign: TextAlign.center),
+                          const Text('Aucune demande pour l\'instant', style: AppTextStyles.h3, textAlign: TextAlign.center),
                           const SizedBox(height: 8),
                           Text('Trouve un professionnel et envoie ta première demande.',
                               style: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted, height: 1.5),
@@ -396,7 +396,7 @@ class _ProfessionalCard extends StatelessWidget {
             Wrap(spacing: 6, runSpacing: 6,
               children: specs.take(4).map((s) => Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: AppRadius.full),
+                decoration: const BoxDecoration(color: AppColors.surfaceVariant, borderRadius: AppRadius.full),
                 child: Text(s.toString(), style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted, fontSize: 11)),
               )).toList()),
           ],
@@ -411,8 +411,8 @@ class _ProfessionalCard extends StatelessWidget {
                   child: Text('${pro['sessionPrice']} ${pro['currency'] ?? 'FCFA'}',
                     style: AppTextStyles.caption.copyWith(color: AppColors.secondary, fontWeight: FontWeight.w800)),
                 ),
-              if (pro['isOnline'] == true)  _ModeChip('🌐 En ligne'),
-              if (pro['isInPerson'] == true) _ModeChip('📍 Présentiel'),
+              if (pro['isOnline'] == true)  const _ModeChip('🌐 En ligne'),
+              if (pro['isInPerson'] == true) const _ModeChip('📍 Présentiel'),
             ])),
             const SizedBox(width: 8),
             ReportButton(targetType: 'professional', targetId: pro['id'], isSmall: true),
@@ -436,7 +436,7 @@ class _ModeChip extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     margin: const EdgeInsets.only(right: 4),
     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-    decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: AppRadius.full),
+    decoration: const BoxDecoration(color: AppColors.surfaceVariant, borderRadius: AppRadius.full),
     child: Text(label, style: AppTextStyles.caption.copyWith(fontSize: 10)),
   );
 }
@@ -502,7 +502,7 @@ class _BookingCard extends StatelessWidget {
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: AppRadius.md),
+            decoration: const BoxDecoration(color: AppColors.surfaceVariant, borderRadius: AppRadius.md),
             child: Text(booking['message'], style: AppTextStyles.bodySmall.copyWith(color: AppColors.onSurfaceMuted, fontSize: 12),
               maxLines: 2, overflow: TextOverflow.ellipsis),
           ),
@@ -595,7 +595,7 @@ class _BookingSheetState extends State<_BookingSheet> {
         decoration: const BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
         child: SingleChildScrollView(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.divider, borderRadius: AppRadius.full))),
+            Center(child: Container(width: 40, height: 4, decoration: const BoxDecoration(color: AppColors.divider, borderRadius: AppRadius.full))),
             const SizedBox(height: 16),
             Row(children: [
               Container(width: 48, height: 48, decoration: BoxDecoration(color: typeConf.color.withValues(alpha: 0.1), shape: BoxShape.circle),
@@ -692,7 +692,7 @@ class _EditBookingSheetState extends State<_EditBookingSheet> {
         decoration: const BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
         child: SingleChildScrollView(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.divider, borderRadius: AppRadius.full))),
+            Center(child: Container(width: 40, height: 4, decoration: const BoxDecoration(color: AppColors.divider, borderRadius: AppRadius.full))),
             const SizedBox(height: 16),
             Row(children: [
               Container(width: 48, height: 48, decoration: BoxDecoration(color: typeConf.color.withValues(alpha: 0.1), shape: BoxShape.circle),

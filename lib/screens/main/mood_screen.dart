@@ -25,7 +25,7 @@ class _MoodScreenState extends ConsumerState<MoodScreen> with SingleTickerProvid
   bool _isLogging   = false;
   String? _note;
   int _stressLevel  = 3;
-  List<String> _selectedFactors = [];
+  final List<String> _selectedFactors = [];
   final _noteController = TextEditingController();
   late AnimationController _fadeController;
   late Animation<double> _fadeAnim;
@@ -52,7 +52,8 @@ class _MoodScreenState extends ConsumerState<MoodScreen> with SingleTickerProvid
         ApiService().getDailyMessage(),
         ApiService().getWellnessTips(),
       ]);
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         final msg = results[0]['message'];
         if (msg != null) _todayMessage = '${msg['text'] ?? ''} ${msg['emoji'] ?? ''}';
         final grouped = results[1]['tips'] as Map<String, dynamic>? ?? {};
@@ -60,6 +61,7 @@ class _MoodScreenState extends ConsumerState<MoodScreen> with SingleTickerProvid
           (tips as List).map((t) => _WellnessTip(
             t['emoji'] ?? '💡', t['title'] ?? '', t['description'] ?? '', t['actionPath'])).toList()));
       });
+      }
     } catch (_) {}
   }
 
@@ -130,7 +132,7 @@ class _MoodScreenState extends ConsumerState<MoodScreen> with SingleTickerProvid
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text('$greeting ${user?.name.split(' ').first ?? ''} 👋',
                           style: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted)),
-                      Text('Comment te sens-tu ?', style: AppTextStyles.h2),
+                      const Text('Comment te sens-tu ?', style: AppTextStyles.h2),
                     ])),
                     Flexible(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                       _PointsBadge(points: user?.totalPoints ?? 0),
@@ -226,7 +228,7 @@ class _DailyMessageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.lg),
+    decoration: const BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.lg),
     child: Row(children: [
       const Text('💬', style: TextStyle(fontSize: 22)),
       const SizedBox(width: 12),
@@ -256,7 +258,7 @@ class _StressLevelSlider extends StatelessWidget {
       boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)]),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text('Niveau de stress', style: AppTextStyles.h4),
+        const Text('Niveau de stress', style: AppTextStyles.h4),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
@@ -292,7 +294,7 @@ class _FactorSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Text("Qu'est-ce qui impacte ton humeur ?", style: AppTextStyles.h4),
+    const Text("Qu'est-ce qui impacte ton humeur ?", style: AppTextStyles.h4),
     const SizedBox(height: 4),
     Text("Sélectionne tout ce qui s'applique",
         style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
@@ -496,7 +498,7 @@ class _WeeklyMoodChart extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Ton évolution', style: AppTextStyles.h4),
+          const Text('Ton évolution', style: AppTextStyles.h4),
           const SizedBox(height: 16),
           // Utilisation d'IntrinsicHeight pour éviter l'overflow
           IntrinsicHeight(
@@ -556,7 +558,7 @@ class _WellnessTipsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Recommandé pour toi', style: AppTextStyles.h4),
+        const Text('Recommandé pour toi', style: AppTextStyles.h4),
         const SizedBox(height: 12),
         ...tips.map((t) => GestureDetector(
           onTap: t.route != null ? () => context.push(t.route!) : null,
@@ -590,7 +592,7 @@ class _WellnessTipsSection extends StatelessWidget {
               ]
             ),
           ),
-        )).toList()
+        ))
       ]
     );
   }
@@ -619,14 +621,14 @@ class _WellnessSheet extends StatelessWidget {
             Center(
               child: Container(
                 width: 40, height: 4,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: AppColors.divider, 
                   borderRadius: AppRadius.full
                 )
               )
             ),
             const SizedBox(height: 20),
-            Text('Prends un moment pour toi', style: AppTextStyles.h3),
+            const Text('Prends un moment pour toi', style: AppTextStyles.h3),
             const SizedBox(height: 16),
             ...tips.map((t) => ListTile(
               leading: Container(
@@ -669,7 +671,7 @@ class _PointsBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-    decoration: BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.full),
+    decoration: const BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.full),
     child: Text('⚡ $points pts',
         style: AppTextStyles.caption.copyWith(color: Colors.white, fontWeight: FontWeight.w800)));
 }

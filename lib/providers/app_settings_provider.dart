@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -10,18 +9,19 @@ class AppSettings {
   final String language;
 
   const AppSettings({
-    this.themeMode = ThemeMode.system,
+    this.themeMode = ThemeMode.light,
     this.textScale = 1.0,
-    this.language  = 'fr',
+    this.language = 'fr',
   });
 
   Locale get locale => Locale(language);
 
-  AppSettings copyWith({ThemeMode? themeMode, double? textScale, String? language}) =>
+  AppSettings copyWith(
+          {ThemeMode? themeMode, double? textScale, String? language}) =>
       AppSettings(
         themeMode: themeMode ?? this.themeMode,
         textScale: textScale ?? this.textScale,
-        language:  language  ?? this.language,
+        language: language ?? this.language,
       );
 }
 
@@ -35,27 +35,13 @@ class AppSettingsNotifier extends Notifier<AppSettings> {
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
-    final theme = prefs.getString('theme') ?? 'system';
     final scale = prefs.getDouble('text_scale') ?? 1.0;
-    final lang  = prefs.getString('language') ?? 'fr';
+    final lang = prefs.getString('language') ?? 'fr';
     state = AppSettings(
-      themeMode: _parseTheme(theme),
+      themeMode: ThemeMode.light,
       textScale: scale,
       language: lang,
     );
-  }
-
-  ThemeMode _parseTheme(String s) {
-    if (s == 'light') return ThemeMode.light;
-    if (s == 'dark') return ThemeMode.dark;
-    return ThemeMode.system;
-  }
-
-  Future<void> setTheme(ThemeMode mode) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = mode == ThemeMode.light ? 'light' : mode == ThemeMode.dark ? 'dark' : 'system';
-    await prefs.setString('theme', key);
-    state = state.copyWith(themeMode: mode);
   }
 
   Future<void> setTextScale(double scale) async {
@@ -71,5 +57,5 @@ class AppSettingsNotifier extends Notifier<AppSettings> {
   }
 }
 
-final appSettingsProvider = NotifierProvider<AppSettingsNotifier, AppSettings>(
-  AppSettingsNotifier.new);
+final appSettingsProvider =
+    NotifierProvider<AppSettingsNotifier, AppSettings>(AppSettingsNotifier.new);

@@ -79,7 +79,7 @@ class _FeedListState extends State<FeedList> {
             );
           }
 
-          final adEvery = 5;
+          const adEvery = 5;
           final adsInserted = i ~/ (adEvery + 1);
           final postIndex = i - adsInserted;
           

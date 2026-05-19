@@ -79,11 +79,13 @@ class _CommentsSectionState extends State<CommentsSection> {
       widget.onCommentPosted(comment, _replyToId);
       _ctrl.clear();
       _focusNode.unfocus();
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _sending = false;
         _replyToId = null;
         _replyToLabel = null;
       });
+      }
     } catch (_) {
       if (mounted) setState(() => _sending = false);
     }

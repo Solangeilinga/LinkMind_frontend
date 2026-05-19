@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import '../../../../utils/theme.dart';
 import '../../../../services/api.service.dart';
 import '../../../../widgets/report_button.dart';
@@ -7,6 +6,7 @@ import 'comments_section.dart';
 import 'reaction_menu.dart';
 import '../models/post_type_config.dart';
 import '../utils/helpers.dart';
+import 'compose_page.dart';
 
 class PostCard extends StatefulWidget {
   final Map<String, dynamic> post;
@@ -42,7 +42,6 @@ class _PostCardState extends State<PostCard> {
   String? _myReactionType;
 
   bool _isEditing = false;
-  final _editController = TextEditingController();
 
   String get _postId =>
       (widget.post['_id'] ?? widget.post['id'] ?? '').toString();
@@ -92,12 +91,10 @@ class _PostCardState extends State<PostCard> {
   void initState() {
     super.initState();
     _updateReactionsFromPost();
-    _editController.text = _content;
   }
 
   @override
   void dispose() {
-    _editController.dispose();
     super.dispose();
   }
 
@@ -105,14 +102,7 @@ class _PostCardState extends State<PostCard> {
   void didUpdateWidget(PostCard old) {
     super.didUpdateWidget(old);
     _updateReactionsFromPost();
-    if (_content != old.post['content']) {
-      _editController.text = _content;
-    }
   }
-
-  // ==========================================================================
-  // Gestion des réactions unifiée
-  // ==========================================================================
 
   void _handlePostLike() {
     _handleReaction('heart');
@@ -207,123 +197,49 @@ class _PostCardState extends State<PostCard> {
   // ==========================================================================
   // Édition / Suppression
   // ==========================================================================
-  void _showEditBottomSheet(BuildContext context) {
-    _editController.text = _content;
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(ctx).size.height * 0.8,
-          ),
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.only(
-                left: 16,
-                right: 16,
-                top: 20,
-                bottom: MediaQuery.viewInsetsOf(ctx).bottom + 16,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
-                    Text('Modifier le post',
-                        style: AppTextStyles.bodySmall.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.onSurface)),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: () => Navigator.pop(ctx),
-                      child: const Icon(Icons.close,
-                          size: 20, color: AppColors.onSurfaceMuted),
-                    ),
-                  ]),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _editController,
-                    maxLines: 6,
-                    minLines: 3,
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(borderRadius: AppRadius.md),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: AppRadius.md,
-                        borderSide: const BorderSide(
-                            color: AppColors.primary, width: 1.5),
-                      ),
-                      hintText: 'Modifie ton post…',
-                      hintStyle: AppTextStyles.bodySmall.copyWith(
-                          color:
-                              AppColors.onSurfaceMuted.withValues(alpha: 0.6)),
-                      contentPadding: const EdgeInsets.all(12),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: Text('Annuler',
-                          style: AppTextStyles.bodySmall
-                              .copyWith(color: AppColors.onSurfaceMuted)),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        shape:
-                            RoundedRectangleBorder(borderRadius: AppRadius.md),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 10),
-                      ),
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        _handleEdit();
-                      },
-                      child: const Text('Enregistrer'),
-                    ),
-                  ]),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
+  Future<void> _openEditComposePage() async {
+    if (_isEditing) return;
+    setState(() => _isEditing = true);
 
-  Future<void> _handleEdit() async {
-    final newContent = _editController.text.trim();
-    if (newContent.isEmpty || newContent == _content) {
+    final postType = widget.post['postType'] as String? ?? 'feeling';
+
+    // On pousse la page d'édition et on attend le résultat (booléen)
+    final success = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => ComposePage(
+          isEditing: true,
+          initialContent: _content,
+          initialType: postType,
+          onSubmit: (content, type, moodEmoji) async {
+            // Ici on ne fait QUE l'appel API et la mise à jour locale
+            // PAS de Navigator.pop ! C'est ComposePage qui fermera la page avec un résultat.
+            await ApiService().editPost(_postId, content);
+            // Mise à jour locale des données du post
+            widget.post['content'] = content;
+            widget.post['editedAt'] = DateTime.now().toIso8601String();
+          },
+        ),
+      ),
+    );
+
+    if (mounted) {
       setState(() => _isEditing = false);
-      return;
-    }
-    try {
-      await ApiService().editPost(_postId, newContent);
-      widget.post['content'] = newContent;
-      widget.post['editedAt'] = DateTime.now().toIso8601String();
-      if (mounted) {
-        setState(() => _isEditing = false);
+      if (success == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Post modifié avec succès'),
-              backgroundColor: AppColors.secondary),
+            content: Text('Post modifié avec succès'),
+            backgroundColor: AppColors.secondary,
+          ),
         );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isEditing = false);
+        // Notifier le parent si besoin
+        widget.onEdit?.call();
+      } else if (success == false) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Erreur: ${e.toString()}'),
-              backgroundColor: AppColors.accent),
+          const SnackBar(
+            content: Text('Erreur lors de la modification'),
+            backgroundColor: AppColors.accent,
+          ),
         );
       }
     }
@@ -533,7 +449,7 @@ class _PostCardState extends State<PostCard> {
                     size: 20, color: AppColors.onSurfaceMuted),
                 onSelected: (value) async {
                   if (value == 'edit' && _canEdit) {
-                    _showEditBottomSheet(context);
+                    await _openEditComposePage();
                   } else if (value == 'edit' && !_canEdit) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(

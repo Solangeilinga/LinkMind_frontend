@@ -111,6 +111,9 @@ String _errorMessage(Object e, {String fallback = 'Une erreur inattendue est sur
             : 'Identifiants incorrects. Vérifie ton email/téléphone et mot de passe.';
       case SecurityErrorType.rateLimited:
         return 'Trop de requêtes. Attends un moment avant de réessayer.';
+      case SecurityErrorType.forbidden:
+        // legal_not_accepted ou autre 403
+        return e.message.isNotEmpty ? e.message : 'Accès refusé. Vérifie que tu as accepté les conditions d\'utilisation.';
       default:
         return e.message.isNotEmpty ? e.message : fallback;
     }

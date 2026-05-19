@@ -118,7 +118,7 @@ class _ReportButtonState extends State<ReportButton> {
         builder: (context, setDialogState) {
           return AlertDialog(
             title: const Text('Signaler'),
-            shape: RoundedRectangleBorder(borderRadius: AppRadius.lg),
+            shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,

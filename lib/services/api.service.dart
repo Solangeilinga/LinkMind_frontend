@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import '../utils/theme.dart';
+import 'cache_manager.dart';
 
 // ============================================================================
 // CLASSES D'ERREUR DE SÉCURITÉ
@@ -49,6 +50,7 @@ class ApiService {
   ApiService._internal();
 
   final _storage = const FlutterSecureStorage();
+  final _cacheManager = ApiCacheManager();
   String? _accessToken;
 
   // ─── Token Management ──────────────────────────────────────────────────────
@@ -122,7 +124,7 @@ class ApiService {
       if (posts is List) {
         final cleanedPosts = posts.map((post) {
           if (post is Map<String, dynamic>) return post;
-          if (post != null && post is dynamic) {
+          if (post != null) {
             try {
               if (post.toJson != null && post.toJson is Function) {
                 return post.toJson();
@@ -207,11 +209,61 @@ class ApiService {
     }
   }
 
+  // ─── Cache Helpers ────────────────────────────────────────────────────────
+  String _generateCacheKey(String path, Map<String, String>? queryParams) {
+    if (queryParams == null || queryParams.isEmpty) return path;
+    final sortedParams = (queryParams.keys.toList()..sort())
+        .map((k) => '$k=${queryParams[k]}')
+        .join('&');
+    return '$path?$sortedParams';
+  }
+
+  Duration _getCacheDuration(String path) {
+    // ✅ Contenu statique: 1 heure
+    if (path.startsWith('/content/')) return const Duration(hours: 1);
+
+    // ✅ Données utilisateur: 10 minutes
+    if (path.startsWith('/users/') || path.startsWith('/professionals/')) {
+      return const Duration(minutes: 10);
+    }
+
+    // ✅ Feed & Community: 5 minutes (changements fréquents)
+    if (path.startsWith('/community/')) return const Duration(minutes: 5);
+
+    // ✅ Mood & Challenges: 5 minutes
+    if (path.startsWith('/mood/') || path.startsWith('/challenges/')) {
+      return const Duration(minutes: 5);
+    }
+
+    // ✅ Notifications: pas de cache (toujours frais)
+    if (path.startsWith('/notifications')) return Duration.zero;
+
+    // ✅ Par défaut: 5 minutes
+    return const Duration(minutes: 5);
+  }
+
   Future<dynamic> get(String path, {Map<String, String>? queryParams}) async {
+    // ✅ Générer clé de cache basée sur le chemin et paramètres
+    final cacheKey = _generateCacheKey(path, queryParams);
+
+    // ✅ Vérifier le cache d'abord
+    final cached = _cacheManager.get<dynamic>(cacheKey);
+    if (cached != null) {
+      debugPrint('💾 API Cache Hit: $path');
+      return cached;
+    }
+
+    // ✅ Sinon, faire la requête
     final uri = Uri.parse('${AppConstants.baseUrl}$path')
         .replace(queryParameters: queryParams);
-    return _execute(
+    final result = await _execute(
         (h) => http.get(uri, headers: h).timeout(const Duration(seconds: 15)));
+
+    // ✅ Cacher la réponse avec durée appropriée
+    final cacheDuration = _getCacheDuration(path);
+    _cacheManager.set(cacheKey, result, expiry: cacheDuration);
+
+    return result;
   }
 
   Future<dynamic> post(String path, Map<String, dynamic> body) async {
@@ -512,11 +564,7 @@ class ApiService {
 
   Future<void> clearAssistantSession() async {
     try {
-      final headers = await _getHeaders();
-      await http.delete(
-        Uri.parse('${AppConstants.baseUrl}/assistant/session'),
-        headers: headers,
-      );
+      await delete('/assistant/session');
     } catch (_) {}
   }
 

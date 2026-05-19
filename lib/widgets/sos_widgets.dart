@@ -43,7 +43,7 @@ class SosButton extends StatelessWidget {
                 shape: BoxShape.circle),
               child: const Center(child: Text('🆘', style: TextStyle(fontSize: 32)))),
             const SizedBox(height: 16),
-            Text('Tu traverses une crise ?',
+            const Text('Tu traverses une crise ?',
                 style: AppTextStyles.h3, textAlign: TextAlign.center),
             const SizedBox(height: 8),
             Text(
@@ -54,7 +54,7 @@ class SosButton extends StatelessWidget {
             const SizedBox(height: 20),
 
             // Bouton SAMU
-            _SosCallButton(
+            const _SosCallButton(
               emoji: '🏥',
               label: 'SAMU',
               sublabel: 'Urgences médicales — 24h/24',
@@ -62,7 +62,7 @@ class SosButton extends StatelessWidget {
               color: AppColors.accent,
             ),
             const SizedBox(height: 10),
-            _SosCallButton(
+            const _SosCallButton(
               emoji: '🚔',
               label: 'Police secours',
               sublabel: 'Sécurité',
@@ -70,7 +70,7 @@ class SosButton extends StatelessWidget {
               color: AppColors.primary,
             ),
             const SizedBox(height: 10),
-            _SosCallButton(
+            const _SosCallButton(
               emoji: '🚒',
               label: 'Pompiers',
               sublabel: 'Accidents — incendies',
@@ -82,7 +82,7 @@ class SosButton extends StatelessWidget {
             // Disclaimer
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.surfaceVariant,
                 borderRadius: AppRadius.md),
               child: Text(
