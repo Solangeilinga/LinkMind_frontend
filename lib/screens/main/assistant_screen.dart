@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../utils/theme.dart';
+import '../../utils/icon_mapper.dart';
 import '../../services/api.service.dart';
 import '../../services/chat_history_service.dart';
 
@@ -33,12 +34,12 @@ class _Starter {
 }
 
 const _defaultStarters = [
-  _Starter('😰', "Je suis stressé(e) par mes examens", 'stressed'),
-  _Starter('😔', "Je me sens seul(e)", 'sad'),
-  _Starter('😴', "Je n'arrive plus à me concentrer", 'tired'),
-  _Starter('💭', "J'ai du mal à me motiver", 'neutral'),
-  _Starter('😟', "J'ai des pensées qui me pèsent", 'anxious'),
-  _Starter('🎯', "Comment mieux organiser mes révisions ?", 'neutral'),
+  _Starter('🌟', "Je veux prendre soin de moi", 'neutral'),
+  _Starter('💪', "Comment rester motivé(e) ?", 'neutral'),
+  _Starter('🧘', "J'aimerais apprendre à gérer mon stress", 'neutral'),
+  _Starter('📚', "Conseils pour les révisions et l'étude", 'neutral'),
+  _Starter('💚', "Je cherche du soutien et des encouragements", 'neutral'),
+  _Starter('🎯', "Comment mieux organiser ma journée ?", 'neutral'),
 ];
 
 // ─── Assistant Screen ──────────────────────────────────────────────────────────
@@ -365,7 +366,7 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen>
             color: AppColors.primary.withValues(alpha: 0.08),
             child: Row(
               children: [
-                const Icon(Icons.lock_outline,
+                Icon(Icons.lock_outline,
                     size: 14, color: AppColors.primary),
                 const SizedBox(width: 6),
                 Expanded(
@@ -410,7 +411,7 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen>
                   border: Border.all(
                       color: AppColors.primary.withValues(alpha: 0.2))),
               child: Column(children: [
-                const Text('🔒', style: TextStyle(fontSize: 32)),
+                Icon(Icons.lock, size: 32, color: AppColors.primary),
                 const SizedBox(height: 8),
                 Text('Limite quotidienne atteinte',
                     style: AppTextStyles.h4.copyWith(color: AppColors.primary)),
@@ -427,7 +428,7 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen>
                     onPressed: () {
                       // TODO: Redirection vers l'écran Premium
                     },
-                    icon: const Text('👑', style: TextStyle(fontSize: 16)),
+                    icon: Icon(Icons.workspace_premium, color: Colors.white),
                     label: const Text('Passer en Premium'),
                     style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.secondary,
@@ -555,7 +556,7 @@ class _WelcomeView extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        Text(s.emoji, style: const TextStyle(fontSize: 22)),
+                        IconMapper.getIcon(s.emoji, size: 22),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Text(s.text,
@@ -705,7 +706,7 @@ class _MessageBubble extends StatelessWidget {
                       color: AppColors.accentOrange.withValues(alpha: 0.25)),
                 ),
                 child: Row(children: [
-                  const Text('💛', style: TextStyle(fontSize: 14)),
+                  Icon(Icons.favorite, size: 14, color: AppColors.accentOrange),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -751,7 +752,7 @@ class _ProfessionalCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            const Text('🏥', style: TextStyle(fontSize: 20)),
+            Icon(Icons.local_hospital, size: 20, color: Colors.white),
             const SizedBox(width: 10),
             Expanded(
               child: Text('Je te recommande un professionnel',
@@ -780,9 +781,9 @@ class _ProfessionalCard extends StatelessWidget {
                     style: AppTextStyles.caption.copyWith(
                         color: Colors.white, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 6),
-                _helpItem('🏫', 'Service de santé universitaire (SUMP)'),
-                _helpItem('📞', 'Ligne d\'écoute étudiante de ton université'),
-                _helpItem('👨‍⚕️', 'Centre Médical le plus proche'),
+                _helpItem(Icons.school, 'Service de santé universitaire (SUMP)'),
+                _helpItem(Icons.phone, 'Ligne d\'écoute étudiante de ton université'),
+                _helpItem(Icons.local_hospital, 'Centre Médical le plus proche'),
               ],
             ),
           ),
@@ -795,10 +796,18 @@ class _ProfessionalCard extends StatelessWidget {
               decoration: const BoxDecoration(
                   color: Colors.white, borderRadius: AppRadius.md),
               child: Center(
-                  child: Text('🩺 Voir les professionnels LinkMind',
-                      style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.accent,
-                          fontWeight: FontWeight.w800))),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.medical_information, color: AppColors.accentRed, size: 18),
+                      const SizedBox(width: 6),
+                      Text('Voir les professionnels LinkMind',
+                          style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.accent,
+                              fontWeight: FontWeight.w800)),
+                    ],
+                  ),
+              ),
             ),
           ),
         ],
@@ -806,10 +815,10 @@ class _ProfessionalCard extends StatelessWidget {
     );
   }
 
-  Widget _helpItem(String icon, String text) => Padding(
+  Widget _helpItem(IconData icon, String text) => Padding(
         padding: const EdgeInsets.only(top: 4),
         child: Row(children: [
-          Text(icon, style: const TextStyle(fontSize: 14)),
+          Icon(icon, size: 14, color: Colors.white),
           const SizedBox(width: 6),
           Expanded(
               child: Text(text,

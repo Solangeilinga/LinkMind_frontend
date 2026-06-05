@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:open_file/open_file.dart';
 import '../../utils/theme.dart';
+import '../../utils/icon_mapper.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api.service.dart';
 import '../../services/report_service.dart';
@@ -53,14 +54,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   /// Nettoie la liste des défis complétés
   List<Map<String, dynamic>> _cleanChallenges(List<Map<String, dynamic>> raw) {
     return raw.map((challengeEntry) {
+      // ✅ Conversion sécurisée de Map<dynamic, dynamic> -> Map<String, dynamic>
+      final challengeData = challengeEntry['challenge'];
       final challengeMap =
-          challengeEntry['challenge'] as Map<String, dynamic>? ?? {};
+          _castMap<dynamic>(challengeData) as Map<String, dynamic>? ?? {};
       return {
         'challenge': {
           'category': (challengeMap['category'] as String?) ?? 'Général',
         },
       };
     }).toList();
+  }
+
+  /// Convertir Map<dynamic, dynamic> en Map<String, T> de manière sécurisée
+  static Map<String, T> _castMap<T>(dynamic data) {
+    if (data is Map<String, T>) return data;
+    if (data is Map) {
+      return Map<String, T>.from(
+          data.map((k, v) => MapEntry(k.toString(), v as T)));
+    }
+    return {};
   }
 
   /// Nettoie la liste des badges
@@ -97,6 +110,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       final moodHistory = _cleanMoodHistory(rawMoodHistory);
       final challenges = _cleanChallenges(rawChallenges);
       final badges = _cleanBadges(rawBadges);
+
+      // ✅ Vérifier qu'il y a assez de données
+      if (moodHistory.isEmpty && challenges.isEmpty && badges.isEmpty) {
+        if (mounted) {
+          setState(() => _exportingReport = false);
+          _showInsufficientDataDialog();
+        }
+        return;
+      }
 
       if (mounted) {
         setState(() => _exportingReport = false);
@@ -143,6 +165,43 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ Alerte données insuffisantes
+  void _showInsufficientDataDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
+        title: const Row(
+          children: [
+            Icon(Icons.info, color: AppColors.accentOrange, size: 28),
+            SizedBox(width: 8),
+            Text('Pas assez de données'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Pour générer un rapport personnalisé, tu dois avoir :'),
+            SizedBox(height: 12),
+            Text('✓ Au moins une entrée d\'humeur', style: AppTextStyles.body),
+            Text('✓ Quelques défis complétés', style: AppTextStyles.body),
+            Text('✓ Ou des badges débloqués', style: AppTextStyles.body),
+            SizedBox(height: 12),
+            Text('Reviens plus tard après avoir utilisé l\'app un peu plus.',
+                style: AppTextStyles.bodySmall),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('D\'accord'),
           ),
         ],
       ),
@@ -319,7 +378,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text('🎭', style: TextStyle(fontSize: 12)),
+                        IconMapper.getIcon('🎭', size: 12, color: Colors.white),
                         const SizedBox(width: 4),
                         Text(
                           user.anonymousAlias!,
@@ -377,12 +436,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       color: Colors.amber,
                       borderRadius: AppRadius.full,
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('👑', style: TextStyle(fontSize: 12)),
-                        SizedBox(width: 4),
-                        Text(
+                        IconMapper.getIcon('👑', size: 12, color: Colors.black),
+                        const SizedBox(width: 4),
+                        const Text(
                           'PREMIUM',
                           style: TextStyle(
                             color: Colors.black,
@@ -430,10 +489,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _buildStatItem(String emoji, String value, String label) {
     return Column(
       children: [
-        Text(
-          emoji,
-          style: const TextStyle(fontSize: 24),
-        ),
+        IconMapper.getIcon(emoji, size: 24, color: AppColors.primary),
         const SizedBox(height: 4),
         Text(
           value,
@@ -642,7 +698,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             child: Column(
               children: [
-                const Text('🏅', style: TextStyle(fontSize: 36)),
+                IconMapper.getIcon('🏅', size: 36, color: AppColors.primary),
                 const SizedBox(height: 8),
                 Text(
                   'Aucun badge encore',
@@ -854,11 +910,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
-        title: const Row(
+        title: Row(
           children: [
-            Text('👑', style: TextStyle(fontSize: 24)),
-            SizedBox(width: 8),
-            Text('Fonctionnalité Premium'),
+            IconMapper.getIcon('👑', size: 24, color: AppColors.primary),
+            const SizedBox(width: 8),
+            const Text('Fonctionnalité Premium'),
           ],
         ),
         content: const Text(

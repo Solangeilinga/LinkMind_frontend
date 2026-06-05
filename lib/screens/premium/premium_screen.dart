@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../utils/theme.dart';
+import '../../utils/icon_mapper.dart';
 import '../../services/api.service.dart';
 import '../../providers/auth_provider.dart';
 
@@ -254,14 +255,14 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header
-            const Center(
+            Center(
               child: Column(
                 children: [
-                  Text('👑', style: TextStyle(fontSize: 56)),
-                  SizedBox(height: 8),
-                  Text('Débloque tout le potentiel de LinkMind',
+                  IconMapper.getIcon('👑', size: 56, color: AppColors.primary),
+                  const SizedBox(height: 8),
+                  const Text('Débloque tout le potentiel de LinkMind',
                       style: AppTextStyles.h2, textAlign: TextAlign.center),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Text('Accède à toutes les fonctionnalités Premium',
                       style: AppTextStyles.body, textAlign: TextAlign.center),
                 ],
@@ -336,7 +337,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                         ),
                         child: Column(
                           children: [
-                            Text(data['emoji'] as String, style: const TextStyle(fontSize: 28)),
+                            IconMapper.getIcon(data['emoji'] as String, size: 28, color: data['color'] as Color),
                             const SizedBox(height: 4),
                             Text(
                               data['name'] as String,
@@ -382,7 +383,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                           children: [
                             Column(
                               children: [
-                                Text(data['emoji'] as String, style: const TextStyle(fontSize: 28)),
+                                IconMapper.getIcon(data['emoji'] as String, size: 28, color: AppColors.primary),
                                 const SizedBox(height: 8),
                                 Text(data['name'] as String, style: AppTextStyles.h4),
                                 const SizedBox(height: 4),
@@ -494,7 +495,7 @@ class _PremiumFeature extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 22)),
+          IconMapper.getIcon(emoji, size: 22, color: AppColors.primary),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

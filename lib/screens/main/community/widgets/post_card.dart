@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../utils/theme.dart';
+import '../../../../utils/icon_mapper.dart';
 import '../../../../services/api.service.dart';
 import '../../../../widgets/report_button.dart';
 import 'comments_section.dart';
@@ -394,8 +395,8 @@ class _PostCardState extends State<PostCard> {
                   color: typeConf.color.withValues(alpha: 0.15),
                   shape: BoxShape.circle),
               child: Center(
-                  child: Text(typeConf.emoji,
-                      style: const TextStyle(fontSize: 20))),
+                  child: IconMapper.getIcon(typeConf.emoji,
+                      size: 20, color: typeConf.color)),
             ),
             const SizedBox(width: 10),
             Expanded(

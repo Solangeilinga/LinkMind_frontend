@@ -360,7 +360,7 @@ class _ProfessionalCard extends StatelessWidget {
             Container(
               width: 56, height: 56,
               decoration: BoxDecoration(color: typeConf.color.withValues(alpha: 0.1), shape: BoxShape.circle),
-              child: Center(child: Text(typeConf.emoji, style: const TextStyle(fontSize: 26)))),
+              child: const Center(child: Text('👤', style: TextStyle(fontSize: 26)))),
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
@@ -466,7 +466,7 @@ class _BookingCard extends StatelessWidget {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Text(typeConf.emoji, style: const TextStyle(fontSize: 22)),
+          const Text('👤', style: TextStyle(fontSize: 22)),
           const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(pro?['fullName'] ?? 'Professionnel', style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w800)),

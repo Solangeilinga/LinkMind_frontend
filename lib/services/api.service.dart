@@ -53,6 +53,9 @@ class ApiService {
   final _cacheManager = ApiCacheManager();
   String? _accessToken;
 
+  // Mode debug pour désactiver le cache (à mettre à false en production)
+  static bool disableCache = kDebugMode; // Désactivé en debug
+
   // ─── Token Management ──────────────────────────────────────────────────────
   Future<void> saveTokens(String access, String refresh) async {
     _accessToken = access;
@@ -200,12 +203,23 @@ class ApiService {
       return _handleResponse(response);
     } on ApiException catch (e) {
       if (e.retryable) {
-        // Token expiré et refreshé — on réessaie UNE fois avec le nouveau token
         final freshHeaders = await _getHeaders();
         final retryResponse = await fn(freshHeaders);
         return _handleResponse(retryResponse);
       }
       rethrow;
+    }
+  }
+
+  // ─── Invalidation de cache ────────────────────────────────────────────────
+  void invalidateCache(String pathPattern) {
+    _cacheManager.invalidateWhere((key) => key.startsWith(pathPattern));
+    debugPrint('🗑️ Cache invalidé pour: $pathPattern');
+  }
+
+  void invalidateMultipleCache(List<String> patterns) {
+    for (final pattern in patterns) {
+      invalidateCache(pattern);
     }
   }
 
@@ -219,6 +233,9 @@ class ApiService {
   }
 
   Duration _getCacheDuration(String path) {
+    // En debug, pas de cache pour voir les changements immédiatement
+    if (disableCache) return Duration.zero;
+    
     // ✅ Contenu statique: 1 heure
     if (path.startsWith('/content/')) return const Duration(hours: 1);
 
@@ -227,7 +244,7 @@ class ApiService {
       return const Duration(minutes: 10);
     }
 
-    // ✅ Feed & Community: 5 minutes (changements fréquents)
+    // ✅ Feed & Community: 5 minutes
     if (path.startsWith('/community/')) return const Duration(minutes: 5);
 
     // ✅ Mood & Challenges: 5 minutes
@@ -235,61 +252,67 @@ class ApiService {
       return const Duration(minutes: 5);
     }
 
-    // ✅ Notifications: pas de cache (toujours frais)
+    // ✅ Notifications: pas de cache
     if (path.startsWith('/notifications')) return Duration.zero;
 
-    // ✅ Par défaut: 5 minutes
     return const Duration(minutes: 5);
   }
 
-  Future<dynamic> get(String path, {Map<String, String>? queryParams}) async {
-    // ✅ Générer clé de cache basée sur le chemin et paramètres
-    final cacheKey = _generateCacheKey(path, queryParams);
-
-    // ✅ Vérifier le cache d'abord
-    final cached = _cacheManager.get<dynamic>(cacheKey);
-    if (cached != null) {
-      debugPrint('💾 API Cache Hit: $path');
-      return cached;
-    }
-
-    // ✅ Sinon, faire la requête
+  Future<dynamic> _fetchFromNetwork(String path, Map<String, String>? queryParams) async {
     final uri = Uri.parse('${AppConstants.baseUrl}$path')
         .replace(queryParameters: queryParams);
     final result = await _execute(
         (h) => http.get(uri, headers: h).timeout(const Duration(seconds: 15)));
-
-    // ✅ Cacher la réponse avec durée appropriée
+    
     final cacheDuration = _getCacheDuration(path);
-    _cacheManager.set(cacheKey, result, expiry: cacheDuration);
-
+    if (cacheDuration > Duration.zero && !disableCache) {
+      final cacheKey = _generateCacheKey(path, queryParams);
+      _cacheManager.set(cacheKey, result, expiry: cacheDuration);
+    }
+    
     return result;
+  }
+
+  Future<dynamic> get(String path, {Map<String, String>? queryParams, bool forceRefresh = false}) async {
+    final cacheKey = _generateCacheKey(path, queryParams);
+
+    // Si forceRefresh, ignorer le cache
+    if (!forceRefresh && !disableCache) {
+      final cached = _cacheManager.get<dynamic>(cacheKey);
+      if (cached != null) {
+        debugPrint('💾 API Cache Hit: $path');
+        return cached;
+      }
+    }
+
+    debugPrint('🌐 API Cache Miss/Fresh: $path');
+    return await _fetchFromNetwork(path, queryParams);
   }
 
   Future<dynamic> post(String path, Map<String, dynamic> body) async {
     final uri = Uri.parse('${AppConstants.baseUrl}$path');
-    return _execute((h) => http
+    return await _execute((h) => http
         .post(uri, headers: h, body: jsonEncode(body))
         .timeout(const Duration(seconds: 15)));
   }
 
   Future<dynamic> put(String path, Map<String, dynamic> body) async {
     final uri = Uri.parse('${AppConstants.baseUrl}$path');
-    return _execute((h) => http
+    return await _execute((h) => http
         .put(uri, headers: h, body: jsonEncode(body))
         .timeout(const Duration(seconds: 15)));
   }
 
   Future<dynamic> patch(String path, Map<String, dynamic> body) async {
     final uri = Uri.parse('${AppConstants.baseUrl}$path');
-    return _execute((h) => http
+    return await _execute((h) => http
         .patch(uri, headers: h, body: jsonEncode(body))
         .timeout(const Duration(seconds: 15)));
   }
 
   Future<dynamic> delete(String path) async {
     final uri = Uri.parse('${AppConstants.baseUrl}$path');
-    return _execute((h) =>
+    return await _execute((h) =>
         http.delete(uri, headers: h).timeout(const Duration(seconds: 15)));
   }
 
@@ -304,7 +327,7 @@ class ApiService {
     String? gender,
     required String password,
     String? anonymousAlias,
-    bool legalAccepted = true, // ← AJOUT
+    bool legalAccepted = true,
   }) async {
     return await post('/auth/register', {
       'firstName': firstName,
@@ -317,17 +340,22 @@ class ApiService {
       'password': password,
       if (anonymousAlias != null && anonymousAlias.isNotEmpty)
         'anonymousAlias': anonymousAlias,
-      'legalAccepted': legalAccepted, // ← AJOUT
+      'legalAccepted': legalAccepted,
     });
   }
 
   Future<Map<String, dynamic>> login(
       {String? email, String? phone, required String password}) async {
-    return await post('/auth/login', {
+    final result = await post('/auth/login', {
       if (email != null && email.isNotEmpty) 'email': email,
       if (phone != null && phone.isNotEmpty) 'phone': phone,
       'password': password,
     });
+    
+    // Invalider le cache utilisateur après login
+    invalidateCache('/users/me');
+    
+    return result;
   }
 
   Future<void> logout() async {
@@ -335,6 +363,7 @@ class ApiService {
       await post('/auth/logout', {});
     } catch (_) {}
     await clearTokens();
+    _cacheManager.clearAll(); // Vider tout le cache à la déconnexion
   }
 
   // ─── Verification (Email ou SMS) ───────────────────────────────────────────
@@ -343,6 +372,7 @@ class ApiService {
 
   Future<bool> verifyEmail(String code) async {
     final response = await post('/auth/verify-email', {'code': code});
+    invalidateCache('/users/me');
     return response['verified'] == true;
   }
 
@@ -375,13 +405,18 @@ class ApiService {
     List<String>? factors,
     int? energyLevel,
   }) async {
-    return await post('/mood', {
+    final result = await post('/mood', {
       'score': score,
       'label': label,
       if (note != null) 'note': note,
       if (factors != null) 'factors': factors,
       if (energyLevel != null) 'energyLevel': energyLevel,
     });
+    
+    // Invalider le cache des moods
+    invalidateMultipleCache(['/mood/today', '/mood/history', '/mood/insights']);
+    
+    return result;
   }
 
   Future<Map<String, dynamic>> getTodayMood() async => await get('/mood/today');
@@ -405,7 +440,13 @@ class ApiService {
     if (durationSeconds != null) body['durationSeconds'] = durationSeconds;
     if (moodId != null) body['moodId'] = moodId;
     if (reflection != null) body['reflection'] = reflection;
-    return await post('/challenges/$challengeId/complete', body);
+    
+    final result = await post('/challenges/$challengeId/complete', body);
+    
+    // Invalider le cache des défis
+    invalidateMultipleCache(['/challenges/daily', '/challenges', '/challenges/$challengeId']);
+    
+    return result;
   }
 
   Future<Map<String, dynamic>> submitChallengeFeedback(
@@ -423,21 +464,21 @@ class ApiService {
 
   // ─── Community ─────────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> getFeed(
-      {int page = 1, int limit = 20, String? type}) async {
+      {int page = 1, int limit = 20, String? type, bool forceRefresh = false}) async {
     final Map<String, String> params = {
       'page': page.toString(),
       'limit': limit.toString(),
     };
     if (type != null && type.isNotEmpty) params['type'] = type;
-    return await get('/community/feed', queryParams: params);
+    return await get('/community/feed', queryParams: params, forceRefresh: forceRefresh);
   }
 
   Future<Map<String, dynamic>> getMyPosts(
-      {int page = 1, int limit = 20}) async {
+      {int page = 1, int limit = 20, bool forceRefresh = false}) async {
     return await get('/community/my-posts', queryParams: {
       'page': page.toString(),
       'limit': limit.toString(),
-    });
+    }, forceRefresh: forceRefresh);
   }
 
   Future<Map<String, dynamic>> createPost({
@@ -447,30 +488,57 @@ class ApiService {
     int? moodScore,
     String? moodEmoji,
   }) async {
-    return await post('/community/posts', {
+    final result = await post('/community/posts', {
       'content': content,
       'postType': postType,
       'isAnonymous': isAnonymous,
       if (moodScore != null) 'moodScore': moodScore,
       if (moodEmoji != null) 'moodEmoji': moodEmoji,
     });
+    
+    // Invalider le cache du feed et des posts
+    invalidateMultipleCache(['/community/feed', '/community/my-posts']);
+    
+    return result;
   }
 
-  Future<Map<String, dynamic>> editPost(String postId, String content) async =>
-      await patch('/community/posts/$postId', {'content': content});
+  Future<Map<String, dynamic>> editPost(String postId, String content) async {
+    final result = await patch('/community/posts/$postId', {'content': content});
+    
+    // Invalider le cache
+    invalidateMultipleCache(['/community/feed', '/community/my-posts', '/community/posts/$postId']);
+    
+    return result;
+  }
 
-  Future<Map<String, dynamic>> toggleLike(String postId) async =>
-      await post('/community/posts/$postId/like', {});
+  Future<Map<String, dynamic>> toggleLike(String postId) async {
+    final result = await post('/community/posts/$postId/like', {});
+    
+    // Invalider le cache du feed
+    invalidateMultipleCache(['/community/feed', '/community/my-posts']);
+    
+    return result;
+  }
 
-  Future<Map<String, dynamic>> toggleSameFeeling(String postId) async =>
-      await post('/community/posts/$postId/same-feeling', {});
+  Future<Map<String, dynamic>> toggleSameFeeling(String postId) async {
+    final result = await post('/community/posts/$postId/same-feeling', {});
+    invalidateMultipleCache(['/community/feed', '/community/my-posts']);
+    return result;
+  }
 
-  Future<void> deletePost(String postId) async =>
-      await delete('/community/posts/$postId');
+  Future<void> deletePost(String postId) async {
+    await delete('/community/posts/$postId');
+    
+    // Invalider le cache
+    invalidateMultipleCache(['/community/feed', '/community/my-posts']);
+  }
 
   Future<Map<String, dynamic>> toggleReaction(
-          String postId, String type) async =>
-      await post('/community/posts/$postId/react', {'type': type});
+          String postId, String type) async {
+    final result = await post('/community/posts/$postId/react', {'type': type});
+    invalidateMultipleCache(['/community/feed', '/community/my-posts']);
+    return result;
+  }
 
   Future<Map<String, dynamic>> searchPosts(String query,
           {String? postType}) async =>
@@ -500,6 +568,7 @@ class ApiService {
     String? search,
     int page = 1,
     int limit = 20,
+    bool forceRefresh = false,
   }) async {
     final Map<String, String> params = {
       'page': page.toString(),
@@ -508,26 +577,33 @@ class ApiService {
     if (type != null) params['type'] = type;
     if (city != null) params['city'] = city;
     if (search != null) params['search'] = search;
-    return await get('/professionals', queryParams: params);
+    return await get('/professionals', queryParams: params, forceRefresh: forceRefresh);
   }
 
   Future<Map<String, dynamic>> getProfessional(String id) async =>
       await get('/professionals/$id');
+      
   Future<Map<String, dynamic>> bookProfessional({
     required String professionalId,
     required String message,
     String? preferredDate,
     String? consultationType,
   }) async {
-    return await post('/professionals/$professionalId/book', {
+    final result = await post('/professionals/$professionalId/book', {
       'message': message,
       if (preferredDate != null) 'preferredDate': preferredDate,
       if (consultationType != null) 'consultationType': consultationType,
     });
+    
+    // Invalider le cache des réservations
+    invalidateCache('/professionals/bookings/me');
+    
+    return result;
   }
 
-  Future<Map<String, dynamic>> getMyBookings() async =>
-      await get('/professionals/bookings/me');
+  Future<Map<String, dynamic>> getMyBookings({bool forceRefresh = false}) async =>
+      await get('/professionals/bookings/me', forceRefresh: forceRefresh);
+      
   Future<Map<String, dynamic>> updateBooking({
     required String bookingId,
     String? consultationType,
@@ -538,16 +614,30 @@ class ApiService {
     if (consultationType != null) data['consultationType'] = consultationType;
     if (preferredDate != null) data['preferredDate'] = preferredDate;
     if (message != null) data['message'] = message;
-    return await put('/professionals/bookings/$bookingId', data);
+    final result = await put('/professionals/bookings/$bookingId', data);
+    
+    invalidateCache('/professionals/bookings/me');
+    
+    return result;
   }
 
-  Future<void> cancelBooking(String bookingId) async =>
-      await delete('/professionals/bookings/$bookingId');
+  Future<void> cancelBooking(String bookingId) async {
+    await delete('/professionals/bookings/$bookingId');
+    
+    // Invalider le cache des réservations
+    invalidateCache('/professionals/bookings/me');
+  }
 
   // ─── User ──────────────────────────────────────────────────────────────────
-  Future<Map<String, dynamic>> getMe() async => await get('/users/me');
-  Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async =>
-      await patch('/users/me', data);
+  Future<Map<String, dynamic>> getMe({bool forceRefresh = false}) async =>
+      await get('/users/me', forceRefresh: forceRefresh);
+      
+  Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
+    final result = await patch('/users/me', data);
+    invalidateCache('/users/me');
+    return result;
+  }
+  
   Future<Map<String, dynamic>> getLeaderboard() async =>
       await get('/users/leaderboard');
 

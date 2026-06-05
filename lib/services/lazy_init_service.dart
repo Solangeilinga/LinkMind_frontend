@@ -4,6 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import '../firebase_options.dart';
 import 'local_notification_service.dart';
+import 'api.service.dart';
 
 /// 🚀 Lazy Initialization Service
 /// Initialise services critiques en background
@@ -68,18 +69,48 @@ class LazyInitService {
 
       debugPrint('🔔 FCM permission status: ${settings.authorizationStatus}');
 
+      // ✅ FIX: Récupérer le token ET l'envoyer au backend
+      final token = await messaging.getToken();
+      if (token != null) {
+        debugPrint('🎫 FCM Token obtenu, envoi au backend...');
+        await _registerTokenToBackend(token);
+      } else {
+        debugPrint('⚠️ FCM Token null — notifications push impossibles');
+      }
+
+      // ✅ FIX: Écouter le refresh du token et le renvoyer au backend
+      messaging.onTokenRefresh.listen((newToken) async {
+        debugPrint('🔄 FCM Token rafraîchi, mise à jour backend...');
+        await _registerTokenToBackend(newToken);
+      });
+
       FirebaseMessaging.onMessage.listen(_onForegroundMessage);
       FirebaseMessaging.onBackgroundMessage(_onBackgroundMessage);
       FirebaseMessaging.onMessageOpenedApp.listen(_onMessageOpenedApp);
-
-      final token = await messaging.getToken();
-      debugPrint('🎫 FCM Token: ${token?.substring(0, 20)}...');
 
       _notificationsInitialized = true;
       debugPrint('✅ FCM initialized');
     } catch (e, stack) {
       debugPrint('⚠️ FCM init failed: $e\n$stack');
     }
+  }
+
+  /// ✅ FIX: Envoyer le token FCM au backend avec retry
+  Future<void> _registerTokenToBackend(String token) async {
+    const maxRetries = 3;
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await ApiService().registerFcmToken(token);
+        debugPrint('✅ FCM Token enregistré sur le backend');
+        return;
+      } catch (e) {
+        debugPrint('⚠️ Tentative $attempt/$maxRetries échouée: $e');
+        if (attempt < maxRetries) {
+          await Future.delayed(Duration(seconds: attempt * 2));
+        }
+      }
+    }
+    debugPrint('❌ Impossible d\'enregistrer le FCM token après $maxRetries tentatives');
   }
 
   /// Handle foreground messages
@@ -89,7 +120,6 @@ class LazyInitService {
     LocalNotificationService.showNotification(
       title: message.notification?.title ?? 'Notification',
       body: message.notification?.body ?? '',
-      // payload supprimé – non supporté par la méthode
     );
   }
 

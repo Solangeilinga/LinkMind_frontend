@@ -502,7 +502,8 @@ static pw.Widget _buildEmptyMessage(String message) {
   static List<Map<String, dynamic>> _analyzeChallengesByCategory(List<Map<String, dynamic>> challenges) {
     final catMap = <String, int>{};
     for (final ch in challenges) {
-      final challengeMap = ch['challenge'] as Map<String, dynamic>?;
+      // ✅ Conversion sécurisée de Map<dynamic, dynamic> -> Map<String, dynamic>
+      final challengeMap = _castMap<dynamic>(ch['challenge']) as Map<String, dynamic>?;
       final cat = _safeString(challengeMap?['category']);
       final category = cat.isEmpty ? 'Général' : cat;
       catMap[category] = (catMap[category] ?? 0) + 1;
@@ -539,5 +540,16 @@ static pw.Widget _buildEmptyMessage(String message) {
     if (value is num) return value.toDouble();
     if (value is String) return double.tryParse(value) ?? defaultValue;
     return defaultValue;
+  }
+
+  // ✅ Fonction utilitaire pour convertir Map<dynamic, dynamic> en Map<String, T>
+  static Map<String, T> _castMap<T>(dynamic data) {
+    if (data is Map<String, T>) return data;
+    if (data is Map) {
+      return Map<String, T>.from(
+        data.map((k, v) => MapEntry(k.toString(), v as T))
+      );
+    }
+    return {};
   }
 }

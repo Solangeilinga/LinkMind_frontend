@@ -62,8 +62,9 @@ class _ChallengeDetailScreenState extends ConsumerState<ChallengeDetailScreen>
       final response = await ApiService().get('/challenges/${widget.challengeId}');
       final challengeData = response['challenge'];
       
-      // ✅ CORRECTION: Convertir en Challenge object
-      final challenge = Challenge.fromJson(challengeData as Map<String, dynamic>);
+      // ✅ Conversion correcte - utilise la fonction générique à 2 paramètres
+      final challengeMap = _castMap<String, dynamic>(challengeData);
+      final challenge = Challenge.fromJson(challengeMap);
       final isCompleted = challengeData['isCompleted'] ?? false;
       
       setState(() {
@@ -76,6 +77,7 @@ class _ChallengeDetailScreenState extends ConsumerState<ChallengeDetailScreen>
         _error = e.toString();
         _isLoading = false;
       });
+      debugPrint('❌ _loadChallenge error: $e');
     }
   }
 
@@ -211,6 +213,22 @@ class _ChallengeDetailScreenState extends ConsumerState<ChallengeDetailScreen>
         },
       ),
     );
+  }
+
+  // ✅ FONCTION CORRIGÉE : avec 2 arguments de type générique K et V
+  Map<K, V> _castMap<K, V>(dynamic data) {
+    if (data is Map<K, V>) return data;
+    if (data is Map) {
+      try {
+        return Map<K, V>.from(
+          data.map((key, value) => MapEntry(key as K, value as V))
+        );
+      } catch (e) {
+        debugPrint('❌ _castMap error: $e');
+        return {};
+      }
+    }
+    return {};
   }
 
   @override
@@ -394,26 +412,26 @@ class _ChallengeDetailScreenState extends ConsumerState<ChallengeDetailScreen>
         )),
         const SizedBox(height: 16),
         TextField(
-  controller: _reflectionController,
-  maxLines: 6,
-  minLines: 4,
-  decoration: InputDecoration(
-    hintText: challenge.completionType.config['inputPlaceholder'] ?? 
-        'Écris ta réflexion ici...',
-    border: const OutlineInputBorder(
-      borderRadius: AppRadius.md,
-      borderSide: BorderSide(color: AppColors.divider),
-    ),
-    enabledBorder: const OutlineInputBorder(
-      borderRadius: AppRadius.md,
-      borderSide: BorderSide(color: AppColors.divider),
-    ),
-    focusedBorder: const OutlineInputBorder(
-      borderRadius: AppRadius.md,
-      borderSide: BorderSide(color: AppColors.primary),
-    ),
-  ),
-)
+          controller: _reflectionController,
+          maxLines: 6,
+          minLines: 4,
+          decoration: InputDecoration(
+            hintText: challenge.completionType.config['inputPlaceholder'] ?? 
+                'Écris ta réflexion ici...',
+            border: const OutlineInputBorder(
+              borderRadius: AppRadius.md,
+              borderSide: BorderSide(color: AppColors.divider),
+            ),
+            enabledBorder: const OutlineInputBorder(
+              borderRadius: AppRadius.md,
+              borderSide: BorderSide(color: AppColors.divider),
+            ),
+            focusedBorder: const OutlineInputBorder(
+              borderRadius: AppRadius.md,
+              borderSide: BorderSide(color: AppColors.primary),
+            ),
+          ),
+        )
       ],
     );
   }

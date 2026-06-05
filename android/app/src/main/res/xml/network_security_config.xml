@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- ✅ Deny all cleartext traffic by default -->
+    <domain-config cleartextTrafficPermitted="false">
+        <!-- Allow HTTPS for all domains -->
+        <domain includeSubdomains="true">linkmind-backend-sub4.onrender.com</domain>
+        <domain includeSubdomains="true">api.linkmind.app</domain>
+        <domain includeSubdomains="true">linkmind-917b4.firebaseapp.com</domain>
+        
+        <!-- Trust system CAs -->
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+    
+    <!-- ⚠️ DEBUG ONLY - Allow localhost HTTP for development -->
+    <!-- NOTE: domain-config n'est PAS autorisé dans debug-overrides -->
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+    
+    <!-- Configuration pour le développement local (hors debug-overrides) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>

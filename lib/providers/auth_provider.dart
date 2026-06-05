@@ -112,7 +112,6 @@ String _errorMessage(Object e, {String fallback = 'Une erreur inattendue est sur
       case SecurityErrorType.rateLimited:
         return 'Trop de requêtes. Attends un moment avant de réessayer.';
       case SecurityErrorType.forbidden:
-        // legal_not_accepted ou autre 403
         return e.message.isNotEmpty ? e.message : 'Accès refusé. Vérifie que tu as accepté les conditions d\'utilisation.';
       default:
         return e.message.isNotEmpty ? e.message : fallback;
@@ -131,7 +130,7 @@ String _errorMessage(Object e, {String fallback = 'Une erreur inattendue est sur
     return 'Pas de connexion internet. Vérifie ton réseau.';
   }
   if (e is TimeoutException) {
-    return 'Le serveur met trop de temps à répondre. Réessaie.';
+    return 'Erreur de connexion au serveur. Réessaie.';
   }
   return fallback;
 }
@@ -189,7 +188,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  // ─── Register (avec legalAccepted) ─────────────────────────────────────────
+  // ─── Register ─────────────────────────────────────────────────────────────
   Future<bool> register({
     required String firstName,
     required String lastName,
@@ -200,7 +199,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     String? gender,
     required String password,
     String? anonymousAlias,
-    bool legalAccepted = true, // ← AJOUT
+    bool legalAccepted = true,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
@@ -209,7 +208,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         email: email, phone: phone,
         age: age, city: city, gender: gender,
         password: password, anonymousAlias: anonymousAlias,
-        legalAccepted: legalAccepted, // ← AJOUT
+        legalAccepted: legalAccepted,
       );
       await _api.saveTokens(data['accessToken'], data['refreshToken']);
       final user = UserModel.fromJson(data['user']);
@@ -315,7 +314,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final result = await _api.verifyEmail(code);
       if (result == true) {
-        // Mise à jour locale de l'utilisateur pour éviter d'attendre refreshUser
         final currentUser = state.user;
         if (currentUser != null) {
           final updatedUser = currentUser.copyWith(isEmailVerified: true);
@@ -399,11 +397,12 @@ class MoodNotifier extends StateNotifier<MoodState> {
   }
 }
 
-// ─── Challenges Notifier ──────────────────────────────────────────────────────
+// ─── Challenges Notifier (VERSION DURABLE) ───────────────────────────────────
 class ChallengesNotifier extends StateNotifier<ChallengesState> {
   final ApiService _api;
+  final Ref _ref;
 
-  ChallengesNotifier(this._api) : super(const ChallengesState()) {
+  ChallengesNotifier(this._api, this._ref) : super(const ChallengesState()) {
     loadDaily();
   }
 
@@ -415,13 +414,35 @@ class ChallengesNotifier extends StateNotifier<ChallengesState> {
   Future<void> loadDaily({String? moodLabel}) async {
     state = state.copyWith(isLoading: true);
     try {
-      final data = await _api.getDailyChallenges(moodLabel: moodLabel);
+      // 🔥 AUTO-MAGIQUE : Si pas de moodLabel fourni, on va le chercher
+      String? finalMoodLabel = moodLabel;
+      if (finalMoodLabel == null) {
+        try {
+          final todayData = await _api.getTodayMood();
+          finalMoodLabel = todayData['mood']?['label'];
+          if (finalMoodLabel != null) {
+            debugPrint('📊 [Challenges] Auto-detected mood: $finalMoodLabel');
+          }
+        } catch (e) {
+          debugPrint('⚠️ [Challenges] Could not fetch mood: $e');
+        }
+      }
+      
+      final data = await _api.getDailyChallenges(moodLabel: finalMoodLabel);
       state = state.copyWith(
         isLoading: false,
         daily: List<Map<String, dynamic>>.from(data['challenges'] ?? []),
+        error: null,
       );
+      
+      debugPrint('✅ [Challenges] Loaded ${state.daily.length} challenges for mood: $finalMoodLabel');
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      debugPrint('❌ [Challenges] Error: $e');
+      state = state.copyWith(
+        isLoading: false, 
+        error: e.toString(),
+        daily: [],
+      );
     }
   }
 
@@ -429,12 +450,15 @@ class ChallengesNotifier extends StateNotifier<ChallengesState> {
     try {
       final data = await _api.completeChallenge(challengeId, durationSeconds: durationSeconds);
       final updated = state.daily.map((c) {
-        if ((c['_id'] ?? c['id']) == challengeId) return {...c, 'isCompleted': true};
+        if ((c['_id'] ?? c['id']) == challengeId) {
+          return {...c, 'isCompleted': true};
+        }
         return c;
       }).toList();
       state = state.copyWith(daily: updated);
       return data;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('❌ [Challenges] Complete error: $e');
       return null;
     }
   }
@@ -451,6 +475,7 @@ final moodProvider = StateNotifierProvider<MoodNotifier, MoodState>(
   (ref) => MoodNotifier(ref.read(apiServiceProvider)),
 );
 
+// ✅ UNE SEULE DÉCLARATION - avec les 2 arguments (Ref)
 final challengesProvider = StateNotifierProvider<ChallengesNotifier, ChallengesState>(
-  (ref) => ChallengesNotifier(ref.read(apiServiceProvider)),
+  (ref) => ChallengesNotifier(ref.read(apiServiceProvider), ref),
 );

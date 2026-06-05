@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../utils/theme.dart';
+import '../../utils/icon_mapper.dart';
 import '../../widgets/ad_banner.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api.service.dart';
@@ -54,15 +55,38 @@ class _MoodScreenState extends ConsumerState<MoodScreen> with SingleTickerProvid
       ]);
       if (mounted) {
         setState(() {
-        final msg = results[0]['message'];
-        if (msg != null) _todayMessage = '${msg['text'] ?? ''} ${msg['emoji'] ?? ''}';
-        final grouped = results[1]['tips'] as Map<String, dynamic>? ?? {};
-        _wellnessTips = grouped.map((mood, tips) => MapEntry(mood,
-          (tips as List).map((t) => _WellnessTip(
-            t['emoji'] ?? '💡', t['title'] ?? '', t['description'] ?? '', t['actionPath'])).toList()));
-      });
+          final msg = results[0]['message'];
+          if (msg != null) _todayMessage = '${msg['text'] ?? ''} ${msg['emoji'] ?? ''}';
+          // ✅ Conversion correcte de Map<dynamic, dynamic> -> Map<String, dynamic>
+          final grouped = _castMap<String, dynamic>(results[1]['tips'] ?? {});
+          _wellnessTips = grouped.map((mood, tips) {
+            final tipsList = (tips as List?)?.map((t) {
+              final tip = _castMap<String, dynamic>(t);
+              return _WellnessTip(
+                tip['emoji'] ?? '💡',
+                tip['title'] ?? '',
+                tip['description'] ?? '',
+                tip['actionPath'] as String?
+              );
+            }).toList() ?? [];
+            return MapEntry(mood, tipsList);
+          });
+        });
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('⚠️ _loadContent error: $e');
+    }
+  }
+
+  // ✅ Fonction utilitaire pour convertir Map<dynamic, dynamic> en Map<String, T>
+  static Map<String, T> _castMap<K, T>(dynamic data) {
+    if (data is Map<K, T>) return data as Map<String, T>;
+    if (data is Map) {
+      return Map<String, T>.from(
+        data.map((k, v) => MapEntry(k.toString(), v as T))
+      );
+    }
+    return {};
   }
 
   @override
@@ -230,7 +254,7 @@ class _DailyMessageCard extends StatelessWidget {
     padding: const EdgeInsets.all(16),
     decoration: const BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.lg),
     child: Row(children: [
-      const Text('💬', style: TextStyle(fontSize: 22)),
+      IconMapper.getIcon('💬', size: 22, color: Colors.white),
       const SizedBox(width: 12),
       Expanded(child: Text(message, style: AppTextStyles.body.copyWith(
           color: Colors.white, fontWeight: FontWeight.w700, height: 1.4))),
@@ -424,7 +448,7 @@ class _MoodEmoji extends StatelessWidget {
           scale: isSelected ? 1.3 : 1.0,
           duration: const Duration(milliseconds: 200),
           curve: Curves.elasticOut,
-          child: Text(mood.emoji, style: const TextStyle(fontSize: 28))),
+          child: IconMapper.getIcon(mood.emoji, size: 28, color: mood.color)),
         const SizedBox(height: 4),
         AnimatedDefaultTextStyle(
           duration: const Duration(milliseconds: 150),

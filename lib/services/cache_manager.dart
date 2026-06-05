@@ -59,6 +59,20 @@ class ApiCacheManager {
     debugPrint('🗑️ Cleared all cache');
   }
 
+  /// ✅ Invalider toutes les entrées dont la clé commence par un pattern
+  void invalidateWhere(bool Function(String key) predicate) {
+    final keysToRemove = _cache.keys.where(predicate).toList();
+    for (final key in keysToRemove) {
+      _cache.remove(key);
+      debugPrint('🗑️ Cache invalidated: $key');
+    }
+  }
+
+  /// ✅ Invalider toutes les entrées qui correspondent à un pattern (wildcard)
+  void invalidatePattern(String pattern) {
+    invalidateWhere((key) => key.startsWith(pattern));
+  }
+
   /// Get cache stats
   Map<String, dynamic> getStats() {
     int expired = 0;

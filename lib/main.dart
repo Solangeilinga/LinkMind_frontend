@@ -166,8 +166,8 @@ class _LinkMindAppState extends ConsumerState<LinkMindApp>
           if (!isLoggedIn) {
             return onboardingDone ? '/auth/login' : '/onboarding';
           }
-          // Connecté : le reste du redirect gère home/onboarding
-          return null;
+          // Connecté : aller au home
+          return '/home';
         }
 
         // 2. Utilisateur NON connecté
