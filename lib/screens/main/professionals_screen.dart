@@ -391,15 +391,7 @@ class _ProfessionalCard extends StatelessWidget {
             Text(pro['bio'], style: AppTextStyles.bodySmall.copyWith(color: AppColors.onSurfaceMuted, height: 1.4), maxLines: 2, overflow: TextOverflow.ellipsis),
           ],
 
-          if (specs.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Wrap(spacing: 6, runSpacing: 6,
-              children: specs.take(4).map((s) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: const BoxDecoration(color: AppColors.surfaceVariant, borderRadius: AppRadius.full),
-                child: Text(s.toString(), style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted, fontSize: 11)),
-              )).toList()),
-          ],
+
 
           const SizedBox(height: 12),
           Row(children: [
@@ -447,6 +439,17 @@ class _BookingCard extends StatelessWidget {
   final VoidCallback onCancel;
   
   const _BookingCard({required this.booking, required this.onEdit, required this.onCancel});
+
+  String _fmtDateTime(String iso) {
+    try {
+      final d = DateTime.parse(iso).toLocal();
+      const days   = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+      const months = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'aoû', 'sep', 'oct', 'nov', 'déc'];
+      final hh = d.hour.toString().padLeft(2, '0');
+      final mm = d.minute.toString().padLeft(2, '0');
+      return '${days[d.weekday % 7]} ${d.day} ${months[d.month - 1]} à ${hh}h${mm}';
+    } catch (_) { return iso; }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -508,6 +511,38 @@ class _BookingCard extends StatelessWidget {
           ),
         ],
 
+        // Créneau confirmé (scheduledAt)
+        if (booking['scheduledAt'] != null) ...[
+          const SizedBox(height: 6),
+          Row(children: [
+            const Icon(Icons.access_time, size: 13, color: AppColors.secondary),
+            const SizedBox(width: 4),
+            Text(_fmtDateTime(booking['scheduledAt'].toString()),
+              style: AppTextStyles.caption.copyWith(color: AppColors.secondary, fontWeight: FontWeight.w600)),
+          ]),
+        ],
+
+        // Lien visio (si confirmé et online)
+        if (booking['status'] == 'confirmed' && booking['meetingLink'] != null) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2563EB).withValues(alpha: 0.08),
+              borderRadius: AppRadius.md,
+              border: Border.all(color: const Color(0xFF2563EB).withValues(alpha: 0.25)),
+            ),
+            child: Row(children: [
+              const Icon(Icons.videocam_outlined, size: 15, color: Color(0xFF2563EB)),
+              const SizedBox(width: 8),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Lien de visioconférence', style: AppTextStyles.caption.copyWith(color: const Color(0xFF2563EB), fontWeight: FontWeight.w700)),
+                Text(booking['meetingLink'], style: AppTextStyles.caption.copyWith(color: const Color(0xFF2563EB)), overflow: TextOverflow.ellipsis, maxLines: 1),
+              ])),
+            ]),
+          ),
+        ],
+
         if (booking['adminNote'] != null) ...[
           const SizedBox(height: 8),
           Container(
@@ -544,224 +579,576 @@ class _BookingCard extends StatelessWidget {
   }
 }
 
+
+// ─── Booking Sheet — avec sélection de créneaux ───────────────────────────────
 class _BookingSheet extends StatefulWidget {
   final Map<String, dynamic> professional;
   final VoidCallback onBooked;
   const _BookingSheet({required this.professional, required this.onBooked});
-
   @override
   State<_BookingSheet> createState() => _BookingSheetState();
 }
 
 class _BookingSheetState extends State<_BookingSheet> {
   final _messageCtrl = TextEditingController();
-  final _dateCtrl    = TextEditingController();
   String _consultationType = 'online';
-  bool   _sending = false;
+  bool   _sending        = false;
+  bool   _loadingSlots   = false;
   String? _error;
 
+  // Créneaux
+  List<Map<String, dynamic>> _slots     = [];
+  String? _selectedSlotId;
+  String? _selectedSlotLabel;
+
+  // Affichage par date
+  Map<String, List<Map<String, dynamic>>> _slotsByDate = {};
+  String? _selectedDate;
+
+  // Rafraîchissement auto toutes les 30s — slot peut être pris par un autre user
+  Timer? _refreshTimer;
+  DateTime? _lastRefresh;
+
   @override
-  void dispose() { _messageCtrl.dispose(); _dateCtrl.dispose(); super.dispose(); }
+  void initState() {
+    super.initState();
+    final pro = widget.professional;
+    if (pro['isOnline'] == true)   _consultationType = 'online';
+    if (pro['isInPerson'] == true && pro['isOnline'] != true) _consultationType = 'in_person';
+    _loadSlots();
+    // Rafraîchir silencieusement toutes les 30 secondes
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) => _refreshSlots());
+  }
+
+  @override
+  void dispose() {
+    _messageCtrl.dispose();
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadSlots() async {
+    setState(() { _loadingSlots = true; _error = null; });
+    try {
+      final proId = widget.professional['id'] ?? widget.professional['_id'];
+      final data  = await ApiService().get('/professionals/$proId/slots');
+      final raw   = List<Map<String, dynamic>>.from(data['slots'] ?? []);
+      final byDate = <String, List<Map<String, dynamic>>>{};
+      for (final s in raw) {
+        final d = s['date']?.toString() ?? '';
+        byDate.putIfAbsent(d, () => []).add(s);
+      }
+      if (!mounted) return;
+      setState(() {
+        _slots       = raw;
+        _slotsByDate = byDate;
+        _loadingSlots = false;
+        _lastRefresh = DateTime.now();
+        if (byDate.isNotEmpty && _selectedDate == null) _selectedDate = byDate.keys.first;
+        // Si le créneau sélectionné a disparu → le déselectionner
+        if (_selectedSlotId != null && !raw.any((s) => s['_id'] == _selectedSlotId)) {
+          _selectedSlotId    = null;
+          _selectedSlotLabel = null;
+          _error = 'Ce créneau vient d\'être pris. Choisis-en un autre.';
+        }
+      });
+    } catch (_) {
+      if (mounted) setState(() { _loadingSlots = false; });
+    }
+  }
+
+  // Rafraîchissement silencieux (sans spinner) — vérifie si slot toujours dispo
+  Future<void> _refreshSlots() async {
+    if (!mounted || _sending) return;
+    try {
+      final proId = widget.professional['id'] ?? widget.professional['_id'];
+      final data  = await ApiService().get('/professionals/$proId/slots');
+      final raw   = List<Map<String, dynamic>>.from(data['slots'] ?? []);
+      final byDate = <String, List<Map<String, dynamic>>>{};
+      for (final s in raw) {
+        final d = s['date']?.toString() ?? '';
+        byDate.putIfAbsent(d, () => []).add(s);
+      }
+      if (!mounted) return;
+      setState(() {
+        _slots       = raw;
+        _slotsByDate = byDate;
+        _lastRefresh = DateTime.now();
+        // Slot sélectionné pris entre-temps → alerte immédiate
+        if (_selectedSlotId != null && !raw.any((s) => s['_id'] == _selectedSlotId)) {
+          _selectedSlotId    = null;
+          _selectedSlotLabel = null;
+          _error = 'Le créneau sélectionné vient d\'être pris par un autre utilisateur. Choisis-en un autre.';
+        }
+      });
+    } catch (_) { /* silencieux */ }
+  }
+
+  String _fmtDate(String iso) {
+    try {
+      final d = DateTime.parse(iso);
+      const days   = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+      const months = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'aoû', 'sep', 'oct', 'nov', 'déc'];
+      return '${days[d.weekday % 7]} ${d.day} ${months[d.month - 1]}';
+    } catch (_) { return iso; }
+  }
 
   Future<void> _submit() async {
-    if (_messageCtrl.text.trim().isEmpty) {
-      setState(() => _error = 'Décris brièvement ta situation'); return;
+    if (_selectedSlotId == null) {
+      setState(() => _error = 'Sélectionne un créneau pour continuer.');
+      return;
     }
     setState(() { _sending = true; _error = null; });
     try {
-      await ApiService().post('/professionals/${widget.professional['id']}/book', {
-          'message': _messageCtrl.text.trim(),
-          'preferredDate': _dateCtrl.text.trim().isEmpty ? null : _dateCtrl.text.trim(),
-          'consultationType': _consultationType,
-      });
+      final proId = widget.professional['id'] ?? widget.professional['_id'];
+      final body  = <String, dynamic>{
+        'consultationType': _consultationType,
+        'message': _messageCtrl.text.trim().isEmpty ? null : _messageCtrl.text.trim(),
+      };
+      if (_selectedSlotId != null) body['slotId'] = _selectedSlotId;
+
+      await ApiService().post('/professionals/$proId/book', body);
       if (mounted) {
+        _refreshTimer?.cancel(); // plus besoin de rafraîchir
         Navigator.pop(context);
         widget.onBooked();
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Demande envoyée ! On te contacte bientôt. ✅'), backgroundColor: AppColors.secondary));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Demande envoyée ! Tu recevras un email de confirmation. ✅'),
+            backgroundColor: AppColors.secondary,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
-    } on ApiException catch (e) { setState(() { _sending = false; _error = e.message; });
-    } catch (_) { setState(() { _sending = false; _error = 'Une erreur est survenue'; }); }
+    } on ApiException catch (e) {
+      // Créneau pris entre-temps → rafraîchir immédiatement + déselectionner
+      if (e.message.contains('créneau') || e.message.contains('SLOT_CONFLICT') || e.message.contains('disponible')) {
+        setState(() {
+          _sending           = false;
+          _selectedSlotId    = null;
+          _selectedSlotLabel = null;
+          _error = e.message;
+        });
+        await _loadSlots(); // recharger la liste fraîche
+      } else {
+        setState(() { _sending = false; _error = e.message; });
+      }
+    } catch (_) {
+      setState(() { _sending = false; _error = 'Une erreur est survenue'; });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final pro = widget.professional;
+    final pro      = widget.professional;
     final typeConf = _typeConfigDefault[pro['type']] ?? _typeConfigDefault['psychologist']!;
+    final hasOnline = pro['isOnline'] == true;
+    final hasInPerson = pro['isInPerson'] == true;
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-        decoration: const BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-        child: SingleChildScrollView(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Center(child: Container(width: 40, height: 4, decoration: const BoxDecoration(color: AppColors.divider, borderRadius: AppRadius.full))),
-            const SizedBox(height: 16),
-            Row(children: [
-              Container(width: 48, height: 48, decoration: BoxDecoration(color: typeConf.color.withValues(alpha: 0.1), shape: BoxShape.circle),
-                child: Center(child: Text(typeConf.emoji, style: const TextStyle(fontSize: 22)))),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(pro['fullName'] ?? '', style: AppTextStyles.h4),
-                Text(typeConf.label, style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
-              ])),
-              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, size: 20)),
-            ]),
-            const SizedBox(height: 20),
-            if (_error != null) ...[
-              Container(
-                margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.1), borderRadius: AppRadius.md, border: Border.all(color: AppColors.accent.withValues(alpha: 0.3))),
-                child: Row(children: [
-                  const Icon(Icons.error_outline, color: AppColors.accent, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(_error!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.accent))),
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.92),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(children: [
+          // Drag handle
+          Center(child: Container(width: 40, height: 4,
+            decoration: const BoxDecoration(color: AppColors.divider, borderRadius: AppRadius.full))),
+          const SizedBox(height: 14),
+
+          // Header professionnel
+          Row(children: [
+            Container(width: 44, height: 44,
+              decoration: BoxDecoration(color: typeConf.color.withValues(alpha: 0.1), shape: BoxShape.circle),
+              child: Center(child: Text(typeConf.emoji, style: const TextStyle(fontSize: 20)))),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(pro['fullName'] ?? '', style: AppTextStyles.h4),
+              Text(typeConf.label, style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
+            ])),
+            IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, size: 20)),
+          ]),
+          const SizedBox(height: 4),
+          const Divider(),
+
+          // Corps scrollable
+          Expanded(child: SingleChildScrollView(
+            padding: const EdgeInsets.only(top: 4, bottom: 16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+              // ── Erreur ───────────────────────────────────────────────────
+              if (_error != null) _ErrorBanner(message: _error!),
+
+              // ── Canal ────────────────────────────────────────────────────
+              if (hasOnline && hasInPerson) ...[
+                const SizedBox(height: 4),
+                _SectionLabel(label: 'Mode de consultation', icon: Icons.videocam_outlined),
+                const SizedBox(height: 8),
+                Row(children: [
+                  _ConsultChip(
+                    label: '🌐 En ligne', selected: _consultationType == 'online',
+                    onTap: () => setState(() => _consultationType = 'online')),
+                  const SizedBox(width: 10),
+                  _ConsultChip(
+                    label: '📍 Présentiel', selected: _consultationType == 'in_person',
+                    onTap: () => setState(() => _consultationType = 'in_person')),
                 ]),
+              ] else ...[
+                const SizedBox(height: 8),
+                _InfoChip(
+                  label: hasOnline ? '🌐 Consultation en ligne uniquement' : '📍 Consultation en présentiel uniquement',
+                ),
+              ],
+              const SizedBox(height: 20),
+
+              // ── Créneaux disponibles ──────────────────────────────────────
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const _SectionLabel(label: 'Choisir un créneau', icon: Icons.calendar_month_outlined),
+                  if (_lastRefresh != null)
+                    GestureDetector(
+                      onTap: _loadSlots,
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.refresh, size: 13, color: AppColors.onSurfaceMuted),
+                        const SizedBox(width: 3),
+                        Text('Actualiser', style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
+                      ]),
+                    ),
+                ],
               ),
-            ],
-            if (pro['isOnline'] == true && pro['isInPerson'] == true) ...[
-              Text('Type de consultation', style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 10),
+
+              if (_loadingSlots)
+                const Center(child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ))
+              else if (_slotsByDate.isEmpty)
+                _NoSlotsBox()
+              else ...[
+                // Sélecteur de dates
+                SizedBox(
+                  height: 48,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _slotsByDate.keys.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (ctx, i) {
+                      final date = _slotsByDate.keys.elementAt(i);
+                      final isSelected = _selectedDate == date;
+                      return GestureDetector(
+                        onTap: () => setState(() { _selectedDate = date; _selectedSlotId = null; _selectedSlotLabel = null; }),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppColors.primary : AppColors.surfaceVariant,
+                            borderRadius: AppRadius.md,
+                            border: Border.all(color: isSelected ? AppColors.primary : Colors.transparent),
+                          ),
+                          child: Text(_fmtDate(date),
+                            style: AppTextStyles.caption.copyWith(
+                              color: isSelected ? Colors.white : AppColors.onSurface,
+                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            )),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Grille d'heures pour la date sélectionnée
+                if (_selectedDate != null) ...[
+                  Wrap(
+                    spacing: 8, runSpacing: 8,
+                    children: (_slotsByDate[_selectedDate] ?? []).map((slot) {
+                      final slotId    = slot['_id']?.toString() ?? '';
+                      final isSelected = _selectedSlotId == slotId;
+                      return GestureDetector(
+                        onTap: () => setState(() {
+                          _selectedSlotId    = slotId;
+                          _selectedSlotLabel = '${_fmtDate(_selectedDate!)} à ${slot['startTime']}';
+                        }),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppColors.secondary.withValues(alpha: 0.15) : AppColors.surfaceVariant,
+                            borderRadius: AppRadius.md,
+                            border: Border.all(
+                              color: isSelected ? AppColors.secondary : AppColors.divider,
+                              width: isSelected ? 2 : 1,
+                            ),
+                          ),
+                          child: Text('${slot['startTime']}',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: isSelected ? AppColors.secondary : AppColors.onSurface,
+                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            )),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+
+                // Récap créneau sélectionné
+                if (_selectedSlotLabel != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondary.withValues(alpha: 0.08),
+                      borderRadius: AppRadius.md,
+                    ),
+                    child: Row(children: [
+                      const Icon(Icons.check_circle_outline, size: 16, color: AppColors.secondary),
+                      const SizedBox(width: 8),
+                      Text('Créneau sélectionné : $_selectedSlotLabel',
+                        style: AppTextStyles.bodySmall.copyWith(color: AppColors.secondary, fontWeight: FontWeight.w600)),
+                    ]),
+                  ),
+                ],
+              ],
+              const SizedBox(height: 20),
+
+              // ── Message (optionnel) ───────────────────────────────────────
+              _SectionLabel(label: 'Motif (optionnel)', icon: Icons.chat_bubble_outline),
               const SizedBox(height: 8),
-              Row(children: [
-                _ConsultChip(label: '📍 Présentiel', selected: _consultationType == 'in_person', onTap: () => setState(() => _consultationType = 'in_person')),
-                const SizedBox(width: 10),
-                _ConsultChip(label: '🌐 En ligne', selected: _consultationType == 'online', onTap: () => setState(() => _consultationType = 'online')),
-              ]),
-              const SizedBox(height: 16),
-            ],
-            TextField(controller: _dateCtrl, decoration: const InputDecoration(labelText: 'Date souhaitée (optionnel)', prefixIcon: Icon(Icons.calendar_today_outlined), hintText: 'Ex: 25/03/2026')),
-            const SizedBox(height: 16),
-            TextField(controller: _messageCtrl, maxLines: 4, minLines: 3, maxLength: 1000, decoration: const InputDecoration(labelText: 'Décris brièvement ta situation *', hintText: 'Ex: Je traverse une période difficile...', alignLabelWithHint: true)),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.05), borderRadius: AppRadius.md),
-              child: Row(children: [
-                const Icon(Icons.lock_outline, size: 14, color: AppColors.primary), const SizedBox(width: 8),
-                Expanded(child: Text('Ta demande est confidentielle. L\'équipe LinkMind te contactera pour confirmer le rendez-vous.', style: AppTextStyles.caption.copyWith(color: AppColors.primary, height: 1.4))),
-              ]),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
+              TextField(
+                controller: _messageCtrl, maxLines: 3, minLines: 2, maxLength: 500,
+                decoration: const InputDecoration(
+                  hintText: 'Ex: Je traverse une période difficile…',
+                  alignLabelWithHint: true,
+                  counterText: '',
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Badge confidentialité + chiffrement
+              _PrivacyBadge(),
+              const SizedBox(height: 20),
+            ]),
+          )),
+
+          // Bouton confirmer (sticky bas)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 28, top: 8),
+            child: SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _sending ? null : _submit, style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-                child: _sending ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Envoyer la demande'),
+                onPressed: _sending ? null : _submit,
+                style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                child: _sending
+                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text('Confirmer le rendez-vous', style: TextStyle(fontWeight: FontWeight.w700)),
               ),
             ),
-          ]),
-        ),
+          ),
+        ]),
       ),
     );
   }
 }
 
+// ─── Edit Booking Sheet ────────────────────────────────────────────────────────
 class _EditBookingSheet extends StatefulWidget {
   final Map<String, dynamic> booking;
   final Function(String?, String?, String?) onUpdate;
   const _EditBookingSheet({required this.booking, required this.onUpdate});
-
   @override
   State<_EditBookingSheet> createState() => _EditBookingSheetState();
 }
 
 class _EditBookingSheetState extends State<_EditBookingSheet> {
   final _messageCtrl = TextEditingController();
-  final _dateCtrl = TextEditingController();
   String _consultationType = 'online';
 
   @override
   void initState() {
     super.initState();
-    _messageCtrl.text = widget.booking['message']?.toString() ?? '';
-    _dateCtrl.text = widget.booking['preferredDate']?.toString() ?? '';
-    _consultationType = widget.booking['consultationType']?.toString() ?? 'online';
+    _messageCtrl.text   = widget.booking['message']?.toString() ?? '';
+    _consultationType   = widget.booking['consultationType']?.toString() ?? 'online';
   }
 
   @override
-  void dispose() { _messageCtrl.dispose(); _dateCtrl.dispose(); super.dispose(); }
+  void dispose() { _messageCtrl.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
-    final pro = widget.booking['professional'] as Map<String, dynamic>?;
+    final pro      = widget.booking['professional'] as Map<String, dynamic>?;
     final typeConf = _typeConfigDefault[pro?['type']] ?? _typeConfigDefault['psychologist']!;
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-        decoration: const BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-        child: SingleChildScrollView(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Center(child: Container(width: 40, height: 4, decoration: const BoxDecoration(color: AppColors.divider, borderRadius: AppRadius.full))),
-            const SizedBox(height: 16),
-            Row(children: [
-              Container(width: 48, height: 48, decoration: BoxDecoration(color: typeConf.color.withValues(alpha: 0.1), shape: BoxShape.circle),
-                child: Center(child: Text(typeConf.emoji, style: const TextStyle(fontSize: 22)))),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(pro?['fullName'] ?? 'Professionnel', style: AppTextStyles.h4),
-                Text(typeConf.label, style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
-              ])),
-              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, size: 20)),
-            ]),
-            const SizedBox(height: 20),
-            const Text('Modifier ma demande', style: AppTextStyles.h3),
-            const SizedBox(height: 20),
-            const Text('Type de consultation', style: AppTextStyles.bodySmall),
-            const SizedBox(height: 8),
-            Row(children: [
-              _ConsultChip(label: '📍 Présentiel', selected: _consultationType == 'in_person', onTap: () => setState(() => _consultationType = 'in_person')),
-              const SizedBox(width: 10),
-              _ConsultChip(label: '🌐 En ligne', selected: _consultationType == 'online', onTap: () => setState(() => _consultationType = 'online')),
-            ]),
-            const SizedBox(height: 16),
-            TextField(controller: _dateCtrl, decoration: const InputDecoration(labelText: 'Date souhaitée (optionnel)', prefixIcon: Icon(Icons.calendar_today_outlined), hintText: 'JJ/MM/AAAA'), keyboardType: TextInputType.datetime),
-            const SizedBox(height: 16),
-            TextField(controller: _messageCtrl, maxLines: 4, minLines: 3, maxLength: 500, decoration: const InputDecoration(labelText: 'Motif de la consultation', hintText: 'Explique brièvement pourquoi tu souhaites consulter...', alignLabelWithHint: true)),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.05), borderRadius: AppRadius.md),
-              child: Row(children: [
-                const Icon(Icons.lock_outline, size: 14, color: AppColors.primary), const SizedBox(width: 8),
-                Expanded(child: Text('Ta demande est confidentielle. L\'équipe LinkMind te contactera pour confirmer le rendez-vous.', style: AppTextStyles.caption.copyWith(color: AppColors.primary, height: 1.4))),
-              ]),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  widget.onUpdate(_consultationType, _dateCtrl.text.trim().isEmpty ? null : _dateCtrl.text.trim(), _messageCtrl.text.trim().isEmpty ? null : _messageCtrl.text.trim());
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-                child: const Text('Enregistrer les modifications'),
-              ),
-            ),
-          ]),
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
+        child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Center(child: Container(width: 40, height: 4,
+            decoration: const BoxDecoration(color: AppColors.divider, borderRadius: AppRadius.full))),
+          const SizedBox(height: 16),
+          Row(children: [
+            Container(width: 48, height: 48,
+              decoration: BoxDecoration(color: typeConf.color.withValues(alpha: 0.1), shape: BoxShape.circle),
+              child: Center(child: Text(typeConf.emoji, style: const TextStyle(fontSize: 22)))),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(pro?['fullName'] ?? 'Professionnel', style: AppTextStyles.h4),
+              Text(typeConf.label, style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
+            ])),
+            IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, size: 20)),
+          ]),
+          const SizedBox(height: 20),
+          const Text('Modifier ma demande', style: AppTextStyles.h3),
+          const SizedBox(height: 20),
+          _SectionLabel(label: 'Type de consultation', icon: Icons.videocam_outlined),
+          const SizedBox(height: 8),
+          Row(children: [
+            _ConsultChip(label: '🌐 En ligne',    selected: _consultationType == 'online',    onTap: () => setState(() => _consultationType = 'online')),
+            const SizedBox(width: 10),
+            _ConsultChip(label: '📍 Présentiel', selected: _consultationType == 'in_person', onTap: () => setState(() => _consultationType = 'in_person')),
+          ]),
+          const SizedBox(height: 16),
+          _SectionLabel(label: 'Motif (optionnel)', icon: Icons.chat_bubble_outline),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _messageCtrl, maxLines: 4, minLines: 3, maxLength: 500,
+            decoration: const InputDecoration(
+              hintText: 'Explique brièvement pourquoi tu souhaites consulter…',
+              alignLabelWithHint: true,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _PrivacyBadge(),
+          const SizedBox(height: 20),
+          SizedBox(width: double.infinity, child: ElevatedButton(
+            onPressed: () {
+              widget.onUpdate(
+                _consultationType,
+                null,
+                _messageCtrl.text.trim().isEmpty ? null : _messageCtrl.text.trim(),
+              );
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            child: const Text('Enregistrer les modifications'),
+          )),
+        ])),
       ),
     );
   }
 }
+
+// ─── Widgets helpers ──────────────────────────────────────────────────────────
 
 class _ConsultChip extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
   const _ConsultChip({required this.label, required this.selected, required this.onTap});
-
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
     child: AnimatedContainer(
       duration: const Duration(milliseconds: 150),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
       decoration: BoxDecoration(
         color: selected ? AppColors.primary.withValues(alpha: 0.1) : AppColors.surfaceVariant,
         borderRadius: AppRadius.full,
-        border: Border.all(color: selected ? AppColors.primary : Colors.transparent, width: 1.5)),
-      child: Text(label, style: AppTextStyles.caption.copyWith(color: selected ? AppColors.primary : AppColors.onSurfaceMuted, fontWeight: selected ? FontWeight.w800 : FontWeight.w600)),
+        border: Border.all(color: selected ? AppColors.primary : Colors.transparent, width: 1.5),
+      ),
+      child: Text(label, style: AppTextStyles.caption.copyWith(
+        color: selected ? AppColors.primary : AppColors.onSurfaceMuted,
+        fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+      )),
     ),
+  );
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  const _SectionLabel({required this.label, required this.icon});
+  @override
+  Widget build(BuildContext context) => Row(children: [
+    Icon(icon, size: 15, color: AppColors.primary),
+    const SizedBox(width: 6),
+    Text(label, style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w700, color: AppColors.onSurface)),
+  ]);
+}
+
+class _InfoChip extends StatelessWidget {
+  final String label;
+  const _InfoChip({required this.label});
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: AppRadius.full),
+    child: Text(label, style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
+  );
+}
+
+class _ErrorBanner extends StatelessWidget {
+  final String message;
+  const _ErrorBanner({required this.message});
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: AppColors.accent.withValues(alpha: 0.08),
+      borderRadius: AppRadius.md,
+      border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+    ),
+    child: Row(children: [
+      const Icon(Icons.error_outline, color: AppColors.accent, size: 16),
+      const SizedBox(width: 8),
+      Expanded(child: Text(message, style: AppTextStyles.bodySmall.copyWith(color: AppColors.accent))),
+    ]),
+  );
+}
+
+class _NoSlotsBox extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: AppRadius.md),
+    child: Column(children: [
+      const Icon(Icons.calendar_today_outlined, size: 28, color: AppColors.onSurfaceMuted),
+      const SizedBox(height: 8),
+      Text('Aucun créneau disponible en ligne', style: AppTextStyles.bodySmall.copyWith(color: AppColors.onSurfaceMuted)),
+      const SizedBox(height: 4),
+      Text('Ta demande sera traitée manuellement par l\'équipe LinkMind.',
+        style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted),
+        textAlign: TextAlign.center),
+    ]),
+  );
+}
+
+class _PrivacyBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: AppColors.primary.withValues(alpha: 0.05),
+      borderRadius: AppRadius.md,
+    ),
+    child: Row(children: [
+      const Icon(Icons.lock_outline, size: 14, color: AppColors.primary),
+      const SizedBox(width: 8),
+      Expanded(child: Text(
+        'Ton message est chiffré de bout en bout. Seule l\'équipe LinkMind y a accès pour traiter ta demande.',
+        style: AppTextStyles.caption.copyWith(color: AppColors.primary, height: 1.4),
+      )),
+    ]),
   );
 }

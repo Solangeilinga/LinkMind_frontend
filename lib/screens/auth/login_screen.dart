@@ -34,7 +34,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final password = _passCtrl.text;
 
     if (identifier.isEmpty) {
-      setState(() => _localError = 'Saisis ton email ou numéro de téléphone.');
+      setState(() => _localError = 'Saisis ton adresse email.');
       return;
     }
     if (password.isEmpty) {
@@ -44,10 +44,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _localError = null);
 
     final isEmail = identifier.contains('@');
-    final phone = isEmail ? null : Validators.normalizePhone(identifier);
     final success = await ref.read(authProvider.notifier).login(
           email: isEmail ? identifier : null,
-          phone: phone,
           password: password,
         );
     if (success && mounted) context.go('/home');
@@ -102,7 +100,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.next,
               decoration: const InputDecoration(
-                  labelText: 'Email ou téléphone (+22661645069)',
+                  labelText: 'Adresse email',
                   prefixIcon: Icon(Icons.person_outline)),
             ),
             const SizedBox(height: 16),
@@ -183,7 +181,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _firstNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
-  final _phoneCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   final _aliasCtrl = TextEditingController();
@@ -195,7 +192,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _confirmFocus = FocusNode();
 
   String? _emailError;
-  String? _phoneError;
   String? _ageError;
 
   String? _gender;
@@ -217,7 +213,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _firstNameCtrl.dispose();
     _lastNameCtrl.dispose();
     _emailCtrl.dispose();
-    _phoneCtrl.dispose();
     _passCtrl.dispose();
     _confirmCtrl.dispose();
     _aliasCtrl.dispose();
@@ -242,19 +237,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     });
   }
 
-  void _validatePhone() {
-    final v = Validators.normalizePhone(_phoneCtrl.text.trim());
-    setState(() {
-      if (v.isEmpty) {
-        _phoneError = null;
-        return;
-      }
-      _phoneError = Validators.isValidPhone(v)
-          ? null
-          : 'Format invalide. Ex: +22661645069';
-    });
-  }
-
   void _validateAge() {
     final v = _ageCtrl.text.trim();
     setState(() {
@@ -276,18 +258,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       if (_lastNameCtrl.text.trim().isEmpty) return 'Le nom est obligatoire';
 
       final emailTxt = _emailCtrl.text.trim();
-      final phoneTxt = _phoneCtrl.text.trim();
 
-      if (emailTxt.isEmpty && phoneTxt.isEmpty) {
-        return 'Un email ou un numéro de téléphone est requis';
+      if (emailTxt.isEmpty) {
+        return 'Un email est requis';
       }
 
       if (emailTxt.isNotEmpty && !Validators.isValidEmail(emailTxt)) {
         return "Format d'email invalide";
-      }
-      if (phoneTxt.isNotEmpty &&
-          !Validators.isValidPhone(Validators.normalizePhone(phoneTxt))) {
-        return "Format de téléphone invalide. Ex: +22661645069";
       }
     }
     if (_step == 1) {
@@ -348,9 +325,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           firstName: _firstNameCtrl.text.trim(),
           lastName: _lastNameCtrl.text.trim(),
           email: _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
-          phone: _phoneCtrl.text.trim().isEmpty
-              ? null
-              : Validators.normalizePhone(_phoneCtrl.text.trim()),
           age: int.tryParse(_ageCtrl.text.trim()),
           city: _cityCtrl.text.trim().isEmpty ? null : _cityCtrl.text.trim(),
           gender: _gender,
@@ -363,18 +337,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (success && mounted) {
       final user = ref.read(authProvider).user;
       debugPrint(
-          '🔍 User après inscription: email=${user?.email}, phone=${user?.phone}, isEmailVerified=${user?.isEmailVerified}');
+          '🔍 User après inscription: email=${user?.email}, isEmailVerified=${user?.isEmailVerified}');
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('needs_onboarding', true);
 
       final needsEmailVerif =
           user?.email != null && user?.isEmailVerified != true;
-      final needsPhoneVerif = !needsEmailVerif &&
-          user?.phone != null &&
-          user?.isPhoneVerified != true;
-
-      if (needsEmailVerif || needsPhoneVerif) {
+      if (needsEmailVerif) {
         debugPrint(
             '📲 Redirection vers vérification (${needsEmailVerif ? "email" : "SMS"})...');
         // Ne pas envoyer le code ici - le VerifyEmailScreen s'en charge (évite les appels redondants)
@@ -502,38 +472,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             size: 18)
                         : null),
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _phoneCtrl,
-                keyboardType: TextInputType.phone,
-                textInputAction: TextInputAction.done,
-                onEditingComplete: _validatePhone,
-                onChanged: (_) {
-                  if (_phoneCtrl.text.length >= 6) _validatePhone();
-                },
-                decoration: InputDecoration(
-                    labelText: 'Numéro de téléphone (optionnel)',
-                    prefixIcon: const Icon(Icons.phone_outlined),
-                    helperText: _phoneError == null
-                        ? 'Format international: +22661645069'
-                        : null,
-                    errorText: _phoneError,
-                    suffixIcon: _phoneCtrl.text.isNotEmpty
-                        ? Icon(
-                            _phoneError == null
-                                ? Icons.check_circle
-                                : Icons.error,
-                            color: _phoneError == null
-                                ? Colors.green
-                                : AppColors.accent,
-                            size: 18)
-                        : null),
-              ),
-              const SizedBox(height: 8),
-              Text('* Au moins un email ou un numéro est requis',
-                  style: AppTextStyles.caption.copyWith(
-                      color: AppColors.onSurfaceMuted,
-                      fontStyle: FontStyle.italic)),
             ],
 
             // ── Étape 1 : Infos personnelles ────────────────────────────────
