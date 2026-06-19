@@ -68,10 +68,11 @@ class ProfessionalsNotifier extends StateNotifier<ProfessionalsState> {
     return '/professionals?$query';
   }
 
-  Future<void> loadProfessionals({String? search, String? type, String? city}) async {
+  Future<void> loadProfessionals({String? search, String? type, String? city, bool forceRefresh = false}) async {
     if (search != null) _currentSearch = search;
     if (type != null) _currentType = type;
     if (city != null) _currentCity = city;
+    if (forceRefresh) _api.invalidateCache('/professionals');
 
     state = state.copyWith(isLoadingPros: true, page: 1, error: null);
     try {
@@ -109,7 +110,8 @@ class ProfessionalsNotifier extends StateNotifier<ProfessionalsState> {
     }
   }
 
-  Future<void> loadBookings() async {
+  Future<void> loadBookings({bool forceRefresh = false}) async {
+    if (forceRefresh) _api.invalidateCache('/professionals/bookings');
     state = state.copyWith(isLoadingBookings: true);
     try {
       final data = await _api.get('/professionals/bookings/me');

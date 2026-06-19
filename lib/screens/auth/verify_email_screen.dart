@@ -24,8 +24,16 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   @override
   void initState() {
     super.initState();
+    // Le code a déjà été envoyé lors de l'inscription
+    // On initialise juste le channel à 'email' sans rappel API
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _sendInitialCode();
+      if (mounted) {
+        setState(() {
+          _channel = 'email';
+          _destinationMasked = null;
+          _isLoading = false;
+        });
+      }
     });
   }
 
@@ -162,8 +170,8 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
     final title =
         _channel == 'email' ? 'Vérifie ton email' : 'Vérifie ton téléphone';
     final subtitle = _channel == 'email'
-        ? 'Un code de vérification a été envoyé à ton adresse email'
-        : 'Un code de vérification a été envoyé par SMS à ton numéro';
+        ? 'Un code de vérification a été envoyé à ton adresse email lors de ton inscription'
+        : 'Un code de vérification a été envoyé par SMS à ton numéro lors de ton inscription';
 
     return Scaffold(
       backgroundColor: AppColors.background,

@@ -189,6 +189,13 @@ class _LinkMindAppState extends ConsumerState<LinkMindApp>
           // Ne pas rediriger sur ces écrans — jamais
           if (isVerifyEmail) return null;
 
+          // Forcer la vérification email si pas encore vérifiée
+          final user = ref.read(authProvider).user;
+          final emailNotVerified = user?.email != null && user?.isEmailVerified != true;
+          if (emailNotVerified && !isVerifyEmail && !isAuthRoute) {
+            return '/verify-email';
+          }
+
           // Autoriser l'onboarding si c'est un nouvel inscrit (flag SharedPrefs)
           if (isOnboarding) {
             final prefs = await ref.read(sharedPrefsProvider.future);

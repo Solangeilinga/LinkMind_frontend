@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../utils/theme.dart';
+import '../../widgets/skeleton_widget.dart';
 import '../../utils/icon_mapper.dart';
 import '../../widgets/ad_banner.dart';
 import '../../providers/auth_provider.dart';
@@ -136,6 +137,13 @@ class _MoodScreenState extends ConsumerState<MoodScreen> with SingleTickerProvid
     final stressFactors = content.loaded && content.stressFactors.isNotEmpty
         ? content.stressFactors
         : <StressFactorDef>[];
+
+    // Afficher skeleton pendant le chargement initial
+    if (!content.loaded) {
+      return const Scaffold(
+        body: SafeArea(child: SkeletonMoodScreen()),
+      );
+    }
 
     return Scaffold(
       body: SafeArea(

@@ -983,11 +983,10 @@ class _EditProfileSheet extends StatefulWidget {
 }
 
 class _EditProfileSheetState extends State<_EditProfileSheet> {
-  late final TextEditingController _firstNameCtrl;
-  late final TextEditingController _lastNameCtrl;
   late final TextEditingController _emailCtrl;
   late final TextEditingController _phoneCtrl;
   late final TextEditingController _cityCtrl;
+  late final TextEditingController _countryCtrl;
   late final TextEditingController _aliasCtrl;
   late final TextEditingController _currentPassCtrl;
   late final TextEditingController _newPassCtrl;
@@ -1011,11 +1010,10 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   void initState() {
     super.initState();
     final u = widget.user;
-    _firstNameCtrl = TextEditingController(text: u.firstName ?? '');
-    _lastNameCtrl = TextEditingController(text: u.lastName ?? '');
     _emailCtrl = TextEditingController(text: u.email ?? '');
     _phoneCtrl = TextEditingController(text: u.phone ?? '');
     _cityCtrl = TextEditingController(text: u.city ?? '');
+    _countryCtrl = TextEditingController(text: u.country ?? '');
     _aliasCtrl = TextEditingController(text: u.anonymousAlias ?? '');
     _ageCtrl = TextEditingController(text: u.age != null ? '${u.age}' : '');
     _currentPassCtrl = TextEditingController();
@@ -1026,11 +1024,10 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   @override
   void dispose() {
     for (final c in [
-      _firstNameCtrl,
-      _lastNameCtrl,
       _emailCtrl,
       _phoneCtrl,
       _cityCtrl,
+      _countryCtrl,
       _aliasCtrl,
       _ageCtrl,
       _currentPassCtrl,
@@ -1042,11 +1039,14 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   }
 
   Future<void> _save() async {
-    final firstName = _firstNameCtrl.text.trim();
-    final lastName = _lastNameCtrl.text.trim();
-
-    if (firstName.isEmpty || lastName.isEmpty) {
-      setState(() => _error = 'Prénom et nom sont obligatoires');
+    final alias = _aliasCtrl.text.trim();
+    final email = _emailCtrl.text.trim();
+    if (alias.isEmpty) {
+      setState(() => _error = 'Le pseudo est obligatoire');
+      return;
+    }
+    if (email.isEmpty) {
+      setState(() => _error = 'L\'email est obligatoire');
       return;
     }
 
@@ -1058,16 +1058,12 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
 
     try {
       final data = await ApiService().updateProfile({
-        'firstName': firstName,
-        'lastName': lastName,
-        'name': '$firstName $lastName',
-        'email': _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
-        'phone': _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
-        'city': _cityCtrl.text.trim().isEmpty ? null : _cityCtrl.text.trim(),
-        'anonymousAlias':
-            _aliasCtrl.text.trim().isEmpty ? null : _aliasCtrl.text.trim(),
-        if (_ageCtrl.text.trim().isNotEmpty)
-          'age': int.tryParse(_ageCtrl.text.trim()),
+        'email': _emailCtrl.text.trim(),
+        'anonymousAlias': _aliasCtrl.text.trim(),
+        if (_phoneCtrl.text.trim().isNotEmpty) 'phone': _phoneCtrl.text.trim(),
+        if (_cityCtrl.text.trim().isNotEmpty) 'city': _cityCtrl.text.trim(),
+        if (_countryCtrl.text.trim().isNotEmpty) 'country': _countryCtrl.text.trim(),
+        if (_ageCtrl.text.trim().isNotEmpty) 'age': int.tryParse(_ageCtrl.text.trim()),
         if (_gender != null) 'gender': _gender,
       });
 
@@ -1262,42 +1258,16 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ),
                 const SizedBox(height: 12),
               ],
-              const Text('Identité', style: AppTextStyles.h4),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _firstNameCtrl,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: 'Prénom *',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextField(
-                      controller: _lastNameCtrl,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: 'Nom *',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Text('Contact', style: AppTextStyles.h4),
+              const Text('Identité & connexion', style: AppTextStyles.h4),
               const SizedBox(height: 12),
               TextField(
                 controller: _emailCtrl,
                 keyboardType: TextInputType.emailAddress,
                 decoration: const InputDecoration(
-                  labelText: 'Email',
+                  labelText: 'Email *',
+                  prefixIcon: Icon(Icons.email_outlined),
                   border: OutlineInputBorder(),
+                  helperText: 'Utilisé pour la connexion uniquement',
                 ),
               ),
               const SizedBox(height: 12),
@@ -1310,13 +1280,24 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('Infos personnelles', style: AppTextStyles.h4),
+              const Text('Localisation', style: AppTextStyles.h4),
               const SizedBox(height: 12),
               TextField(
                 controller: _cityCtrl,
                 textCapitalization: TextCapitalization.words,
                 decoration: const InputDecoration(
-                  labelText: 'Ville',
+                  labelText: 'Ville *',
+                  prefixIcon: Icon(Icons.location_city_outlined),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _countryCtrl,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                  labelText: 'Pays *',
+                  prefixIcon: Icon(Icons.public_outlined),
                   border: OutlineInputBorder(),
                 ),
               ),
@@ -1347,7 +1328,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 controller: _aliasCtrl,
                 maxLength: 30,
                 decoration: const InputDecoration(
-                  labelText: 'Pseudo anonyme',
+                  labelText: 'Pseudo anonyme *',
                   hintText: 'Ex: 🌙 Lune curieuse',
                   border: OutlineInputBorder(),
                 ),

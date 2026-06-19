@@ -190,25 +190,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   // ─── Register ─────────────────────────────────────────────────────────────
   Future<bool> register({
-    required String firstName,
-    required String lastName,
-    String? email,
-    String? phone,
+    required String email,
+    String? anonymousAlias,
+    required String password,
+    bool legalAccepted = true,
     int? age,
     String? city,
+    String? country,
     String? gender,
-    required String password,
-    String? anonymousAlias,
-    bool legalAccepted = true,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final data = await _api.register(
-        firstName: firstName, lastName: lastName,
-        email: email, phone: phone,
-        age: age, city: city, gender: gender,
-        password: password, anonymousAlias: anonymousAlias,
-        legalAccepted: legalAccepted,
+        email: email, anonymousAlias: anonymousAlias,
+        password: password, legalAccepted: legalAccepted,
+        age: age, city: city, country: country, gender: gender,
       );
       await _api.saveTokens(data['accessToken'], data['refreshToken']);
       final user = UserModel.fromJson(data['user']);

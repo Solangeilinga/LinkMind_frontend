@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../utils/theme.dart';
 import '../../services/api.service.dart';
-import '../../providers/professionals_provider.dart'; // ✅ Ton nouveau provider
+import '../../providers/professionals_provider.dart';
+import '../../widgets/skeleton_widget.dart'; // ✅ Ton nouveau provider
 import '../../widgets/report_button.dart';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -164,11 +165,18 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
       builder: (_) => _BookingSheet(
         professional: pro,
         onBooked: () {
-          ref.read(professionalsProvider.notifier).loadBookings();
+          ref.read(professionalsProvider.notifier).loadBookings(forceRefresh: true);
           _tabCtrl.animateTo(1);
         },
       ),
     );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh au retour sur cet écran via navigation
+    ref.read(professionalsProvider.notifier).loadProfessionals();
   }
 
   @override
@@ -260,7 +268,7 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
               const SizedBox(height: 8),
 
               Expanded(child: state.isLoadingPros
-                ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                ? SkeletonList(itemBuilder: () => const SkeletonProCard(), count: 4)
                 : state.error != null
                   ? Center(child: Text(state.error!, style: AppTextStyles.body.copyWith(color: AppColors.accent)))
                   : state.professionals.isEmpty
@@ -298,7 +306,7 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
 
             // ─── ONGLET 2 : MES DEMANDES ───
             state.isLoadingBookings
-                ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                ? SkeletonList(itemBuilder: () => const SkeletonBookingCard(), count: 3)
                 : state.bookings.isEmpty
                     ? Center(child: Padding(
                         padding: const EdgeInsets.all(40),
@@ -381,7 +389,14 @@ class _ProfessionalCard extends StatelessWidget {
                 Row(children: [
                   const Icon(Icons.location_on_outlined, size: 13, color: AppColors.onSurfaceMuted),
                   const SizedBox(width: 3),
-                  Text(pro['city'], style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
+                  Flexible(child: Text(
+                    pro['address'] != null
+                        ? '${pro['city']} — ${pro['address']}'
+                        : pro['city'],
+                    style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  )),
                 ]),
             ])),
           ]),

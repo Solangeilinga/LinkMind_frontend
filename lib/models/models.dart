@@ -8,6 +8,7 @@ class UserModel {
   final String? phone;
   final int?    age;
   final String? city;
+  final String? country;
   final String? gender;
   final String? avatar;
   final String? anonymousAlias;
@@ -30,6 +31,7 @@ class UserModel {
     this.phone,
     this.age,
     this.city,
+    this.country,
     this.gender,
     this.avatar,
     this.anonymousAlias,
@@ -53,6 +55,7 @@ class UserModel {
     phone:     json['phone'],
     age:       json['age'],
     city:      json['city'],
+    country:   json['country'],
     gender:    json['gender'],
     avatar:    json['avatar'],
     anonymousAlias: json['anonymousAlias'],
@@ -80,6 +83,7 @@ class UserModel {
     'phone': phone,
     'age': age,
     'city': city,
+    'country': country,
     'gender': gender,
     'avatar': avatar,
     'anonymousAlias': anonymousAlias,
@@ -117,6 +121,7 @@ class UserModel {
     String? phone,
     int? age,
     String? city,
+    String? country,
     String? gender,
     String? avatar,
     String? anonymousAlias,
@@ -139,6 +144,7 @@ class UserModel {
       phone: phone ?? this.phone,
       age: age ?? this.age,
       city: city ?? this.city,
+      country: country ?? this.country,
       gender: gender ?? this.gender,
       avatar: avatar ?? this.avatar,
       anonymousAlias: anonymousAlias ?? this.anonymousAlias,

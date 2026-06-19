@@ -57,6 +57,7 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen>
   final _chatHistoryService = ChatHistoryService();
   bool _isTyping = false;
   bool _hasStarted = false;
+  bool _bannerDismissed = false;
   Map<String, dynamic>? _userContext;
   int _messagesUsed = 0;
   List<_Starter> _starters = _defaultStarters;
@@ -318,169 +319,129 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen>
 
   @override
   Widget build(BuildContext context) {
+    // ── MINDO DÉSACTIVÉ — en attente de l'IA prédictive ────────────────────
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Row(
           children: [
             Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-              ),
-              child: ClipOval(
-                  child: Image.asset('assets/images/logo.png',
-                      width: 36, height: 36, fit: BoxFit.cover)),
+              width: 36, height: 36,
+              decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+              child: ClipOval(child: Image.asset('assets/images/logo.png', width: 36, height: 36, fit: BoxFit.cover)),
             ),
             const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Mindo',
-                    style: AppTextStyles.body
-                        .copyWith(fontWeight: FontWeight.w800)),
-                Text('Assistant bien-être · IA',
-                    style: AppTextStyles.caption
-                        .copyWith(color: AppColors.onSurfaceMuted)),
-              ],
-            ),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Mindo', style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w800)),
+              Text('Bientôt disponible', style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
+            ]),
           ],
         ),
-        actions: [
-          if (_hasStarted)
-            IconButton(
-              icon: const Icon(Icons.refresh_outlined,
-                  color: AppColors.onSurfaceMuted),
-              tooltip: 'Nouvelle conversation',
-              onPressed: _confirmReset,
-            ),
-        ],
+        actions: const [],
       ),
-      body: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: AppColors.primary.withValues(alpha: 0.08),
-            child: Row(
-              children: [
-                Icon(Icons.lock_outline,
-                    size: 14, color: AppColors.primary),
-                const SizedBox(width: 6),
-                Expanded(
-                    child: Text(
-                  'Conversation confidentielle — Mindo ne partage rien',
-                  style: AppTextStyles.caption.copyWith(
-                      color: AppColors.primary, fontWeight: FontWeight.w700),
-                  overflow: TextOverflow.ellipsis,
-                )),
-              ],
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
+          child: Column(children: [
+            // Illustration
+            Container(
+              width: 120, height: 120,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.psychology_outlined, size: 60, color: AppColors.primary),
             ),
-          ),
-          Expanded(
-            child: !_hasStarted
-                ? _WelcomeView(
-                    starters: _starters,
-                    onStarterTapped: (text, ctx) =>
-                        _sendMessage(text, userCtx: ctx))
-                : ListView.builder(
-                    controller: _scrollCtrl,
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    itemCount: _messages.length + (_isTyping ? 1 : 0),
-                    itemBuilder: (context, i) {
-                      if (i == _messages.length) {
-                        return _TypingIndicator(controller: _typingController);
-                      }
-                      return _MessageBubble(
-                        message: _messages[i],
-                        onQuickAction: (action) => _sendMessage(action),
-                      );
-                    },
-                  ),
-          ),
-          if (_limitReached)
+            const SizedBox(height: 28),
+
+            // Titre
+            Text('Mindo arrive bientôt', style: AppTextStyles.h2.copyWith(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 12),
+            Text(
+              'Mindo sera ton compagnon de bien-être mental. '
+              'Nous préparons une expérience sérieuse et bienveillante, '
+              'conçue avec des professionnels de santé.',
+              style: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted, height: 1.6),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+
+            // Ce qui arrive
             Container(
               width: double.infinity,
-              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Ce qui arrive en v2', style: AppTextStyles.bodySmall.copyWith(
+                  fontWeight: FontWeight.w800, color: AppColors.primary)),
+                const SizedBox(height: 14),
+                ...[
+                  ('📋', 'Check-in quotidien', '5 questions courtes sur ton humeur, sommeil et énergie'),
+                  ('📊', 'Bilan émotionnel', 'Suivi de tes tendances sur 7 jours, présenté avec bienveillance'),
+                  ('🤝', 'Orientation douce', 'Si tu traverses une période difficile, Mindo te propose du soutien sans t\'alarmer'),
+                  ('🔒', 'Confidentialité totale', 'Tes réponses restent privées et ne sont jamais partagées'),
+                ].map((item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(item.$1, style: const TextStyle(fontSize: 20)),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(item.$2, style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 2),
+                      Text(item.$3, style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted, height: 1.4)),
+                    ])),
+                  ]),
+                )),
+              ]),
+            ),
+            const SizedBox(height: 24),
+
+            // Voir un pro maintenant
+            Container(
+              width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.2))),
-              child: Column(children: [
-                Icon(Icons.lock, size: 32, color: AppColors.primary),
-                const SizedBox(height: 8),
-                Text('Limite quotidienne atteinte',
-                    style: AppTextStyles.h4.copyWith(color: AppColors.primary)),
-                const SizedBox(height: 4),
-                Text(
-                    "Tu as utilisé tes $_messagesLimit messages Mindo aujourd'hui.\nReviens demain ou passe en Premium pour des conversations illimitées.",
-                    style: AppTextStyles.bodySmall
-                        .copyWith(color: AppColors.onSurfaceMuted, height: 1.5),
-                    textAlign: TextAlign.center),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      // TODO: Redirection vers l'écran Premium
-                    },
-                    icon: Icon(Icons.workspace_premium, color: Colors.white),
-                    label: const Text('Passer en Premium'),
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.secondary,
-                        minimumSize: const Size.fromHeight(46)),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.divider),
+              ),
+              child: Row(children: [
+                Container(
+                  width: 44, height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.people_outline, color: AppColors.secondary, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Tu veux parler à quelqu\'un maintenant ?',
+                    style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                  Text('Des professionnels de santé mentale sont disponibles.',
+                    style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
+                ])),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () => context.go('/professionals'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text('Voir', style: AppTextStyles.caption.copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
                   ),
                 ),
               ]),
             ),
-          if (!_limitReached)
-            _InputBar(
-              ctrl: _inputCtrl,
-              isTyping: _isTyping,
-              onSend: () => _sendMessage(_inputCtrl.text),
-            ),
-        ],
-      ),
-    );
-  }
-
-  void _confirmReset() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Nouvelle conversation'),
-        content: const Text('Effacer cette conversation et recommencer ?'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Annuler')),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              try {
-                await ApiService().clearAssistantSession();
-              } catch (_) {}
-              try {
-                // 💾 Effacer l'historique local
-                await _chatHistoryService.clearHistory();
-                debugPrint('📚 Historique effacé');
-              } catch (e) {
-                debugPrint('❌ Erreur suppression historique: $e');
-              }
-              if (mounted) {
-                setState(() {
-                  _messages.clear();
-                  _hasStarted = false;
-                });
-              }
-            },
-            child: const Text('Recommencer'),
-          ),
-        ],
+          ]),
+        ),
       ),
     );
   }

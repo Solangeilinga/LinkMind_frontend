@@ -53,8 +53,7 @@ class ApiService {
   final _cacheManager = ApiCacheManager();
   String? _accessToken;
 
-  // Mode debug pour désactiver le cache (à mettre à false en production)
-  static bool disableCache = kDebugMode; // Désactivé en debug
+  static bool disableCache = kDebugMode;
 
   // ─── Token Management ──────────────────────────────────────────────────────
   Future<void> saveTokens(String access, String refresh) async {
@@ -68,9 +67,7 @@ class ApiService {
     try {
       _accessToken = await _storage.read(key: 'access_token');
     } catch (_) {
-      try {
-        await _storage.deleteAll();
-      } catch (_) {}
+      try { await _storage.deleteAll(); } catch (_) {}
       _accessToken = null;
     }
     return _accessToken;
@@ -82,9 +79,7 @@ class ApiService {
       try {
         refresh = await _storage.read(key: 'refresh_token');
       } catch (_) {
-        try {
-          await _storage.deleteAll();
-        } catch (_) {}
+        try { await _storage.deleteAll(); } catch (_) {}
         return false;
       }
       if (refresh == null) return false;
@@ -120,7 +115,6 @@ class ApiService {
     };
   }
 
-  // Helper pour nettoyer les posts
   dynamic _cleanPosts(dynamic response) {
     if (response is Map<String, dynamic> && response.containsKey('posts')) {
       final posts = response['posts'];
@@ -129,12 +123,8 @@ class ApiService {
           if (post is Map<String, dynamic>) return post;
           if (post != null) {
             try {
-              if (post.toJson != null && post.toJson is Function) {
-                return post.toJson();
-              }
               return Map<String, dynamic>.from(post as Map);
             } catch (e) {
-              debugPrint('⚠️ Erreur nettoyage post: $e');
               return {'_raw': post.toString()};
             }
           }
@@ -155,19 +145,16 @@ class ApiService {
 
     if (response.statusCode == 401) {
       if (body['code'] == 'SESSION_EXPIRED') {
-        throw SecurityException(
-            'Session expirée', SecurityErrorType.sessionExpired);
+        throw SecurityException('Session expirée', SecurityErrorType.sessionExpired);
       }
       if (body['code'] == 'TOKEN_EXPIRED') {
         final refreshed = await refreshAccessToken();
         if (!refreshed) {
-          throw SecurityException(
-              'Session expirée', SecurityErrorType.sessionExpired);
+          throw SecurityException('Session expirée', SecurityErrorType.sessionExpired);
         }
         throw ApiException('retry', 401, retryable: true);
       }
-      throw SecurityException(
-          body['error'] ?? 'Non authentifié', SecurityErrorType.unauthorized);
+      throw SecurityException(body['error'] ?? 'Non authentifié', SecurityErrorType.unauthorized);
     }
 
     if (response.statusCode == 429) {
@@ -181,20 +168,16 @@ class ApiService {
             SecurityErrorType.accountRestricted,
             data: {'until': body['until']});
       }
-      throw SecurityException(
-          body['error'] ?? 'Trop de requêtes', SecurityErrorType.rateLimited);
+      throw SecurityException(body['error'] ?? 'Trop de requêtes', SecurityErrorType.rateLimited);
     }
 
     if (response.statusCode == 403) {
-      throw SecurityException(
-          body['error'] ?? 'Accès interdit', SecurityErrorType.forbidden);
+      throw SecurityException(body['error'] ?? 'Accès interdit', SecurityErrorType.forbidden);
     }
 
-    throw ApiException(
-        body['error'] ?? 'Une erreur est survenue', response.statusCode);
+    throw ApiException(body['error'] ?? 'Une erreur est survenue', response.statusCode);
   }
 
-  // ─── Exécute une requête HTTP avec retry automatique après refresh de token ──
   Future<dynamic> _execute(
       Future<http.Response> Function(Map<String, String> headers) fn) async {
     final headers = await _getHeaders();
@@ -211,7 +194,7 @@ class ApiService {
     }
   }
 
-  // ─── Invalidation de cache ────────────────────────────────────────────────
+  // ─── Cache ────────────────────────────────────────────────────────────────
   void invalidateCache(String pathPattern) {
     _cacheManager.invalidateWhere((key) => key.startsWith(pathPattern));
     debugPrint('🗑️ Cache invalidé pour: $pathPattern');
@@ -223,7 +206,6 @@ class ApiService {
     }
   }
 
-  // ─── Cache Helpers ────────────────────────────────────────────────────────
   String _generateCacheKey(String path, Map<String, String>? queryParams) {
     if (queryParams == null || queryParams.isEmpty) return path;
     final sortedParams = (queryParams.keys.toList()..sort())
@@ -233,29 +215,32 @@ class ApiService {
   }
 
   Duration _getCacheDuration(String path) {
-    // En debug, pas de cache pour voir les changements immédiatement
     if (disableCache) return Duration.zero;
-    
-    // ✅ Contenu statique: 1 heure
-    if (path.startsWith('/content/')) return const Duration(hours: 1);
 
-    // ✅ Données utilisateur: 10 minutes
-    if (path.startsWith('/users/') || path.startsWith('/professionals/')) {
-      return const Duration(minutes: 10);
+    if (path.startsWith('/content/moods') ||
+        path.startsWith('/content/professional-types') ||
+        path.startsWith('/content/challenge-categories') ||
+        path.startsWith('/content/challenge-difficulties') ||
+        path.startsWith('/content/stress-factors') ||
+        path.startsWith('/content/post-types')) {
+      return const Duration(minutes: 30);
     }
 
-    // ✅ Feed & Community: 5 minutes
-    if (path.startsWith('/community/')) return const Duration(minutes: 5);
+    if (path.startsWith('/content/')) return const Duration(minutes: 10);
 
-    // ✅ Mood & Challenges: 5 minutes
-    if (path.startsWith('/mood/') || path.startsWith('/challenges/')) {
-      return const Duration(minutes: 5);
+    if (path.startsWith('/professionals/bookings') ||
+        path.startsWith('/users/me')) {
+      return Duration.zero;
     }
 
-    // ✅ Notifications: pas de cache
+    if (path.startsWith('/professionals')) return const Duration(minutes: 2);
+    if (path.startsWith('/community/')) return const Duration(minutes: 1);
+    if (path.startsWith('/mood/history')) return const Duration(minutes: 2);
+    if (path.startsWith('/mood/today')) return Duration.zero;
+    if (path.startsWith('/challenges/')) return const Duration(minutes: 2);
     if (path.startsWith('/notifications')) return Duration.zero;
 
-    return const Duration(minutes: 5);
+    return const Duration(minutes: 2);
   }
 
   Future<dynamic> _fetchFromNetwork(String path, Map<String, String>? queryParams) async {
@@ -263,20 +248,19 @@ class ApiService {
         .replace(queryParameters: queryParams);
     final result = await _execute(
         (h) => http.get(uri, headers: h).timeout(const Duration(seconds: 15)));
-    
+
     final cacheDuration = _getCacheDuration(path);
     if (cacheDuration > Duration.zero && !disableCache) {
       final cacheKey = _generateCacheKey(path, queryParams);
       _cacheManager.set(cacheKey, result, expiry: cacheDuration);
     }
-    
+
     return result;
   }
 
   Future<dynamic> get(String path, {Map<String, String>? queryParams, bool forceRefresh = false}) async {
     final cacheKey = _generateCacheKey(path, queryParams);
 
-    // Si forceRefresh, ignorer le cache
     if (!forceRefresh && !disableCache) {
       final cached = _cacheManager.get<dynamic>(cacheKey);
       if (cached != null) {
@@ -318,29 +302,24 @@ class ApiService {
 
   // ─── Auth ──────────────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> register({
-    required String firstName,
-    required String lastName,
-    String? email,
-    String? phone,
-    int? age,
-    String? city,
-    String? gender,
+    required String email,
     required String password,
     String? anonymousAlias,
     bool legalAccepted = true,
+    int? age,
+    String? city,
+    String? country,
+    String? gender,
   }) async {
     return await post('/auth/register', {
-      'firstName': firstName,
-      'lastName': lastName,
-      if (email != null && email.isNotEmpty) 'email': email,
-      if (phone != null && phone.isNotEmpty) 'phone': phone,
+      'email': email,
+      'password': password,
+      if (anonymousAlias != null && anonymousAlias.isNotEmpty) 'anonymousAlias': anonymousAlias,
+      'legalAccepted': legalAccepted,
       if (age != null) 'age': age,
       if (city != null && city.isNotEmpty) 'city': city,
+      if (country != null && country.isNotEmpty) 'country': country,
       if (gender != null) 'gender': gender,
-      'password': password,
-      if (anonymousAlias != null && anonymousAlias.isNotEmpty)
-        'anonymousAlias': anonymousAlias,
-      'legalAccepted': legalAccepted,
     });
   }
 
@@ -351,22 +330,17 @@ class ApiService {
       if (phone != null && phone.isNotEmpty) 'phone': phone,
       'password': password,
     });
-    
-    // Invalider le cache utilisateur après login
     invalidateCache('/users/me');
-    
     return result;
   }
 
   Future<void> logout() async {
-    try {
-      await post('/auth/logout', {});
-    } catch (_) {}
+    try { await post('/auth/logout', {}); } catch (_) {}
     await clearTokens();
-    _cacheManager.clearAll(); // Vider tout le cache à la déconnexion
+    _cacheManager.clearAll();
   }
 
-  // ─── Verification (Email ou SMS) ───────────────────────────────────────────
+  // ─── Verification ──────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> sendVerification() async =>
       await post('/auth/send-verification', {});
 
@@ -379,11 +353,10 @@ class ApiService {
   // ─── Legal ─────────────────────────────────────────────────────────────────
   Future<void> acceptLegal() async => await post('/users/accept-legal', {});
 
-  // ─── Account Management (RGPD) ─────────────────────────────────────────────
+  // ─── Account ───────────────────────────────────────────────────────────────
   Future<void> deleteAccount() async => await delete('/users/me');
   Future<dynamic> exportMyData() async => await get('/users/me/export');
 
-  // ─── User Activity ─────────────────────────────────────────────────────────
   Future<void> recordActivity({
     required String type,
     Map<String, dynamic>? metadata,
@@ -412,10 +385,7 @@ class ApiService {
       if (factors != null) 'factors': factors,
       if (energyLevel != null) 'energyLevel': energyLevel,
     });
-    
-    // Invalider le cache des moods
     invalidateMultipleCache(['/mood/today', '/mood/history', '/mood/insights']);
-    
     return result;
   }
 
@@ -440,12 +410,8 @@ class ApiService {
     if (durationSeconds != null) body['durationSeconds'] = durationSeconds;
     if (moodId != null) body['moodId'] = moodId;
     if (reflection != null) body['reflection'] = reflection;
-    
     final result = await post('/challenges/$challengeId/complete', body);
-    
-    // Invalider le cache des défis
     invalidateMultipleCache(['/challenges/daily', '/challenges', '/challenges/$challengeId']);
-    
     return result;
   }
 
@@ -495,28 +461,19 @@ class ApiService {
       if (moodScore != null) 'moodScore': moodScore,
       if (moodEmoji != null) 'moodEmoji': moodEmoji,
     });
-    
-    // Invalider le cache du feed et des posts
     invalidateMultipleCache(['/community/feed', '/community/my-posts']);
-    
     return result;
   }
 
   Future<Map<String, dynamic>> editPost(String postId, String content) async {
     final result = await patch('/community/posts/$postId', {'content': content});
-    
-    // Invalider le cache
     invalidateMultipleCache(['/community/feed', '/community/my-posts', '/community/posts/$postId']);
-    
     return result;
   }
 
   Future<Map<String, dynamic>> toggleLike(String postId) async {
     final result = await post('/community/posts/$postId/like', {});
-    
-    // Invalider le cache du feed
     invalidateMultipleCache(['/community/feed', '/community/my-posts']);
-    
     return result;
   }
 
@@ -528,20 +485,16 @@ class ApiService {
 
   Future<void> deletePost(String postId) async {
     await delete('/community/posts/$postId');
-    
-    // Invalider le cache
     invalidateMultipleCache(['/community/feed', '/community/my-posts']);
   }
 
-  Future<Map<String, dynamic>> toggleReaction(
-          String postId, String type) async {
+  Future<Map<String, dynamic>> toggleReaction(String postId, String type) async {
     final result = await post('/community/posts/$postId/react', {'type': type});
     invalidateMultipleCache(['/community/feed', '/community/my-posts']);
     return result;
   }
 
-  Future<Map<String, dynamic>> searchPosts(String query,
-          {String? postType}) async =>
+  Future<Map<String, dynamic>> searchPosts(String query, {String? postType}) async =>
       await get('/community/search',
           queryParams: {'q': query, if (postType != null) 'type': postType});
 
@@ -582,7 +535,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> getProfessional(String id) async =>
       await get('/professionals/$id');
-      
+
   Future<Map<String, dynamic>> bookProfessional({
     required String professionalId,
     required String message,
@@ -594,16 +547,13 @@ class ApiService {
       if (preferredDate != null) 'preferredDate': preferredDate,
       if (consultationType != null) 'consultationType': consultationType,
     });
-    
-    // Invalider le cache des réservations
     invalidateCache('/professionals/bookings/me');
-    
     return result;
   }
 
   Future<Map<String, dynamic>> getMyBookings({bool forceRefresh = false}) async =>
       await get('/professionals/bookings/me', forceRefresh: forceRefresh);
-      
+
   Future<Map<String, dynamic>> updateBooking({
     required String bookingId,
     String? consultationType,
@@ -615,29 +565,25 @@ class ApiService {
     if (preferredDate != null) data['preferredDate'] = preferredDate;
     if (message != null) data['message'] = message;
     final result = await put('/professionals/bookings/$bookingId', data);
-    
     invalidateCache('/professionals/bookings/me');
-    
     return result;
   }
 
   Future<void> cancelBooking(String bookingId) async {
     await delete('/professionals/bookings/$bookingId');
-    
-    // Invalider le cache des réservations
     invalidateCache('/professionals/bookings/me');
   }
 
   // ─── User ──────────────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> getMe({bool forceRefresh = false}) async =>
       await get('/users/me', forceRefresh: forceRefresh);
-      
+
   Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
     final result = await patch('/users/me', data);
     invalidateCache('/users/me');
     return result;
   }
-  
+
   Future<Map<String, dynamic>> getLeaderboard() async =>
       await get('/users/leaderboard');
 
@@ -653,12 +599,10 @@ class ApiService {
   }
 
   Future<void> clearAssistantSession() async {
-    try {
-      await delete('/assistant/session');
-    } catch (_) {}
+    try { await delete('/assistant/session'); } catch (_) {}
   }
 
-  // ─── Content (from DB) ────────────────────────────────────────────────────
+  // ─── Content ───────────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> getDailyMessage() async =>
       await get('/content/daily-message');
   Future<Map<String, dynamic>> getWellnessTips({String? mood}) async =>

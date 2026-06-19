@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../utils/theme.dart';
+import '../../../../widgets/skeleton_widget.dart';
 import '../../../../widgets/ad_banner.dart';
 import 'post_card.dart';
 import 'empty_feed.dart';
@@ -55,7 +56,7 @@ class _FeedListState extends State<FeedList> {
   @override
   Widget build(BuildContext context) {
     if (widget.isLoading) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+      return SkeletonList(itemBuilder: () => const SkeletonPostCard(), count: 4);
     }
     
     if (widget.posts.isEmpty) {

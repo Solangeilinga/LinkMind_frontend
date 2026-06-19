@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/content_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/professionals_provider.dart';
 import '../../utils/theme.dart';
 
 class HomeShell extends ConsumerStatefulWidget {
@@ -62,7 +64,21 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                 return Expanded(
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: () => context.go(tab.path),
+                    onTap: () {
+                      // Vider le cache des données dynamiques au changement d'onglet
+                      final api = ref.read(apiServiceProvider);
+                      if (tab.path == '/professionals') {
+                        ref.read(professionalsProvider.notifier).loadProfessionals(forceRefresh: true);
+                        ref.read(professionalsProvider.notifier).loadBookings(forceRefresh: true);
+                      } else if (tab.path == '/home') {
+                        api.invalidateCache('/mood/today');
+                      } else if (tab.path == '/community') {
+                        api.invalidateCache('/community/');
+                      } else if (tab.path == '/challenges') {
+                        api.invalidateCache('/challenges/');
+                      }
+                      context.go(tab.path);
+                    },
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
