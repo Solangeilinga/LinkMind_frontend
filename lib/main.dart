@@ -230,7 +230,7 @@ class _LinkMindAppState extends ConsumerState<LinkMindApp>
         ),
         GoRoute(
           path: '/auth/register',
-          builder: (_, __) => const RegisterScreen(),
+          builder: (_, __) => RegisterScreen(),
         ),
         GoRoute(
           path: '/auth/forgot-password',

@@ -2,13 +2,41 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/gestures.dart';
+import 'package:lottie/lottie.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../../utils/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/validators.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api.service.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+
+// ─── Error Banner ─────────────────────────────────────────────────────────────
+class _ErrorBanner extends StatelessWidget {
+  final String message;
+  final bool isNetwork;
+  const _ErrorBanner({required this.message, required this.isNetwork});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isNetwork ? Colors.orange : Colors.red;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.shade200),
+      ),
+      child: Row(children: [
+        Icon(isNetwork ? Icons.wifi_off : Icons.error_outline,
+            color: color.shade700, size: 16),
+        const SizedBox(width: 10),
+        Expanded(child: Text(message,
+            style: TextStyle(color: color.shade800, fontSize: 13))),
+      ]),
+    );
+  }
+}
 
 // ─── Login Screen ─────────────────────────────────────────────────────────────
 class LoginScreen extends ConsumerStatefulWidget {
@@ -18,27 +46,26 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _identifierCtrl = TextEditingController();
-  final _passCtrl       = TextEditingController();
-  bool _obscurePass     = true;
+  final _emailCtrl = TextEditingController();
+  final _passCtrl  = TextEditingController();
+  bool _obscurePass = true;
   String? _localError;
 
   @override
   void dispose() {
-    _identifierCtrl.dispose();
+    _emailCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _login() async {
-    final identifier = _identifierCtrl.text.trim();
-    final password   = _passCtrl.text;
-    if (identifier.isEmpty) { setState(() => _localError = 'Saisis ton adresse email.'); return; }
-    if (password.isEmpty)   { setState(() => _localError = 'Saisis ton mot de passe.'); return; }
+    final email    = _emailCtrl.text.trim();
+    final password = _passCtrl.text;
+    if (email.isEmpty)    { setState(() => _localError = 'Saisis ton adresse email.'); return; }
+    if (password.isEmpty) { setState(() => _localError = 'Saisis ton mot de passe.'); return; }
     setState(() => _localError = null);
     final success = await ref.read(authProvider.notifier).login(
-      email: identifier.contains('@') ? identifier : null,
-      password: password,
+      email: email, password: password,
     );
     if (success && mounted) context.go('/home');
   }
@@ -46,140 +73,217 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final state  = ref.watch(authProvider);
+    final size   = MediaQuery.of(context).size;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surfaceColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final borderColor  = isDark ? Colors.white12 : AppColors.divider;
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFF5F5F5),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 40, 20, 40),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
+      body: Column(
+        children: [
 
-            // ── Logo + titre ────────────────────────────────────────────
-            Center(child: Column(children: [
+          // ── Zone image en haut ─────────────────────────────────────────
+          SizedBox(
+            width: size.width,
+            height: size.height * 0.42,
+            child: Stack(fit: StackFit.expand, children: [
+              // Fond bordeaux avec coins arrondis en bas
               Container(
-                width: 72, height: 72,
-                decoration: const BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.lg),
-                child: ClipRRect(borderRadius: AppRadius.lg,
-                    child: Image.asset('assets/images/logo.png', fit: BoxFit.contain)),
-              ),
-              const SizedBox(height: 14),
-              Text('LinkMind', style: AppTextStyles.h1.copyWith(color: AppColors.primary)),
-              const SizedBox(height: 4),
-              Text('Connecte-toi à ton espace bien-être',
-                  style: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted)),
-            ])),
-            const SizedBox(height: 32),
-
-            // ── Erreurs ─────────────────────────────────────────────────
-            if (_localError != null) ...[
-              _ErrorBanner(message: _localError!, isNetwork: false),
-              const SizedBox(height: 12),
-            ],
-            if (state.error != null) ...[
-              _ErrorBanner(message: state.error!, isNetwork: state.error!.contains('internet')),
-              const SizedBox(height: 12),
-            ],
-
-            // ── Card formulaire ──────────────────────────────────────────
-            Container(
-              decoration: BoxDecoration(
-                color: surfaceColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: borderColor),
-              ),
-              padding: const EdgeInsets.all(16),
-              child: Column(children: [
-                TextField(
-                  controller: _identifierCtrl,
-                  keyboardType: TextInputType.emailAddress,
-                  textInputAction: TextInputAction.next,
-                  decoration: const InputDecoration(
-                    labelText: 'Adresse email',
-                    prefixIcon: Icon(Icons.email_outlined),
+                decoration: const BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.only(
+                    bottomLeft:  Radius.circular(36),
+                    bottomRight: Radius.circular(36),
                   ),
                 ),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: _passCtrl,
-                  obscureText: _obscurePass,
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => _login(),
-                  decoration: InputDecoration(
-                    labelText: 'Mot de passe',
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscurePass
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined),
-                      onPressed: () => setState(() => _obscurePass = !_obscurePass),
-                      splashRadius: 20,
-                      padding: const EdgeInsets.all(12),
-                      constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              ),
+              // Lottie pleine zone
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  bottomLeft:  Radius.circular(36),
+                  bottomRight: Radius.circular(36),
+                ),
+                child: Lottie.asset(
+                  'assets/animations/welcome.json',
+                  fit: BoxFit.cover,
+                  repeat: true,
+                  errorBuilder: (_, __, ___) => const SizedBox(),
+                ),
+              ),
+              // Gradient sombre en bas pour lisibilité du texte
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  bottomLeft:  Radius.circular(36),
+                  bottomRight: Radius.circular(36),
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        AppColors.primary.withValues(alpha: 0.85),
+                      ],
+                      stops: const [0.35, 1.0],
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: GestureDetector(
-                    onTap: () => context.go('/auth/forgot-password'),
-                    child: Text('Mot de passe oublié ?',
-                        style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.primary, fontWeight: FontWeight.w700)),
-                  ),
-                ),
-              ]),
-            ),
-            const SizedBox(height: 20),
-
-            // ── Bouton ───────────────────────────────────────────────────
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: state.isLoading ? null : _login,
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(52),
-                  backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 0,
-                ),
-                child: state.isLoading
-                    ? const SizedBox(width: 20, height: 20,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : Text('Se connecter',
-                        style: AppTextStyles.button.copyWith(
-                            color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
               ),
-            ),
-            const SizedBox(height: 16),
+              // Texte en bas de la zone image
+              Positioned(
+                bottom: 28,
+                left: 28,
+                right: 28,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Heureux de te revoir !',
+                      style: AppTextStyles.h2.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "Ton espace bien-être t'attendait.",
+                      style: AppTextStyles.body.copyWith(
+                        color: Colors.white.withValues(alpha: 0.85),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // SafeArea pour le padding système
+              const Positioned(
+                top: 0, left: 0, right: 0,
+                child: SafeArea(child: SizedBox()),
+              ),
+            ]),
+          ),
 
-            // ── Lien inscription ─────────────────────────────────────────
-            Center(child: RichText(
-              text: TextSpan(
-                style: AppTextStyles.bodySmall.copyWith(color: AppColors.onSurfaceMuted),
+          // ── Formulaire en bas ──────────────────────────────────────────
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const TextSpan(text: 'Pas encore de compte ? '),
-                  TextSpan(
-                    text: 'Créer un compte',
-                    style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.primary, fontWeight: FontWeight.w800),
-                    recognizer: TapGestureRecognizer()
-                      ..onTap = () => context.go('/auth/register'),
+
+                  Text('Connexion',
+                      style: AppTextStyles.h2.copyWith(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 20),
+
+                  if (_localError != null) ...[
+                    _ErrorBanner(message: _localError!, isNetwork: false),
+                    const SizedBox(height: 12),
+                  ],
+                  if (state.error != null) ...[
+                    _ErrorBanner(
+                        message: state.error!,
+                        isNetwork: state.error!.contains('internet')),
+                    const SizedBox(height: 12),
+                  ],
+
+                  TextField(
+                    controller: _emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Adresse email',
+                      prefixIcon: Icon(Icons.email_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  TextField(
+                    controller: _passCtrl,
+                    obscureText: _obscurePass,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _login(),
+                    decoration: InputDecoration(
+                      labelText: 'Mot de passe',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(_obscurePass
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined),
+                        onPressed: () => setState(() => _obscurePass = !_obscurePass),
+                        splashRadius: 20,
+                        padding: const EdgeInsets.all(12),
+                        constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      onTap: () => context.go('/auth/forgot-password'),
+                      child: Text('Mot de passe oublié ?',
+                          style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: state.isLoading ? null : _login,
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                        backgroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                        elevation: 0,
+                      ),
+                      child: state.isLoading
+                          ? const SizedBox(
+                              width: 20, height: 20,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2))
+                          : Text('Se connecter',
+                              style: AppTextStyles.button.copyWith(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  Center(
+                    child: RichText(
+                      text: TextSpan(
+                        style: AppTextStyles.bodySmall
+                            .copyWith(color: AppColors.onSurfaceMuted),
+                        children: [
+                          const TextSpan(text: 'Pas encore de compte ? '),
+                          TextSpan(
+                            text: 'Créer un compte',
+                            style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w800),
+                            recognizer: TapGestureRecognizer()
+                              ..onTap = () => context.go('/auth/register'),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
-            )),
-          ]),
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// ─── Register Screen ──────────────────────────────────────────────────────────
+
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
   @override
@@ -717,29 +821,3 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 }
-
-// ─── Widget erreur ────────────────────────────────────────────────────────────
-class _ErrorBanner extends StatelessWidget {
-  final String message;
-  final bool isNetwork;
-  const _ErrorBanner({required this.message, required this.isNetwork});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = isNetwork ? Colors.orange : Colors.red;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: color.shade50,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.shade200),
-      ),
-      child: Row(children: [
-        Icon(isNetwork ? Icons.wifi_off : Icons.error_outline, color: color.shade700, size: 18),
-        const SizedBox(width: 10),
-        Expanded(child: Text(message,
-            style: TextStyle(color: color.shade800, fontSize: 13))),
-      ]),
-    );
-  }
-} 

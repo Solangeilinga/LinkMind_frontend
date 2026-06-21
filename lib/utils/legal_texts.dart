@@ -87,7 +87,7 @@ Chez LinkMind, nous prenons la protection de tes données personnelles très au 
 
 Données de compte :
 • Prénom, nom
-• Email et/ou numéro de téléphone
+• Adresse email
 • Âge, ville, genre (optionnels)
 • Pseudo anonyme communauté
 
@@ -117,7 +117,7 @@ Nous N'utilisons JAMAIS tes données pour :
 
 3. ANONYMAT DANS LA COMMUNAUTÉ
 
-Tes publications dans la communauté sont affichées sous ton pseudo anonyme. Ton identité réelle (nom, email, téléphone) n'est jamais visible des autres membres.
+Tes publications dans la communauté sont affichées sous ton pseudo anonyme. Ton identité réelle (nom, email) n'est jamais visible des autres membres.
 
 4. CONVERSATIONS AVEC MINDO
 

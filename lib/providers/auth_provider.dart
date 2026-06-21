@@ -108,7 +108,7 @@ String _errorMessage(Object e, {String fallback = 'Une erreur inattendue est sur
       case SecurityErrorType.unauthorized:
         return e.message.isNotEmpty
             ? e.message
-            : 'Identifiants incorrects. Vérifie ton email/téléphone et mot de passe.';
+            : 'Identifiants incorrects. Vérifie ton email et ton mot de passe.';
       case SecurityErrorType.rateLimited:
         return 'Trop de requêtes. Attends un moment avant de réessayer.';
       case SecurityErrorType.forbidden:
@@ -119,7 +119,7 @@ String _errorMessage(Object e, {String fallback = 'Une erreur inattendue est sur
   }
   if (e is ApiException) {
     if (e.statusCode == 401) {
-      return 'Identifiants incorrects. Vérifie ton email/téléphone et ton mot de passe.';
+      return 'Identifiants incorrects. Vérifie ton email et ton mot de passe.';
     }
     if (e.statusCode == 409) return e.message;
     if (e.statusCode == 400) return e.message;
@@ -167,10 +167,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   // ─── Login ────────────────────────────────────────────────────────────────
-  Future<bool> login({String? email, String? phone, required String password}) async {
+  Future<bool> login({String? email, required String password}) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final data = await _api.login(email: email, phone: phone, password: password);
+      final data = await _api.login(email: email, password: password);
       await _api.saveTokens(data['accessToken'], data['refreshToken']);
       final user = UserModel.fromJson(data['user']);
       debugPrint('🔍 [Login] legalAccepted=${user.legalAccepted}');
@@ -250,11 +250,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   // ─── Mot de passe oublié ──────────────────────────────────────────────────
-  Future<Map<String, dynamic>> forgotPassword({String? email, String? phone}) async {
+  Future<Map<String, dynamic>> forgotPassword({required String email}) async {
     try {
       final data = await _api.post('/auth/forgot-password', {
         if (email != null) 'email': email,
-        if (phone != null) 'phone': phone,
       });
       return Map<String, dynamic>.from(data ?? {});
     } catch (e) {
@@ -263,11 +262,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<String?> verifyOtp({String? email, String? phone, required String code}) async {
+  Future<String?> verifyOtp({String? email, required String code}) async {
     try {
       final data = await _api.post('/auth/verify-otp', {
         if (email != null) 'email': email,
-        if (phone != null) 'phone': phone,
         'code': code,
       });
       return data['resetToken'] as String?;
@@ -279,14 +277,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> resetPassword({
     String? email,
-    String? phone,
     required String resetToken,
     required String newPassword,
   }) async {
     try {
       await _api.post('/auth/reset-password', {
         if (email != null) 'email': email,
-        if (phone != null) 'phone': phone,
         'resetToken': resetToken,
         'newPassword': newPassword,
       });

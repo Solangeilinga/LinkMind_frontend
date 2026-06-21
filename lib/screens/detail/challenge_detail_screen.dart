@@ -476,7 +476,7 @@ class _ChallengeDetailScreenState extends ConsumerState<ChallengeDetailScreen>
                 width: 18, height: 18,
                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
             : const Icon(Icons.check_circle_rounded, size: 22),
-        label: Text(_isCompleting ? 'Enregistrement...' : 'Terminer le défi ✅'),
+        label: Text(_isCompleting ? 'Enregistrement...' : 'Terminer le défi'),
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.secondary,
           minimumSize: const Size.fromHeight(54),
@@ -566,7 +566,7 @@ class _ChallengeDetailScreenState extends ConsumerState<ChallengeDetailScreen>
                 width: 18, height: 18,
                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
             : const Icon(Icons.check_circle_rounded, size: 22),
-        label: Text(_isCompleting ? 'Enregistrement...' : 'Terminer le défi ✅'),
+        label: Text(_isCompleting ? 'Enregistrement...' : 'Terminer le défi'),
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.secondary,
           minimumSize: const Size.fromHeight(54),
@@ -935,7 +935,7 @@ class _SuccessSheet extends StatelessWidget {
                 backgroundColor: AppColors.primary,
                 minimumSize: const Size.fromHeight(54),
               ),
-              child: const Text('Super, continuer ! 🚀'),
+              child: const Text('Super, continuer !'),
             ),
           ),
         ],

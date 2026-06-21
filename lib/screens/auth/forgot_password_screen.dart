@@ -38,21 +38,16 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   Future<void> _sendOtp() async {
     final identifier = _identifierCtrl.text.trim();
     if (identifier.isEmpty) {
-      setState(() => _error = 'Saisis ton email ou ton numéro de téléphone');
+      setState(() => _error = 'Saisis ton adresse email');
       return;
     }
 
     FocusScope.of(context).unfocus();
     setState(() { _isLoading = true; _error = null; });
 
-    final isEmail = identifier.contains('@');
-    final phone   = isEmail ? null : Validators.normalizePhone(identifier);
-
     try {
-      // Appel au notifier
       final result = await ref.read(authProvider.notifier).forgotPassword(
-        email: isEmail ? identifier : null,
-        phone: phone,
+        email: identifier,
       );
 
       // Vérification supplémentaire : si le résultat contient un indicateur de succès
@@ -69,9 +64,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
         if (mounted) {
           setState(() {
             _isLoading = false;
-            _hint = isEmail
-                ? 'Code envoyé à ton adresse email (vérifie aussi tes spams).'
-                : 'Code envoyé par SMS à ton numéro.';
+            _hint = 'Code envoyé à ton adresse email (vérifie aussi tes spams).';
             _step = 1;
           });
         } else {
@@ -112,11 +105,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     try {
       final identifier = _identifierCtrl.text.trim();
       final isEmail    = identifier.contains('@');
-      final phone      = isEmail ? null : Validators.normalizePhone(identifier);
 
       final token = await ref.read(authProvider.notifier).verifyOtp(
         email: isEmail ? identifier : null,
-        phone: phone,
         code: otp,
       );
 
@@ -161,11 +152,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     try {
       final identifier = _identifierCtrl.text.trim();
       final isEmail    = identifier.contains('@');
-      final phone      = isEmail ? null : Validators.normalizePhone(identifier);
 
       await ref.read(authProvider.notifier).resetPassword(
         email: isEmail ? identifier : null,
-        phone: phone,
         resetToken: _resetToken!,
         newPassword: newPass,
       );
@@ -266,9 +255,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _isLoading ? null : _sendOtp(),
                 decoration: const InputDecoration(
-                  labelText: 'Email ou numéro de téléphone',
+                  labelText: 'Email',
                   prefixIcon: Icon(Icons.person_outline),
-                  helperText: 'Format téléphone : +22661645069',
+                  helperText: '',
                 ),
               ),
             ],

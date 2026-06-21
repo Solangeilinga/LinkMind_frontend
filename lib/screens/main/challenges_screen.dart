@@ -210,13 +210,17 @@ class _SkeletonChallengeCard extends StatelessWidget {
           const SizedBox(height: 5),
           const SkeletonBox(width: 160, height: 13, radius: 5),
           const SizedBox(height: 10),
-          Row(children: const [
-            SkeletonBox(width: 55, height: 20, radius: 10),
-            SizedBox(width: 6),
-            SkeletonBox(width: 65, height: 20, radius: 10),
-            SizedBox(width: 6),
-            SkeletonBox(width: 45, height: 20, radius: 10),
-          ]),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const NeverScrollableScrollPhysics(),
+            child: Row(children: const [
+              SkeletonBox(width: 55, height: 20, radius: 10),
+              SizedBox(width: 6),
+              SkeletonBox(width: 65, height: 20, radius: 10),
+              SizedBox(width: 6),
+              SkeletonBox(width: 45, height: 20, radius: 10),
+            ]),
+          ),
         ])),
         const SizedBox(width: 10),
         Column(mainAxisAlignment: MainAxisAlignment.center, children: const [

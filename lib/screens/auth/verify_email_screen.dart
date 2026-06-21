@@ -55,7 +55,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
           _isLoading = false;
         });
         debugPrint(
-            '✅ Code envoyé par ${response['channel'] == 'email' ? 'email' : 'SMS'}');
+            '✅ Code envoyé par ${'email'}');
       }
     } on TimeoutException catch (e) {
       debugPrint('⏱️ Timeout lors de l\'envoi du code: $e');
@@ -80,10 +80,10 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
           errorMsg = 'Délai d\'attente dépassé. Réessaie.';
         } else if (errorStr.contains('configuration') ||
             errorStr.contains('credentials')) {
-          errorMsg = 'Service SMS non configuré. Contacte le support.';
+          errorMsg = 'Service email non disponible. Réessaie plus tard.';
         } else if (errorStr.contains('lafricamobile') ||
-            errorStr.contains('sms')) {
-          errorMsg = 'Problème d\'envoi SMS. Réessaie ou utilise un email.';
+            errorStr.contains('resend')) {
+          errorMsg = 'Problème d\'envoi email. Réessaie plus tard.';
         } else if (errorStr.contains('not properly configured')) {
           errorMsg = 'Service non disponible. Réessaie plus tard.';
         }
@@ -142,7 +142,7 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
       if (mounted) {
         setState(() {
           _success =
-              'Nouveau code envoyé par ${response['channel'] == 'email' ? 'email' : 'SMS'}';
+              'Nouveau code envoyé par ${'email'}';
           _isResending = false;
         });
       }
@@ -166,12 +166,12 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
       );
     }
 
-    final icon = _channel == 'email' ? '📧' : '📱';
+    final icon = '📧';
     final title =
-        _channel == 'email' ? 'Vérifie ton email' : 'Vérifie ton téléphone';
+        'Vérifie ton email';
     final subtitle = _channel == 'email'
-        ? 'Un code de vérification a été envoyé à ton adresse email lors de ton inscription'
-        : 'Un code de vérification a été envoyé par SMS à ton numéro lors de ton inscription';
+        ? 'Un code a été envoyé à ton adresse email lors de ton inscription'
+        : 'Un code a été envoyé à ton adresse email lors de ton inscription';
 
     return Scaffold(
       backgroundColor: AppColors.background,

@@ -5,7 +5,6 @@ class UserModel {
   final String? firstName;
   final String? lastName;
   final String? email;
-  final String? phone;
   final int?    age;
   final String? city;
   final String? country;
@@ -17,7 +16,6 @@ class UserModel {
   final int     streakDays;
   final bool    isPremium;
   final bool    isEmailVerified;      // ✅ Vérification email
-  final bool    isPhoneVerified;      // ✅ AJOUTÉ : vérification téléphone
   final bool    legalAccepted;        // ✅ CGU acceptées
   final UserPreferences preferences;
   final List<UserBadge> badges;
@@ -28,7 +26,6 @@ class UserModel {
     this.firstName,
     this.lastName,
     this.email,
-    this.phone,
     this.age,
     this.city,
     this.country,
@@ -40,7 +37,6 @@ class UserModel {
     required this.streakDays,
     required this.isPremium,
     this.isEmailVerified = false,
-    this.isPhoneVerified = false,     // ✅ AJOUTÉ
     this.legalAccepted = false,
     required this.preferences,
     this.badges = const [],
@@ -52,7 +48,6 @@ class UserModel {
     firstName: json['firstName'],
     lastName:  json['lastName'],
     email:     json['email'],
-    phone:     json['phone'],
     age:       json['age'],
     city:      json['city'],
     country:   json['country'],
@@ -64,7 +59,6 @@ class UserModel {
     streakDays:  json['streakDays'] ?? 0,
     isPremium:   json['isPremium'] ?? false,
     isEmailVerified: json['isEmailVerified'] ?? false,
-    isPhoneVerified: json['isPhoneVerified'] ?? false,   // ✅ AJOUTÉ
     legalAccepted:   json['legalAccepted'] ?? false,
     preferences: json['preferences'] != null
         ? UserPreferences.fromJson(json['preferences'])
@@ -80,7 +74,6 @@ class UserModel {
     'firstName': firstName,
     'lastName': lastName,
     'email': email,
-    'phone': phone,
     'age': age,
     'city': city,
     'country': country,
@@ -92,7 +85,6 @@ class UserModel {
     'streakDays': streakDays,
     'isPremium': isPremium,
     'isEmailVerified': isEmailVerified,
-    'isPhoneVerified': isPhoneVerified,   // ✅ AJOUTÉ
     'legalAccepted': legalAccepted,
     'preferences': preferences.toJson(),
     'badges': badges.map((b) => b.toJson()).toList(),
@@ -118,7 +110,6 @@ class UserModel {
     String? firstName,
     String? lastName,
     String? email,
-    String? phone,
     int? age,
     String? city,
     String? country,
@@ -130,7 +121,6 @@ class UserModel {
     int? streakDays,
     bool? isPremium,
     bool? isEmailVerified,
-    bool? isPhoneVerified,    // ✅ AJOUTÉ
     bool? legalAccepted,
     UserPreferences? preferences,
     List<UserBadge>? badges,
@@ -141,7 +131,6 @@ class UserModel {
       firstName: firstName ?? this.firstName,
       lastName: lastName ?? this.lastName,
       email: email ?? this.email,
-      phone: phone ?? this.phone,
       age: age ?? this.age,
       city: city ?? this.city,
       country: country ?? this.country,
@@ -153,7 +142,6 @@ class UserModel {
       streakDays: streakDays ?? this.streakDays,
       isPremium: isPremium ?? this.isPremium,
       isEmailVerified: isEmailVerified ?? this.isEmailVerified,
-      isPhoneVerified: isPhoneVerified ?? this.isPhoneVerified,   // ✅ AJOUTÉ
       legalAccepted: legalAccepted ?? this.legalAccepted,
       preferences: preferences ?? this.preferences,
       badges: badges ?? this.badges,

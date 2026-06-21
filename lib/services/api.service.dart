@@ -324,10 +324,9 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> login(
-      {String? email, String? phone, required String password}) async {
+      {String? email, required String password}) async {
     final result = await post('/auth/login', {
       if (email != null && email.isNotEmpty) 'email': email,
-      if (phone != null && phone.isNotEmpty) 'phone': phone,
       'password': password,
     });
     invalidateCache('/users/me');

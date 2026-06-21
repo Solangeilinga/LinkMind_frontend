@@ -306,7 +306,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     const SizedBox(height: 20),
                     _buildStatsSection(user),
                     const SizedBox(height: 24),
-                    if (user.email != null || user.phone != null)
+                    if (user.email != null)
                       _buildContactSection(user),
                     _buildProgressSection(user),
                     const SizedBox(height: 24),
@@ -345,7 +345,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             radius: 40,
             backgroundColor: Colors.white.withValues(alpha: 0.2),
             child: Text(
-              user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
+              (user.anonymousAlias?.isNotEmpty == true) ? user.anonymousAlias![0].toUpperCase() : '?',
               style: AppTextStyles.h2.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w900,
@@ -358,7 +358,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  user.name,
+                  user.anonymousAlias ?? 'Anonyme',
                   style: AppTextStyles.h3.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -545,33 +545,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               subtitle: Text(
                 'Email',
-                style: AppTextStyles.caption.copyWith(
-                  color: AppColors.onSurfaceMuted,
-                ),
-              ),
-            ),
-          if (user.email != null && user.phone != null)
-            const Divider(height: 1),
-          if (user.phone != null)
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.secondary.withValues(alpha: 0.08),
-                  borderRadius: AppRadius.md,
-                ),
-                child: const Icon(
-                  Icons.phone_outlined,
-                  color: AppColors.secondary,
-                  size: 20,
-                ),
-              ),
-              title: Text(
-                user.phone!,
-                style: AppTextStyles.body,
-              ),
-              subtitle: Text(
-                'Téléphone',
                 style: AppTextStyles.caption.copyWith(
                   color: AppColors.onSurfaceMuted,
                 ),
@@ -984,7 +957,6 @@ class _EditProfileSheet extends StatefulWidget {
 
 class _EditProfileSheetState extends State<_EditProfileSheet> {
   late final TextEditingController _emailCtrl;
-  late final TextEditingController _phoneCtrl;
   late final TextEditingController _cityCtrl;
   late final TextEditingController _countryCtrl;
   late final TextEditingController _aliasCtrl;
@@ -1011,7 +983,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     super.initState();
     final u = widget.user;
     _emailCtrl = TextEditingController(text: u.email ?? '');
-    _phoneCtrl = TextEditingController(text: u.phone ?? '');
     _cityCtrl = TextEditingController(text: u.city ?? '');
     _countryCtrl = TextEditingController(text: u.country ?? '');
     _aliasCtrl = TextEditingController(text: u.anonymousAlias ?? '');
@@ -1025,7 +996,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   void dispose() {
     for (final c in [
       _emailCtrl,
-      _phoneCtrl,
       _cityCtrl,
       _countryCtrl,
       _aliasCtrl,
@@ -1060,7 +1030,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       final data = await ApiService().updateProfile({
         'email': _emailCtrl.text.trim(),
         'anonymousAlias': _aliasCtrl.text.trim(),
-        if (_phoneCtrl.text.trim().isNotEmpty) 'phone': _phoneCtrl.text.trim(),
         if (_cityCtrl.text.trim().isNotEmpty) 'city': _cityCtrl.text.trim(),
         if (_countryCtrl.text.trim().isNotEmpty) 'country': _countryCtrl.text.trim(),
         if (_ageCtrl.text.trim().isNotEmpty) 'age': int.tryParse(_ageCtrl.text.trim()),
@@ -1272,10 +1241,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
               ),
               const SizedBox(height: 12),
               TextField(
-                controller: _phoneCtrl,
-                keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(
-                  labelText: 'Téléphone',
                   border: OutlineInputBorder(),
                 ),
               ),

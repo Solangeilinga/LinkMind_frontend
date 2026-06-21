@@ -162,7 +162,7 @@ class _MoodScreenState extends ConsumerState<MoodScreen> with SingleTickerProvid
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                   child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('$greeting ${user?.name.split(' ').first ?? ''} 👋',
+                      Text('$greeting ${user?.anonymousAlias ?? 'Anonyme'} 👋',
                           style: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted)),
                       const Text('Comment te sens-tu ?', style: AppTextStyles.h2),
                     ])),
