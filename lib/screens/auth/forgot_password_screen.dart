@@ -104,10 +104,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
     try {
       final identifier = _identifierCtrl.text.trim();
-      final isEmail    = identifier.contains('@');
 
       final token = await ref.read(authProvider.notifier).verifyOtp(
-        email: isEmail ? identifier : null,
+        email: identifier,
         code: otp,
       );
 
@@ -151,10 +150,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
     try {
       final identifier = _identifierCtrl.text.trim();
-      final isEmail    = identifier.contains('@');
 
       await ref.read(authProvider.notifier).resetPassword(
-        email: isEmail ? identifier : null,
+        email: identifier,
         resetToken: _resetToken!,
         newPassword: newPass,
       );

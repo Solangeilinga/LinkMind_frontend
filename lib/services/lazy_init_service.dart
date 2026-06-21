@@ -11,6 +11,7 @@ import 'api.service.dart';
 /// Réduit startup time de 500-800ms
 
 class LazyInitService {
+  static String? pendingFcmToken;
   static final LazyInitService _instance = LazyInitService._internal();
 
   factory LazyInitService() => _instance;
@@ -69,19 +70,27 @@ class LazyInitService {
 
       debugPrint('🔔 FCM permission status: ${settings.authorizationStatus}');
 
-      // ✅ FIX: Récupérer le token ET l'envoyer au backend
+      // Récupérer le token FCM — envoi au backend APRÈS connexion
       final token = await messaging.getToken();
       if (token != null) {
-        debugPrint('🎫 FCM Token obtenu, envoi au backend...');
-        await _registerTokenToBackend(token);
+        debugPrint('🎫 FCM Token obtenu, stocké en attente de l\'authentification');
+        pendingFcmToken = token;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('pending_fcm_token', token);
       } else {
         debugPrint('⚠️ FCM Token null — notifications push impossibles');
       }
 
-      // ✅ FIX: Écouter le refresh du token et le renvoyer au backend
+      // Écouter le refresh du token
       messaging.onTokenRefresh.listen((newToken) async {
-        debugPrint('🔄 FCM Token rafraîchi, mise à jour backend...');
-        await _registerTokenToBackend(newToken);
+        debugPrint('🔄 FCM Token rafraîchi');
+        pendingFcmToken = newToken;
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('pending_fcm_token', newToken);
+          // Si déjà authentifié, envoyer immédiatement
+          await ApiService().registerFcmToken(newToken);
+        } catch (_) {}
       });
 
       FirebaseMessaging.onMessage.listen(_onForegroundMessage);

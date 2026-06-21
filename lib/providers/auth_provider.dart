@@ -180,6 +180,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       _ref.read(moodProvider.notifier).reset();
 
       if (user.legalAccepted == true) _saveLegalCache(user.id);
+      _sendPendingFcmToken(); // envoyer FCM token maintenant que JWT est disponible
       return true;
     } catch (e) {
       debugPrint('❌ [Login] ${e.runtimeType}: $e');
@@ -230,6 +231,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   void updateUser(UserModel user) => state = state.copyWith(user: user);
+
+  Future<void> _sendPendingFcmToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('pending_fcm_token');
+      if (token != null && token.isNotEmpty) {
+        await _api.registerFcmToken(token);
+        debugPrint('✅ FCM token envoyé après authentification');
+      }
+    } catch (e) {
+      debugPrint('⚠️ FCM token send failed: $e');
+    }
+  }
 
   Future<void> refreshUser() async {
     try {

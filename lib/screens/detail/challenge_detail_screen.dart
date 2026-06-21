@@ -169,8 +169,9 @@ class _ChallengeDetailScreenState extends ConsumerState<ChallengeDetailScreen>
 
       if (!mounted) return;
 
-      // Rafraîchit le provider pour que la liste des défis se mette à jour
+      // Rafraîchir les défis ET le profil utilisateur (points, level, streak)
       ref.read(challengesProvider.notifier).loadDaily();
+      ref.read(authProvider.notifier).refreshUser();
 
       setState(() {
         _isCompleted = true;

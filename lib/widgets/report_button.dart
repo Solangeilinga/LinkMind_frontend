@@ -85,27 +85,29 @@ class _ReportButtonState extends State<ReportButton> {
       widget.onReported?.call();
       
     } catch (e) {
-      // Fermer le dialog
-      if (dialogContext.mounted) {
-        Navigator.pop(dialogContext);
+      if (dialogContext.mounted) Navigator.pop(dialogContext);
+
+      // Utiliser le statusCode de ApiException ou le message direct
+      if (e is ApiException) {
+        if (e.statusCode == 409) {
+          _showMessage('Tu as déjà signalé ce contenu. Notre équipe va l'examiner.', isError: false);
+        } else if (e.statusCode == 429) {
+          _showMessage('Trop de signalements. Réessaie dans quelques minutes.', isError: true);
+        } else if (e.statusCode == 403) {
+          _showMessage('Action non autorisée.', isError: true);
+        } else {
+          _showMessage(e.message.isNotEmpty ? e.message : 'Erreur lors du signalement.', isError: true);
+        }
+      } else {
+        // Fallback sur le message texte
+        final msg = e.toString().toLowerCase();
+        if (msg.contains('déjà signalé') || msg.contains('already')) {
+          _showMessage('Tu as déjà signalé ce contenu. Notre équipe va l'examiner.', isError: false);
+        } else {
+          _showMessage('Erreur lors du signalement. Réessaie plus tard.', isError: true);
+        }
       }
-      
-      // Analyser l'erreur
-      final errorStr = e.toString().toLowerCase();
-      
-      if (errorStr.contains('409') || errorStr.contains('already reported')) {
-        _showMessage('⚠️ Vous avez déjà signalé ce contenu.', isError: false);
-      } 
-      else if (errorStr.contains('429')) {
-        _showMessage('⏳ Trop de signalements. Veuillez patienter.', isError: true);
-      }
-      else if (errorStr.contains('403')) {
-        _showMessage('🔒 Action non autorisée.', isError: true);
-      }
-      else {
-        _showMessage('❌ Erreur lors du signalement. Réessayez plus tard.', isError: true);
-      }
-      
+
     } finally {
       if (mounted) setState(() => _isReporting = false);
     }
