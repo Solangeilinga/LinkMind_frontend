@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../utils/theme.dart';
@@ -20,6 +21,7 @@ const _statusConfig = {
   'confirmed': (label: 'Confirmée',   color: Color(0xFF2ECC71)),
   'cancelled': (label: 'Annulée',     color: AppColors.accent),
   'completed': (label: 'Terminée',    color: AppColors.onSurfaceMuted),
+  'no_show':   (label: 'Non tenu',    color: Color(0xFF95A5A6)),
 };
 
 class ProfessionalsScreen extends ConsumerStatefulWidget {
@@ -72,13 +74,14 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
   }
 
   Future<void> _updateBooking(Map<String, dynamic> booking, {
-    String? consultationType, String? preferredDate, String? message,
+    String? consultationType, String? preferredDate, String? message, String? slotId,
   }) async {
     try {
       final Map<String, dynamic> data = {};
       if (consultationType != null) data['consultationType'] = consultationType;
       if (preferredDate != null) data['preferredDate'] = preferredDate;
       if (message != null) data['message'] = message;
+      if (slotId != null) data['slotId'] = slotId;
       
       await ApiService().put('/professionals/bookings/${booking['_id']}', data);
       
@@ -86,7 +89,7 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Demande modifiée avec succès'), backgroundColor: AppColors.secondary),
         );
-        ref.read(professionalsProvider.notifier).loadBookings();
+        ref.read(professionalsProvider.notifier).loadBookings(forceRefresh: true);
       }
     } catch (e) {
       if (mounted) {
@@ -100,6 +103,152 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
         );
       }
     }
+  }
+
+  Future<void> _submitFeedback(Map<String, dynamic> booking, bool attended, int? rating, String? comment) async {
+    debugPrint('📤 [Feedback] Submitting: bookingId=${booking['_id']} attended=$attended rating=$rating');
+    try {
+      await ApiService().post('/professionals/bookings/${booking['_id']}/feedback', {
+        'attended': attended,
+        if (rating != null) 'rating': rating,
+        if (comment != null && comment.isNotEmpty) 'comment': comment,
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Merci pour ton retour !'), backgroundColor: Color(0xFF27AE60)),
+        );
+        ref.read(professionalsProvider.notifier).loadBookings(forceRefresh: true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _hideBooking(Map<String, dynamic> booking) async {
+    try {
+      await ApiService().patch('/professionals/bookings/${booking['_id']}/hide', {});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Rendez-vous masqué'), backgroundColor: Color(0xFF27AE60)),
+        );
+        ref.read(professionalsProvider.notifier).loadBookings(forceRefresh: true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _showFeedbackDialog(Map<String, dynamic> booking) {
+    bool? attended;
+    int? rating;
+    final commentCtrl = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setState) => Container(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Le rendez-vous a-t-il eu lieu ?', style: AppTextStyles.h3.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 16),
+              Row(children: [
+                Expanded(child: GestureDetector(
+                  onTap: () => setState(() => attended = true),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: attended == true ? const Color(0xFF27AE60) : AppColors.surfaceVariant,
+                      borderRadius: AppRadius.md,
+                    ),
+                    child: Column(children: [
+                      const Text('✅', style: TextStyle(fontSize: 24)),
+                      const SizedBox(height: 4),
+                      Text('Oui', style: AppTextStyles.caption.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: attended == true ? Colors.white : AppColors.onSurfaceMuted,
+                      )),
+                    ]),
+                  ),
+                )),
+                const SizedBox(width: 12),
+                Expanded(child: GestureDetector(
+                  onTap: () => setState(() => attended = false),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: attended == false ? const Color(0xFFE74C3C) : AppColors.surfaceVariant,
+                      borderRadius: AppRadius.md,
+                    ),
+                    child: Column(children: [
+                      const Text('❌', style: TextStyle(fontSize: 24)),
+                      const SizedBox(height: 4),
+                      Text('Non', style: AppTextStyles.caption.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: attended == false ? Colors.white : AppColors.onSurfaceMuted,
+                      )),
+                    ]),
+                  ),
+                )),
+              ]),
+              if (attended == true) ...[
+                const SizedBox(height: 16),
+                Text('Note (optionnel)', style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(5, (i) =>
+                  GestureDetector(
+                    onTap: () => setState(() => rating = i + 1),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: Icon(
+                        (rating ?? 0) > i ? Icons.star : Icons.star_outline,
+                        color: const Color(0xFFF5B731), size: 32,
+                      ),
+                    ),
+                  ),
+                )),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: commentCtrl,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    hintText: 'Ton avis (optionnel)...',
+                    border: OutlineInputBorder(borderRadius: AppRadius.md),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+              SizedBox(width: double.infinity, child: ElevatedButton(
+                onPressed: attended == null ? null : () {
+                  Navigator.pop(ctx);
+                  _submitFeedback(booking, attended!, rating, commentCtrl.text.trim());
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
+                ),
+                child: const Text('Envoyer', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              )),
+            ]),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _cancelBooking(Map<String, dynamic> booking) async {
@@ -126,7 +275,7 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Demande annulée avec succès'), backgroundColor: AppColors.secondary),
           );
-          ref.read(professionalsProvider.notifier).loadBookings();
+          ref.read(professionalsProvider.notifier).loadBookings(forceRefresh: true);
         }
       } catch (e) {
         if (mounted) {
@@ -150,8 +299,8 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
       backgroundColor: Colors.transparent,
       builder: (_) => _EditBookingSheet(
         booking: booking,
-        onUpdate: (consultationType, preferredDate, message) {
-          _updateBooking(booking, consultationType: consultationType, preferredDate: preferredDate, message: message);
+        onUpdate: (consultationType, preferredDate, message, slotId) {
+          _updateBooking(booking, consultationType: consultationType, preferredDate: preferredDate, message: message, slotId: slotId);
         },
       ),
     );
@@ -332,6 +481,8 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
                               booking: state.bookings[i],
                               onEdit: () => _showEditBookingSheet(state.bookings[i]),
                               onCancel: () => _cancelBooking(state.bookings[i]),
+                              onFeedback: () => _showFeedbackDialog(state.bookings[i]),
+                              onHide: () => _hideBooking(state.bookings[i]),
                             ),
                           ),
                         ),
@@ -452,8 +603,10 @@ class _BookingCard extends StatelessWidget {
   final Map<String, dynamic> booking;
   final VoidCallback onEdit;
   final VoidCallback onCancel;
+  final VoidCallback onFeedback;
+  final VoidCallback onHide;
   
-  const _BookingCard({required this.booking, required this.onEdit, required this.onCancel});
+  const _BookingCard({required this.booking, required this.onEdit, required this.onCancel, required this.onFeedback, required this.onHide});
 
   String _fmtDateTime(String iso) {
     try {
@@ -473,6 +626,10 @@ class _BookingCard extends StatelessWidget {
     final pro = booking['professional'] as Map<String, dynamic>?;
     final typeConf = _typeConfigDefault[pro?['type']] ?? _typeConfigDefault['psychologist']!;
     final isPending = status == 'pending';
+    
+    // 🔍 DEBUG — à retirer après validation
+    debugPrint('🃏 [BookingCard] id=${booking['_id']} status=$status userFeedback=${booking['userFeedback']} isPending=$isPending');
+    debugPrint('  → show feedback btn check: start=${booking['scheduledAt']} durationMin=${booking['durationMin']}');
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -588,6 +745,73 @@ class _BookingCard extends StatelessWidget {
               ),
             ),
           ]),
+        ],
+
+        // Bouton "Le RDV a-t-il eu lieu ?" uniquement pour les RDV confirmés SANS feedback
+        if (status == 'confirmed' &&
+            (booking['userFeedback'] == null || booking['userFeedback']['submittedAt'] == null) &&
+            booking['scheduledAt'] != null &&
+            () {
+              final start = DateTime.tryParse(booking['scheduledAt'].toString());
+              if (start == null) return false;
+              final duration = (booking['durationMin'] as num?)?.toInt() ?? 60;
+              final end = start.add(Duration(minutes: duration));
+              return end.isBefore(DateTime.now());
+            }()) ...[
+          const SizedBox(height: 12),
+          SizedBox(width: double.infinity, child: ElevatedButton.icon(
+            onPressed: onFeedback,
+            icon: const Icon(Icons.rate_review_outlined, size: 16, color: Colors.white),
+            label: const Text('Le RDV a-t-il eu lieu ?', style: TextStyle(color: Colors.white, fontSize: 13)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: AppRadius.md),
+            ),
+          )),
+        ],
+
+        // Feedback déjà soumis
+        if (booking['userFeedback'] != null && booking['userFeedback']['submittedAt'] != null) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: (booking['userFeedback']['attended'] == true
+                ? const Color(0xFF27AE60) : const Color(0xFFE74C3C)).withValues(alpha: 0.08),
+              borderRadius: AppRadius.md,
+            ),
+            child: Row(children: [
+              Text(booking['userFeedback']['attended'] == true ? '✅' : '❌', style: const TextStyle(fontSize: 14)),
+              const SizedBox(width: 6),
+              Expanded(child: Text(
+                booking['userFeedback']['attended'] == true ? 'RDV confirmé par le patient' : 'RDV non tenu',
+                style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w700),
+              )),
+              if (booking['userFeedback']['rating'] != null) ...[
+                ...List.generate((booking['userFeedback']['rating'] as int), (_) =>
+                  const Icon(Icons.star, color: Color(0xFFF5B731), size: 14)),
+              ],
+            ]),
+          ),
+          if (booking['userFeedback']['comment'] != null && (booking['userFeedback']['comment'] as String).isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text('"${booking['userFeedback']['comment']}"',
+                style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted, fontStyle: FontStyle.italic)),
+            ),
+          ],
+        ],
+
+        // Bouton masquer pour RDV terminés / annulés
+        if (status == 'cancelled' || status == 'completed' || status == 'no_show') ...[
+          const SizedBox(height: 8),
+          Align(alignment: Alignment.centerRight, child: TextButton.icon(
+            onPressed: onHide,
+            icon: const Icon(Icons.visibility_off_outlined, size: 14, color: AppColors.onSurfaceMuted),
+            label: const Text('Masquer', style: TextStyle(color: AppColors.onSurfaceMuted, fontSize: 12)),
+          )),
         ],
       ]),
     );
@@ -974,7 +1198,7 @@ class _BookingSheetState extends State<_BookingSheet> {
 // ─── Edit Booking Sheet ────────────────────────────────────────────────────────
 class _EditBookingSheet extends StatefulWidget {
   final Map<String, dynamic> booking;
-  final Function(String?, String?, String?) onUpdate;
+  final Function(String?, String?, String?, String?) onUpdate; // consultationType, preferredDate, message, slotId
   const _EditBookingSheet({required this.booking, required this.onUpdate});
   @override
   State<_EditBookingSheet> createState() => _EditBookingSheetState();
@@ -983,16 +1207,85 @@ class _EditBookingSheet extends StatefulWidget {
 class _EditBookingSheetState extends State<_EditBookingSheet> {
   final _messageCtrl = TextEditingController();
   String _consultationType = 'online';
+  bool _loadingSlots = false;
+  List<Map<String, dynamic>> _slots = [];
+  Map<String, List<Map<String, dynamic>>> _slotsByDate = {};
+  String? _selectedDate;
+  String? _selectedSlotId;
+  String? _selectedSlotLabel;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _messageCtrl.text   = widget.booking['message']?.toString() ?? '';
-    _consultationType   = widget.booking['consultationType']?.toString() ?? 'online';
+    final msg = widget.booking['message']?.toString() ?? '';
+    _messageCtrl.text = msg;
+    _consultationType = widget.booking['consultationType']?.toString() ?? 'online';
+    debugPrint('✏️ [EditSheet] message="$msg" consultationType=$_consultationType');
+    _loadSlots();
   }
 
   @override
   void dispose() { _messageCtrl.dispose(); super.dispose(); }
+
+  String _fmtDate(String iso) {
+    try {
+      final d = DateTime.parse(iso);
+      const days   = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+      const months = ['jan','fév','mar','avr','mai','juin','juil','aoû','sep','oct','nov','déc'];
+      return '${days[d.weekday%7]} ${d.day} ${months[d.month-1]}';
+    } catch (_) { return iso; }
+  }
+
+  String _fmtDateTime(String iso) {
+    try {
+      final d = DateTime.parse(iso).toLocal();
+      const days   = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+      const months = ['jan','fév','mar','avr','mai','juin','juil','aoû','sep','oct','nov','déc'];
+      final hh = d.hour.toString().padLeft(2,'0');
+      final mm = d.minute.toString().padLeft(2,'0');
+      return '${days[d.weekday%7]} ${d.day} ${months[d.month-1]} à ${hh}h${mm}';
+    } catch (_) { return iso; }
+  }
+
+  Future<void> _loadSlots() async {
+    final pro = widget.booking['professional'] as Map<String, dynamic>?;
+    final proId = pro?['id'] ?? pro?['_id'];
+    if (proId == null) return;
+    setState(() { _loadingSlots = true; _error = null; });
+    try {
+      final currentSlotId = widget.booking['slotId']?.toString();
+      // Passer l'id du créneau actuel pour qu'il soit inclus même s'il est réservé
+      final url = currentSlotId != null
+          ? '/professionals/$proId/slots?includeSlotId=$currentSlotId'
+          : '/professionals/$proId/slots';
+      final data = await ApiService().get(url);
+      final raw = List<Map<String, dynamic>>.from(data['slots'] ?? []);
+      final byDate = <String, List<Map<String, dynamic>>>{};
+      for (final s in raw) {
+        byDate.putIfAbsent(s['date']?.toString() ?? '', () => []).add(s);
+      }
+      if (!mounted) return;
+      setState(() {
+        _slots = raw;
+        _slotsByDate = byDate;
+        _loadingSlots = false;
+        if (byDate.isNotEmpty) _selectedDate = byDate.keys.first;
+        // Pré-sélectionner le créneau actuel
+        if (currentSlotId != null) {
+          final currentSlot = raw.where((s) => s['_id'] == currentSlotId).firstOrNull;
+          if (currentSlot != null) {
+            _selectedSlotId = currentSlotId;
+            final date = currentSlot['date']?.toString() ?? '';
+            _selectedSlotLabel = '${_fmtDate(date)} à ${currentSlot['startTime']}';
+            _selectedDate = date;
+          }
+        }
+      });
+    } catch (e) {
+      if (mounted) setState(() { _loadingSlots = false; _error = 'Impossible de charger les créneaux'; });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1002,19 +1295,20 @@ class _EditBookingSheetState extends State<_EditBookingSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.92),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
         decoration: const BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
-        child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        child: Column(children: [
           Center(child: Container(width: 40, height: 4,
             decoration: const BoxDecoration(color: AppColors.divider, borderRadius: AppRadius.full))),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           Row(children: [
-            Container(width: 48, height: 48,
+            Container(width: 44, height: 44,
               decoration: BoxDecoration(color: typeConf.color.withValues(alpha: 0.1), shape: BoxShape.circle),
-              child: Center(child: Text(typeConf.emoji, style: const TextStyle(fontSize: 22)))),
+              child: Center(child: Text(typeConf.emoji, style: const TextStyle(fontSize: 20)))),
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(pro?['fullName'] ?? 'Professionnel', style: AppTextStyles.h4),
@@ -1022,42 +1316,158 @@ class _EditBookingSheetState extends State<_EditBookingSheet> {
             ])),
             IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, size: 20)),
           ]),
-          const SizedBox(height: 20),
-          const Text('Modifier ma demande', style: AppTextStyles.h3),
-          const SizedBox(height: 20),
-          _SectionLabel(label: 'Type de consultation', icon: Icons.videocam_outlined),
-          const SizedBox(height: 8),
-          Row(children: [
-            _ConsultChip(label: '🌐 En ligne',    selected: _consultationType == 'online',    onTap: () => setState(() => _consultationType = 'online')),
-            const SizedBox(width: 10),
-            _ConsultChip(label: '📍 Présentiel', selected: _consultationType == 'in_person', onTap: () => setState(() => _consultationType = 'in_person')),
-          ]),
-          const SizedBox(height: 16),
-          _SectionLabel(label: 'Motif (optionnel)', icon: Icons.chat_bubble_outline),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _messageCtrl, maxLines: 4, minLines: 3, maxLength: 500,
-            decoration: const InputDecoration(
-              hintText: 'Explique brièvement pourquoi tu souhaites consulter…',
-              alignLabelWithHint: true,
-            ),
-          ),
-          const SizedBox(height: 10),
-          _PrivacyBadge(),
-          const SizedBox(height: 20),
-          SizedBox(width: double.infinity, child: ElevatedButton(
-            onPressed: () {
-              widget.onUpdate(
-                _consultationType,
-                null,
-                _messageCtrl.text.trim().isEmpty ? null : _messageCtrl.text.trim(),
-              );
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-            child: const Text('Enregistrer les modifications'),
+          const Divider(height: 20),
+
+          Expanded(child: SingleChildScrollView(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+              if (_error != null) _ErrorBanner(message: _error!),
+
+              // ── Type de consultation ──────────────────────────────────────
+              _SectionLabel(label: 'Type de consultation', icon: Icons.videocam_outlined),
+              const SizedBox(height: 8),
+              Row(children: [
+                _ConsultChip(label: '🌐 En ligne',   selected: _consultationType == 'online',    onTap: () => setState(() => _consultationType = 'online')),
+                const SizedBox(width: 10),
+                _ConsultChip(label: '📍 Présentiel', selected: _consultationType == 'in_person', onTap: () => setState(() => _consultationType = 'in_person')),
+              ]),
+              const SizedBox(height: 20),
+
+              // ── Sélection du créneau ──────────────────────────────────────
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                const _SectionLabel(label: 'Créneau', icon: Icons.calendar_month_outlined),
+                GestureDetector(
+                  onTap: _loadSlots,
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.refresh, size: 13, color: AppColors.onSurfaceMuted),
+                    const SizedBox(width: 3),
+                    Text('Actualiser', style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
+                  ]),
+                ),
+              ]),
+              const SizedBox(height: 10),
+
+              if (_loadingSlots)
+                const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator(strokeWidth: 2)))
+              else if (_slotsByDate.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: AppRadius.md),
+                  child: Text('Aucun créneau disponible', style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
+                )
+              else ...[
+                // Sélecteur de dates
+                SizedBox(
+                  height: 44,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _slotsByDate.keys.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (ctx, i) {
+                      final date = _slotsByDate.keys.elementAt(i);
+                      final isSel = _selectedDate == date;
+                      return GestureDetector(
+                        onTap: () => setState(() => _selectedDate = date),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isSel ? AppColors.primary : AppColors.surfaceVariant,
+                            borderRadius: AppRadius.md,
+                          ),
+                          child: Text(_fmtDate(date), style: AppTextStyles.caption.copyWith(
+                            color: isSel ? Colors.white : AppColors.onSurface,
+                            fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                          )),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 10),
+                if (_selectedDate != null)
+                  Wrap(
+                    spacing: 8, runSpacing: 8,
+                    children: (_slotsByDate[_selectedDate] ?? []).map((slot) {
+                      final slotId = slot['_id']?.toString() ?? '';
+                      final isCurrent = slotId == widget.booking['slotId']?.toString();
+                      final isSel = _selectedSlotId == slotId;
+                      return GestureDetector(
+                        onTap: () => setState(() {
+                          _selectedSlotId = slotId;
+                          _selectedSlotLabel = '${_fmtDate(_selectedDate!)} à ${slot['startTime']}';
+                        }),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isSel ? AppColors.secondary.withValues(alpha: 0.15) : AppColors.surfaceVariant,
+                            borderRadius: AppRadius.md,
+                            border: Border.all(
+                              color: isSel ? AppColors.secondary : (isCurrent ? AppColors.primary.withValues(alpha: 0.4) : AppColors.divider),
+                              width: isSel || isCurrent ? 2 : 1,
+                            ),
+                          ),
+                          child: Column(mainAxisSize: MainAxisSize.min, children: [
+                            Text(slot['startTime'], style: AppTextStyles.bodySmall.copyWith(
+                              color: isSel ? AppColors.secondary : AppColors.onSurface,
+                              fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                            )),
+                            if (isCurrent) Text('actuel', style: AppTextStyles.caption.copyWith(color: AppColors.primary, fontSize: 9)),
+                          ]),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                if (_selectedSlotLabel != null) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(color: AppColors.secondary.withValues(alpha: 0.08), borderRadius: AppRadius.md),
+                    child: Row(children: [
+                      const Icon(Icons.check_circle_outline, size: 14, color: AppColors.secondary),
+                      const SizedBox(width: 6),
+                      Text('Créneau : $_selectedSlotLabel', style: AppTextStyles.caption.copyWith(color: AppColors.secondary, fontWeight: FontWeight.w600)),
+                    ]),
+                  ),
+                ],
+              ],
+              const SizedBox(height: 20),
+
+              // ── Motif ─────────────────────────────────────────────────────
+              _SectionLabel(label: 'Motif (optionnel)', icon: Icons.chat_bubble_outline),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _messageCtrl, maxLines: 4, minLines: 3, maxLength: 500,
+                decoration: const InputDecoration(
+                  hintText: 'Explique brièvement pourquoi tu souhaites consulter…',
+                  alignLabelWithHint: true,
+                ),
+              ),
+              const SizedBox(height: 10),
+              _PrivacyBadge(),
+              const SizedBox(height: 20),
+            ]),
           )),
-        ])),
+
+          Padding(
+            padding: const EdgeInsets.only(bottom: 28, top: 8),
+            child: SizedBox(width: double.infinity, child: ElevatedButton(
+              onPressed: () {
+                widget.onUpdate(
+                  _consultationType,
+                  null,
+                  _messageCtrl.text.trim().isEmpty ? null : _messageCtrl.text.trim(),
+                  _selectedSlotId,
+                );
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+              child: const Text('Enregistrer les modifications', style: TextStyle(fontWeight: FontWeight.w700)),
+            )),
+          ),
+        ]),
       ),
     );
   }

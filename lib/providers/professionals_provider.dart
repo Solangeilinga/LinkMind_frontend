@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/api.service.dart';
 
@@ -63,7 +64,7 @@ class ProfessionalsNotifier extends StateNotifier<ProfessionalsState> {
     if (_currentCity.isNotEmpty) params['city'] = _currentCity;
 
     final query = params.entries.map((e) =>
-        '\${Uri.encodeQueryComponent(e.key)}=\${Uri.encodeQueryComponent(e.value)}'
+        '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}'
     ).join('&');
     return '/professionals?$query';
   }
@@ -78,13 +79,14 @@ class ProfessionalsNotifier extends StateNotifier<ProfessionalsState> {
     try {
       final data = await _api.get(_buildQuery(1));
       final pros = List<Map<String, dynamic>>.from(data['professionals'] ?? []);
-      
+      debugPrint('📋 [Bookings] loadProfessionals: ${pros.length} pros loaded');
       state = state.copyWith(
         isLoadingPros: false,
         professionals: pros,
         hasMore: pros.length == 20,
       );
     } catch (e) {
+      debugPrint('❌ [Bookings] loadProfessionals error: $e');
       state = state.copyWith(isLoadingPros: false, error: "Impossible de charger les professionnels.");
     }
   }
@@ -115,11 +117,22 @@ class ProfessionalsNotifier extends StateNotifier<ProfessionalsState> {
     state = state.copyWith(isLoadingBookings: true);
     try {
       final data = await _api.get('/professionals/bookings/me');
+      final bookings = List<Map<String, dynamic>>.from(data['bookings'] ?? []);
+      
+      debugPrint('📋 [Bookings] loadBookings: ${bookings.length} bookings');
+      for (final b in bookings) {
+        final status = b['status'] ?? 'unknown';
+        final feedback = b['userFeedback'];
+        final id = b['_id'] ?? b['id'] ?? '?';
+        debugPrint('  → booking $id | status=$status | userFeedback=${feedback != null ? "present(attended=${feedback['attended']})" : "null"}');
+      }
+      
       state = state.copyWith(
         isLoadingBookings: false,
-        bookings: List<Map<String, dynamic>>.from(data['bookings'] ?? []),
+        bookings: bookings,
       );
     } catch (e) {
+      debugPrint('❌ [Bookings] loadBookings error: $e');
       state = state.copyWith(isLoadingBookings: false);
     }
   }
