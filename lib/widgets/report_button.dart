@@ -85,12 +85,15 @@ class _ReportButtonState extends State<ReportButton> {
       widget.onReported?.call();
       
     } catch (e) {
-      if (dialogContext.mounted) Navigator.pop(dialogContext);
-
-      // Utiliser le statusCode de ApiException ou le message direct
+      // Fermer le dialog
+      if (dialogContext.mounted) {
+        Navigator.pop(dialogContext);
+      }
+      
+      // Utiliser statusCode de ApiException pour un message précis
       if (e is ApiException) {
         if (e.statusCode == 409) {
-          _showMessage('Tu as déjà signalé ce contenu. Notre équipe va l'examiner.', isError: false);
+          _showMessage("Tu as déjà signalé ce contenu. Notre équipe va l'examiner.", isError: false);
         } else if (e.statusCode == 429) {
           _showMessage('Trop de signalements. Réessaie dans quelques minutes.', isError: true);
         } else if (e.statusCode == 403) {
@@ -99,15 +102,14 @@ class _ReportButtonState extends State<ReportButton> {
           _showMessage(e.message.isNotEmpty ? e.message : 'Erreur lors du signalement.', isError: true);
         }
       } else {
-        // Fallback sur le message texte
         final msg = e.toString().toLowerCase();
         if (msg.contains('déjà signalé') || msg.contains('already')) {
-          _showMessage('Tu as déjà signalé ce contenu. Notre équipe va l'examiner.', isError: false);
+          _showMessage("Tu as déjà signalé ce contenu. Notre équipe va l'examiner.", isError: false);
         } else {
           _showMessage('Erreur lors du signalement. Réessaie plus tard.', isError: true);
         }
       }
-
+      
     } finally {
       if (mounted) setState(() => _isReporting = false);
     }

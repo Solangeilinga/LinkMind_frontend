@@ -2,6 +2,7 @@ import 'dart:async'; // ← AJOUT OBLIGATOIRE
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../firebase_options.dart';
 import 'local_notification_service.dart';
 import 'api.service.dart';
@@ -70,13 +71,16 @@ class LazyInitService {
 
       debugPrint('🔔 FCM permission status: ${settings.authorizationStatus}');
 
-      // Récupérer le token FCM — envoi au backend APRÈS connexion
+      // Token FCM stocké localement — envoyé au backend après login
       final token = await messaging.getToken();
       if (token != null) {
-        debugPrint('🎫 FCM Token obtenu, stocké en attente de l\'authentification');
+        debugPrint(
+            '🎫 FCM Token obtenu, stocké en attente de l\'authentification');
         pendingFcmToken = token;
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('pending_fcm_token', token);
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('pending_fcm_token', token);
+        } catch (_) {}
       } else {
         debugPrint('⚠️ FCM Token null — notifications push impossibles');
       }
@@ -88,7 +92,6 @@ class LazyInitService {
         try {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('pending_fcm_token', newToken);
-          // Si déjà authentifié, envoyer immédiatement
           await ApiService().registerFcmToken(newToken);
         } catch (_) {}
       });
@@ -119,7 +122,8 @@ class LazyInitService {
         }
       }
     }
-    debugPrint('❌ Impossible d\'enregistrer le FCM token après $maxRetries tentatives');
+    debugPrint(
+        '❌ Impossible d\'enregistrer le FCM token après $maxRetries tentatives');
   }
 
   /// Handle foreground messages
