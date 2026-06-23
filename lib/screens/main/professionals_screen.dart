@@ -1570,7 +1570,7 @@ class _PrivacyBadge extends StatelessWidget {
       const Icon(Icons.lock_outline, size: 14, color: AppColors.primary),
       const SizedBox(width: 8),
       Expanded(child: Text(
-        'Ton message est chiffré de bout en bout. Seule l\'équipe LinkMind y a accès pour traiter ta demande.',
+        'Ton message est chiffré de bout en bout. Seul le professionnel y a accès pour traiter ta demande.',
         style: AppTextStyles.caption.copyWith(color: AppColors.primary, height: 1.4),
       )),
     ]),
