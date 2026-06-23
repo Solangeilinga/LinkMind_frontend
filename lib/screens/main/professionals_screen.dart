@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../utils/theme.dart';
@@ -106,7 +105,6 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
   }
 
   Future<void> _submitFeedback(Map<String, dynamic> booking, bool attended, int? rating, String? comment) async {
-    debugPrint('📤 [Feedback] Submitting: bookingId=${booking['_id']} attended=$attended rating=$rating');
     try {
       await ApiService().post('/professionals/bookings/${booking['_id']}/feedback', {
         'attended': attended,
@@ -628,8 +626,6 @@ class _BookingCard extends StatelessWidget {
     final isPending = status == 'pending';
     
     // 🔍 DEBUG — à retirer après validation
-    debugPrint('🃏 [BookingCard] id=${booking['_id']} status=$status userFeedback=${booking['userFeedback']} isPending=$isPending');
-    debugPrint('  → show feedback btn check: start=${booking['scheduledAt']} durationMin=${booking['durationMin']}');
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -901,7 +897,11 @@ class _BookingSheetState extends State<_BookingSheet> {
     if (!mounted || _sending) return;
     try {
       final proId = widget.professional['id'] ?? widget.professional['_id'];
-      final data  = await ApiService().get('/professionals/$proId/slots');
+      // includeSlotId pour garder le créneau sélectionné même s'il est isBooked
+      final url = _selectedSlotId != null
+          ? '/professionals/$proId/slots?includeSlotId=$_selectedSlotId'
+          : '/professionals/$proId/slots';
+      final data  = await ApiService().get(url);
       final raw   = List<Map<String, dynamic>>.from(data['slots'] ?? []);
       final byDate = <String, List<Map<String, dynamic>>>{};
       for (final s in raw) {
@@ -1221,7 +1221,6 @@ class _EditBookingSheetState extends State<_EditBookingSheet> {
     final msg = widget.booking['message']?.toString() ?? '';
     _messageCtrl.text = msg;
     _consultationType = widget.booking['consultationType']?.toString() ?? 'online';
-    debugPrint('✏️ [EditSheet] message="$msg" consultationType=$_consultationType');
     _loadSlots();
   }
 
