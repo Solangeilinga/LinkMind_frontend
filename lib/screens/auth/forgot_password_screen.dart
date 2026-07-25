@@ -241,7 +241,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               const Text('Mot de passe oublié ?', style: AppTextStyles.h2),
               const SizedBox(height: 8),
               Text(
-                "Saisis l'email ou le numéro avec lequel tu t'es inscrit. "
+                "Saisis l'adresse email avec laquelle tu t'es inscrit(e)."
                 "On t'envoie un code de vérification.",
                 style: AppTextStyles.body.copyWith(
                     color: AppColors.onSurfaceMuted, height: 1.5),

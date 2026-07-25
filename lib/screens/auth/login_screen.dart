@@ -659,7 +659,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             recognizer: TapGestureRecognizer()
                               ..onTap = () => context.push('/legal-terms'),
                           ),
-                          const TextSpan(text: " de LinkMind *"),
+                          const TextSpan(text: " de BASYAM *"),
                         ],
                       ),
                     )),

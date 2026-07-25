@@ -8,6 +8,7 @@ import '../../widgets/ad_banner.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api.service.dart';
 import '../../providers/content_provider.dart';
+import '../../services/local_notification_service.dart';
 
 class _WellnessTip {
   final String icon, title, desc;
@@ -21,7 +22,8 @@ class MoodScreen extends ConsumerStatefulWidget {
   ConsumerState<MoodScreen> createState() => _MoodScreenState();
 }
 
-class _MoodScreenState extends ConsumerState<MoodScreen> with SingleTickerProviderStateMixin {
+class _MoodScreenState extends ConsumerState<MoodScreen>
+    with SingleTickerProviderStateMixin {
   int? _selectedMoodIndex;
   bool _moodLogged  = false;
   bool _isLogging   = false;
@@ -35,16 +37,26 @@ class _MoodScreenState extends ConsumerState<MoodScreen> with SingleTickerProvid
   String _todayMessage = 'Chaque jour est une nouvelle chance de prendre soin de toi. 🌱';
   Map<String, List<_WellnessTip>> _wellnessTips = {};
 
+  // ── Insight généré localement ──────────────────────────────────────────────
+  String? _weeklyInsight;
+
+  // ── Insights & recommendations depuis le backend ─────────────────────────
+  Map<String, dynamic>? _serverInsights;
+  Map<String, dynamic>? _recommendations;
+
   @override
   void initState() {
     super.initState();
-    _fadeController = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
-    _fadeAnim = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
+    _fadeController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 500));
+    _fadeAnim =
+        CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
     _fadeController.forward();
     _loadContent();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final moodState = ref.read(moodProvider);
       if (moodState.todayMood != null) setState(() => _moodLogged = true);
+      _computeWeeklyInsight(moodState.history, moodState.stats);
     });
   }
 
@@ -53,25 +65,27 @@ class _MoodScreenState extends ConsumerState<MoodScreen> with SingleTickerProvid
       final results = await Future.wait([
         ApiService().getDailyMessage(),
         ApiService().getWellnessTips(),
+        ApiService().getMoodInsights().catchError((_) => <String,dynamic>{}),
       ]);
       if (mounted) {
         setState(() {
           final msg = results[0]['message'];
-          if (msg != null) _todayMessage = '${msg['text'] ?? ''} ${msg['emoji'] ?? ''}';
-          // ✅ Conversion correcte de Map<dynamic, dynamic> -> Map<String, dynamic>
-          final grouped = _castMap<String, dynamic>(results[1]['tips'] ?? {});
+          if (msg != null)
+            _todayMessage = '${msg['text'] ?? ''} ${msg['emoji'] ?? ''}';
+          final grouped =
+              _castMap<String, dynamic>(results[1]['tips'] ?? {});
           _wellnessTips = grouped.map((mood, tips) {
             final tipsList = (tips as List?)?.map((t) {
-              final tip = _castMap<String, dynamic>(t);
-              return _WellnessTip(
-                tip['emoji'] ?? '💡',
-                tip['title'] ?? '',
-                tip['description'] ?? '',
-                tip['actionPath'] as String?
-              );
-            }).toList() ?? [];
+                  final tip = _castMap<String, dynamic>(t);
+                  return _WellnessTip(tip['emoji'] ?? '💡', tip['title'] ?? '',
+                      tip['description'] ?? '', tip['actionPath'] as String?);
+                }).toList() ??
+                [];
             return MapEntry(mood, tipsList);
           });
+          if (results.length > 2 && results[2].isNotEmpty) {
+            _serverInsights = results[2] as Map<String, dynamic>;
+          }
         });
       }
     } catch (e) {
@@ -79,70 +93,187 @@ class _MoodScreenState extends ConsumerState<MoodScreen> with SingleTickerProvid
     }
   }
 
-  // ✅ Fonction utilitaire pour convertir Map<dynamic, dynamic> en Map<String, T>
   static Map<String, T> _castMap<K, T>(dynamic data) {
     if (data is Map<K, T>) return data as Map<String, T>;
     if (data is Map) {
       return Map<String, T>.from(
-        data.map((k, v) => MapEntry(k.toString(), v as T))
-      );
+          data.map((k, v) => MapEntry(k.toString(), v as T)));
     }
     return {};
   }
 
+  // ── Calcule une phrase d'insight sur les 7 derniers jours ─────────────────
+  void _computeWeeklyInsight(
+      List<Map<String, dynamic>> history, Map<String, dynamic>? stats) {
+    if (history.isEmpty) return;
+
+    final now = DateTime.now();
+    final week = history.where((e) {
+      final raw = e['createdAt']?.toString() ?? e['date']?.toString() ?? '';
+      final dt = DateTime.tryParse(raw);
+      return dt != null && now.difference(dt).inDays <= 6;
+    }).toList();
+
+    final logged = week.length;
+    if (logged == 0) return;
+
+    final scores =
+        week.map((e) => (e['score'] as num?)?.toDouble() ?? 3.0).toList();
+    final avg = scores.reduce((a, b) => a + b) / scores.length;
+
+    // Tendance : compare 1ère moitié vs 2ème moitié
+    String trend = '';
+    if (scores.length >= 4) {
+      final mid = scores.length ~/ 2;
+      final firstHalf =
+          scores.sublist(0, mid).reduce((a, b) => a + b) / mid;
+      final secondHalf =
+          scores.sublist(mid).reduce((a, b) => a + b) / (scores.length - mid);
+      final delta = secondHalf - firstHalf;
+      if (delta >= 0.5) trend = ', en hausse 📈';
+      if (delta <= -0.5) trend = ', en baisse 📉';
+    }
+
+    // Facteur le plus fréquent
+    final allFactors = <String>[];
+    for (final e in week) {
+      final f = e['factors'];
+      if (f is List) allFactors.addAll(f.map((x) => x.toString()));
+    }
+    String factorNote = '';
+    if (allFactors.isNotEmpty) {
+      final freq = <String, int>{};
+      for (final f in allFactors) freq[f] = (freq[f] ?? 0) + 1;
+      final top =
+          freq.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+      factorNote = ' "$top" revient souvent.';
+    }
+
+    setState(() {
+      _weeklyInsight =
+          '$logged jour${logged > 1 ? 's' : ''} sur 7 enregistrés. '
+          'Moyenne : ${avg.toStringAsFixed(1)}/5$trend.$factorNote';
+    });
+  }
+
   @override
-  void dispose() { 
-    _fadeController.dispose(); 
-    _noteController.dispose(); 
-    super.dispose(); 
+  void dispose() {
+    _fadeController.dispose();
+    _noteController.dispose();
+    super.dispose();
   }
 
   Future<void> _logMood() async {
     if (_selectedMoodIndex == null) return;
     setState(() => _isLogging = true);
     final moods = ref.read(contentProvider).moodDefinitions;
-    final mood  = moods[_selectedMoodIndex!];
+    final mood = moods[_selectedMoodIndex!];
     final result = await ref.read(moodProvider.notifier).logMood(
-      score: mood.score, label: mood.id, note: _note, factors: _selectedFactors);
-    setState(() { _isLogging = false; _moodLogged = result != null; });
+        score: mood.score,
+        label: mood.id,
+        note: _note,
+        factors: _selectedFactors);
+    setState(() {
+      _isLogging = false;
+      _moodLogged = result != null;
+    });
     if (result != null && mounted) {
-      ref.read(authProvider.notifier).loadDailyChallenges(moodLabel: mood.id);
-      _showWellnessSheet(mood.id);
+      ref
+          .read(authProvider.notifier)
+          .loadDailyChallenges(moodLabel: mood.id);
+
+      // Stocker les recommendations retournées par le backend
+      final recs = result['recommendations'] as Map<String, dynamic>?;
+      if (recs != null) setState(() => _recommendations = recs);
+
+      // Planifier notif contextuelle avec contexte mis à jour
+      final updatedState = ref.read(moodProvider);
+      final streak = ref.read(authProvider).user?.streakDays ?? 0;
+      LocalNotificationService.setupAllReminders(
+        lastMoodLabel: mood.id,
+        streakDays: streak,
+        badgesNeeded: 7 - streak > 0 ? 7 - streak : null,
+      );
+
+      // Recalcule l'insight après enregistrement
+      final moodState = ref.read(moodProvider);
+      _computeWeeklyInsight(moodState.history, moodState.stats);
+
+      // Micro-célébration contextuelle
+      _showPostLogCelebration(mood.id, result);
     }
   }
 
-  void _showWellnessSheet(String moodId) {
-    final tips = _wellnessTips[moodId] ?? _wellnessTips['neutral'] ?? [];
+  // ── Célébration après enregistrement ──────────────────────────────────────
+  void _showPostLogCelebration(
+      String moodId, Map<String, dynamic> result) {
+    final user = ref.read(authProvider).user;
+    final streak = user?.streakDays ?? 0;
+    final moodState = ref.read(moodProvider);
+    final history = moodState.history;
+
+    // Calcule si l'humeur est meilleure qu'hier
+    String? betterThanYesterday;
+    if (history.length >= 2) {
+      final yesterday = (history[history.length - 2]['score'] as num?)?.toDouble() ?? 3;
+      final today = (history.last['score'] as num?)?.toDouble() ?? 3;
+      if (today > yesterday + 0.5) betterThanYesterday = '😊 Meilleure qu\'hier !';
+    }
+
     showModalBottomSheet(
-      context: context, isScrollControlled: true, backgroundColor: Colors.transparent,
-      builder: (_) => _WellnessSheet(moodId: moodId, tips: tips));
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PostLogSheet(
+        streak: streak,
+        moodId: moodId,
+        betterThanYesterday: betterThanYesterday,
+        tips: _wellnessTips[moodId] ?? _wellnessTips['neutral'] ?? [],
+        isFirstEver: history.length <= 1,
+      ),
+    );
+  }
+
+  void _showWellnessSheet(String moodId) {
+    final tips =
+        _wellnessTips[moodId] ?? _wellnessTips['neutral'] ?? [];
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) =>
+          _WellnessSheet(moodId: moodId, tips: tips));
   }
 
   List<_WellnessTip> get _currentTips {
     final moods = ref.read(contentProvider).moodDefinitions;
     if (_selectedMoodIndex == null) return _wellnessTips['neutral'] ?? [];
-    return _wellnessTips[moods[_selectedMoodIndex!].id] ?? _wellnessTips['neutral'] ?? [];
+    return _wellnessTips[moods[_selectedMoodIndex!].id] ??
+        _wellnessTips['neutral'] ?? [];
   }
 
   @override
   Widget build(BuildContext context) {
-    final content  = ref.watch(contentProvider);
-    final moods    = content.moodDefinitions;
+    final content = ref.watch(contentProvider);
+    final moods = content.moodDefinitions;
     final moodState = ref.watch(moodProvider);
-    final user     = ref.watch(authProvider).user;
-    final hour     = DateTime.now().hour;
-    final greeting = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
+    final user = ref.watch(authProvider).user;
+    final hour = DateTime.now().hour;
+    final greeting =
+        hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
 
-    // Stress factors from DB with fallback
     final stressFactors = content.loaded && content.stressFactors.isNotEmpty
         ? content.stressFactors
         : <StressFactorDef>[];
 
-    // Afficher skeleton pendant le chargement initial
     if (!content.loaded) {
-      return const Scaffold(
-        body: SafeArea(child: SkeletonMoodScreen()),
-      );
+      return const Scaffold(body: SafeArea(child: SkeletonMoodScreen()));
+    }
+
+    // Recalcule l'insight si l'historique change
+    if (_weeklyInsight == null && moodState.history.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) =>
+          _computeWeeklyInsight(moodState.history, moodState.stats));
     }
 
     return Scaffold(
@@ -156,32 +287,49 @@ class _MoodScreenState extends ConsumerState<MoodScreen> with SingleTickerProvid
               await _loadContent();
             },
             child: CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(), 
+              physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
-                SliverToBoxAdapter(child: Padding(
+                // ── Header ──────────────────────────────────────────────────
+                SliverToBoxAdapter(
+                    child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                  child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('$greeting ${user?.anonymousAlias ?? 'Anonyme'} 👋',
-                          style: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted)),
-                      const Text('Comment te sens-tu ?', style: AppTextStyles.h2),
-                    ])),
-                    Flexible(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                      _PointsBadge(points: user?.totalPoints ?? 0),
-                      if ((user?.streakDays ?? 0) > 0) ...[
-                        const SizedBox(height: 4),
-                        _StreakBadge(days: user!.streakDays),
-                      ],
-                    ])),
-                  ]),
+                  child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                              Text(
+                                  '$greeting ${user?.anonymousAlias ?? 'Anonyme'} 👋',
+                                  style: AppTextStyles.body.copyWith(
+                                      color: AppColors.onSurfaceMuted)),
+                              const Text('Comment te sens-tu ?',
+                                  style: AppTextStyles.h2),
+                            ])),
+                        Flexible(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                              _PointsBadge(points: user?.totalPoints ?? 0),
+                              if ((user?.streakDays ?? 0) > 0) ...[
+                                const SizedBox(height: 4),
+                                _StreakBadge(days: user!.streakDays),
+                              ],
+                            ])),
+                      ]),
                 )),
 
-                SliverToBoxAdapter(child: Padding(
+                // ── Message du jour ──────────────────────────────────────────
+                SliverToBoxAdapter(
+                    child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                   child: _DailyMessageCard(message: _todayMessage),
                 )),
 
-                SliverToBoxAdapter(child: Padding(
+                // ── Carte humeur ─────────────────────────────────────────────
+                SliverToBoxAdapter(
+                    child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                   child: _MoodCard(
                     moods: moods,
@@ -189,64 +337,234 @@ class _MoodScreenState extends ConsumerState<MoodScreen> with SingleTickerProvid
                     moodLogged: _moodLogged,
                     isLogging: _isLogging,
                     todayMood: moodState.todayMood,
-                    onMoodSelected: (i) => setState(() { _selectedMoodIndex = i; _moodLogged = false; }),
+                    onMoodSelected: (i) => setState(
+                        () {
+                          _selectedMoodIndex = i;
+                          _moodLogged = false;
+                        }),
                     onLog: _logMood,
                   ),
                 )),
 
+                // ── Détails (stress, facteurs, note) ─────────────────────────
                 if (_selectedMoodIndex != null && !_moodLogged) ...[
-                  SliverToBoxAdapter(child: Padding(
+                  SliverToBoxAdapter(
+                      child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
                     child: _StressLevelSlider(
-                      value: _stressLevel,
-                      onChanged: (v) => setState(() => _stressLevel = v)),
+                        value: _stressLevel,
+                        onChanged: (v) =>
+                            setState(() => _stressLevel = v)),
                   )),
                   if (stressFactors.isNotEmpty)
-                    SliverToBoxAdapter(child: Padding(
+                    SliverToBoxAdapter(
+                        child: Padding(
                       padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
                       child: _FactorSelector(
                         factors: stressFactors,
                         selected: _selectedFactors,
                         onToggle: (f) => setState(() =>
-                          _selectedFactors.contains(f) ? _selectedFactors.remove(f) : _selectedFactors.add(f)),
+                            _selectedFactors.contains(f)
+                                ? _selectedFactors.remove(f)
+                                : _selectedFactors.add(f)),
                       ),
                     )),
-                  SliverToBoxAdapter(child: Padding(
+                  SliverToBoxAdapter(
+                      child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
                     child: TextField(
-                      controller: _noteController, maxLines: 2, maxLength: 280,
+                      controller: _noteController,
+                      maxLines: 2,
+                      maxLength: 280,
                       decoration: const InputDecoration(
-                        hintText: 'Ajoute une note libre... (optionnel)',
-                        counterStyle: TextStyle(fontSize: 11)),
+                          hintText:
+                              'Ajoute une note libre... (optionnel)',
+                          counterStyle: TextStyle(fontSize: 11)),
                       onChanged: (v) => _note = v.isEmpty ? null : v,
                       style: AppTextStyles.body,
                     ),
                   )),
                 ],
 
-                SliverToBoxAdapter(child: Padding(
+                // ── Graphe 7 jours + insight ──────────────────────────────────
+                SliverToBoxAdapter(
+                    child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-                  child: _WeeklyMoodChart(history: moodState.history, stats: moodState.stats),
+                  child: _WeeklyMoodChart(
+                    history: moodState.history,
+                    stats: moodState.stats,
+                    insight: _weeklyInsight,
+                    onViewJournal: () => context.push('/mood/history'),
+                  ),
                 )),
 
-                SliverToBoxAdapter(child: Padding(
+                // ── Tips bien-être ────────────────────────────────────────────
+                SliverToBoxAdapter(
+                    child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                   child: _WellnessTipsSection(
                     tips: _selectedMoodIndex != null && !_moodLogged
                         ? _currentTips
-                        : (_wellnessTips[moodState.todayMood?['label']] ?? _wellnessTips['neutral'] ?? []),
+                        : (_wellnessTips[moodState.todayMood?['label']] ??
+                            _wellnessTips['neutral'] ?? []),
                     moodId: _selectedMoodIndex != null
                         ? moods[_selectedMoodIndex!].id
                         : (moodState.todayMood?['label'] ?? 'neutral'),
-                    moodColor: _selectedMoodIndex != null ? moods[_selectedMoodIndex!].color : AppColors.primary,
+                    moodColor: _selectedMoodIndex != null
+                        ? moods[_selectedMoodIndex!].color
+                        : AppColors.primary,
                   ),
                 )),
 
-                const SliverToBoxAdapter(child: AdBanner(placement: 'mood_screen')),
+                // ── Recommendations du backend ────────────────────────────────
+                if (_recommendations != null)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                      child: _RecommendationSection(data: _recommendations!),
+                    ),
+                  ),
+
+                const SliverToBoxAdapter(
+                    child: AdBanner(placement: 'mood_screen')),
                 const SliverToBoxAdapter(child: SizedBox(height: 100)),
-              ]
+              ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Post-log celebration sheet ───────────────────────────────────────────────
+class _PostLogSheet extends StatelessWidget {
+  final int streak;
+  final String moodId;
+  final String? betterThanYesterday;
+  final List<_WellnessTip> tips;
+  final bool isFirstEver;
+
+  const _PostLogSheet({
+    required this.streak,
+    required this.moodId,
+    required this.tips,
+    this.betterThanYesterday,
+    this.isFirstEver = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isGoodMood = ['happy', 'excited', 'calm', 'content'].contains(moodId);
+    final isHardMood = ['sad', 'anxious', 'angry', 'stressed'].contains(moodId);
+
+    String title;
+    String subtitle;
+    String emoji;
+
+    if (isFirstEver) {
+      title = 'Premier pas accompli ! 🎉';
+      subtitle = 'Tu viens d\'enregistrer ton humeur pour la première fois. C\'est le début de quelque chose d\'important.';
+      emoji = '🌱';
+    } else if (streak >= 7 && streak % 7 == 0) {
+      title = '$streak jours de suite ! 🔥';
+      subtitle = 'Incroyable régularité. Chaque jour compte.';
+      emoji = '🏆';
+    } else if (streak >= 3) {
+      title = '$streak jours consécutifs 🔥';
+      subtitle = 'Tu construis une vraie habitude. Continue !';
+      emoji = '🔥';
+    } else if (betterThanYesterday != null) {
+      title = 'Meilleure journée qu\'hier 😊';
+      subtitle = 'Ta progression est visible. Chaque effort compte.';
+      emoji = '📈';
+    } else if (isHardMood) {
+      title = 'Enregistré. C\'est déjà courageux.';
+      subtitle = 'Reconnaître comment tu te sens, c\'est la première étape. Voilà quelques pistes pour t\'aider.';
+      emoji = '💙';
+    } else {
+      title = 'Humeur enregistrée ✅';
+      subtitle = 'Continue chaque jour pour voir ton évolution.';
+      emoji = '✨';
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: const BoxDecoration(
+                    color: AppColors.divider,
+                    borderRadius: AppRadius.full),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(emoji, style: const TextStyle(fontSize: 52)),
+            const SizedBox(height: 12),
+            Text(title,
+                style: AppTextStyles.h3, textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            Text(subtitle,
+                style: AppTextStyles.body
+                    .copyWith(color: AppColors.onSurfaceMuted),
+                textAlign: TextAlign.center),
+
+            if (tips.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              const Divider(),
+              const SizedBox(height: 12),
+              const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Recommandé pour toi',
+                      style: AppTextStyles.h4)),
+              const SizedBox(height: 10),
+              ...tips.take(2).map((t) => ListTile(
+                    leading: Container(
+                      width: 40, height: 40,
+                      decoration: BoxDecoration(
+                          color: AppColors.surfaceVariant,
+                          borderRadius: BorderRadius.circular(10)),
+                      child: Center(
+                          child: Text(t.icon,
+                              style: const TextStyle(fontSize: 20))),
+                    ),
+                    title: Text(t.title,
+                        style: AppTextStyles.bodySmall
+                            .copyWith(fontWeight: FontWeight.w800)),
+                    subtitle: Text(t.desc,
+                        style: AppTextStyles.caption.copyWith(
+                            color: AppColors.onSurfaceMuted)),
+                    contentPadding:
+                        const EdgeInsets.symmetric(vertical: 4),
+                    trailing: t.route != null
+                        ? const Icon(Icons.chevron_right, size: 20)
+                        : null,
+                    onTap: () {
+                      Navigator.pop(context);
+                      if (t.route != null) context.push(t.route!);
+                    },
+                  )),
+            ],
+
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(50)),
+                child: const Text('Super, continuer !'),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -259,24 +577,32 @@ class _DailyMessageCard extends StatelessWidget {
   const _DailyMessageCard({required this.message});
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: const BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.lg),
-    child: Row(children: [
-      IconMapper.getIcon('💬', size: 22, color: Colors.white),
-      const SizedBox(width: 12),
-      Expanded(child: Text(message, style: AppTextStyles.body.copyWith(
-          color: Colors.white, fontWeight: FontWeight.w700, height: 1.4))),
-    ]),
-  );
+        padding: const EdgeInsets.all(16),
+        decoration: const BoxDecoration(
+            color: AppColors.primary, borderRadius: AppRadius.lg),
+        child: Row(children: [
+          IconMapper.getIcon('💬', size: 22, color: Colors.white),
+          const SizedBox(width: 12),
+          Expanded(
+              child: Text(message,
+                  style: AppTextStyles.body.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      height: 1.4))),
+        ]),
+      );
 }
 
 // ─── Stress Level Slider ──────────────────────────────────────────────────────
 class _StressLevelSlider extends StatelessWidget {
   final int value;
   final Function(int) onChanged;
-  const _StressLevelSlider({required this.value, required this.onChanged});
+  const _StressLevelSlider(
+      {required this.value, required this.onChanged});
 
-  static const _labels = ['Très bas', 'Bas', 'Modéré', 'Élevé', 'Très élevé'];
+  static const _labels = [
+    'Très bas', 'Bas', 'Modéré', 'Élevé', 'Très élevé'
+  ];
   static const _colors = [
     Color(0xFF6BCF7F), Color(0xFFFFD93D), Color(0xFFFFB347),
     Color(0xFFFF7675), Color(0xFFE84393),
@@ -284,72 +610,113 @@ class _StressLevelSlider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: AppColors.surface, borderRadius: AppRadius.lg,
-      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)]),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        const Text('Niveau de stress', style: AppTextStyles.h4),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: _colors[value - 1].withValues(alpha: 0.15), borderRadius: AppRadius.full),
-          child: Text(_labels[value - 1], style: AppTextStyles.caption.copyWith(
-              color: _colors[value - 1], fontWeight: FontWeight.w800))),
-      ]),
-      SliderTheme(
-        data: SliderThemeData(
-          activeTrackColor: _colors[value - 1],
-          inactiveTrackColor: _colors[value - 1].withValues(alpha: 0.2),
-          thumbColor: _colors[value - 1],
-          overlayColor: _colors[value - 1].withValues(alpha: 0.1),
-          trackHeight: 6),
-        child: Slider(
-          value: value.toDouble(), min: 1, max: 5, divisions: 4,
-          onChanged: (v) => onChanged(v.round())),
-      ),
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text('😌 Calme', style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
-        Text('😰 Très stressé', style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
-      ]),
-    ]),
-  );
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: AppRadius.lg,
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10)
+            ]),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            const Text('Niveau de stress', style: AppTextStyles.h4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                  color: _colors[value - 1].withValues(alpha: 0.15),
+                  borderRadius: AppRadius.full),
+              child: Text(_labels[value - 1],
+                  style: AppTextStyles.caption.copyWith(
+                      color: _colors[value - 1],
+                      fontWeight: FontWeight.w800)),
+            ),
+          ]),
+          SliderTheme(
+            data: SliderThemeData(
+                activeTrackColor: _colors[value - 1],
+                inactiveTrackColor:
+                    _colors[value - 1].withValues(alpha: 0.2),
+                thumbColor: _colors[value - 1],
+                overlayColor:
+                    _colors[value - 1].withValues(alpha: 0.1),
+                trackHeight: 6),
+            child: Slider(
+                value: value.toDouble(),
+                min: 1, max: 5, divisions: 4,
+                onChanged: (v) => onChanged(v.round())),
+          ),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Text('😌 Calme',
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.onSurfaceMuted)),
+            Text('😰 Très stressé',
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.onSurfaceMuted)),
+          ]),
+        ]),
+      );
 }
 
-// ─── Factor Selector (depuis DB) ─────────────────────────────────────────────
+// ─── Factor Selector ──────────────────────────────────────────────────────────
 class _FactorSelector extends StatelessWidget {
   final List<StressFactorDef> factors;
   final List<String> selected;
   final Function(String) onToggle;
-  const _FactorSelector({required this.factors, required this.selected, required this.onToggle});
+  const _FactorSelector(
+      {required this.factors,
+      required this.selected,
+      required this.onToggle});
 
   @override
-  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    const Text("Qu'est-ce qui impacte ton humeur ?", style: AppTextStyles.h4),
-    const SizedBox(height: 4),
-    Text("Sélectionne tout ce qui s'applique",
-        style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
-    const SizedBox(height: 10),
-    Wrap(spacing: 8, runSpacing: 8, children: factors.map((f) {
-      final isSel = selected.contains(f.id);
-      return GestureDetector(
-        onTap: () => onToggle(f.id),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: isSel ? AppColors.primary : AppColors.surface,
-            borderRadius: AppRadius.full,
-            border: Border.all(color: isSel ? AppColors.primary : AppColors.divider, width: 1.5),
-            boxShadow: isSel ? [BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.25), blurRadius: 8)] : null),
-          child: Text('${f.emoji} ${f.label}', style: AppTextStyles.bodySmall.copyWith(
-              color: isSel ? Colors.white : AppColors.onSurface, fontWeight: FontWeight.w700)),
-        ),
-      );
-    }).toList()),
-  ]);
+  Widget build(BuildContext context) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text("Qu'est-ce qui impacte ton humeur ?",
+            style: AppTextStyles.h4),
+        const SizedBox(height: 4),
+        Text("Sélectionne tout ce qui s'applique",
+            style: AppTextStyles.caption
+                .copyWith(color: AppColors.onSurfaceMuted)),
+        const SizedBox(height: 10),
+        Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: factors.map((f) {
+              final isSel = selected.contains(f.id);
+              return GestureDetector(
+                onTap: () => onToggle(f.id),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSel ? AppColors.primary : AppColors.surface,
+                    borderRadius: AppRadius.full,
+                    border: Border.all(
+                        color: isSel
+                            ? AppColors.primary
+                            : AppColors.divider,
+                        width: 1.5),
+                    boxShadow: isSel
+                        ? [
+                            BoxShadow(
+                                color: AppColors.primary
+                                    .withValues(alpha: 0.25),
+                                blurRadius: 8)
+                          ]
+                        : null,
+                  ),
+                  child: Text('${f.emoji} ${f.label}',
+                      style: AppTextStyles.bodySmall.copyWith(
+                          color: isSel
+                              ? Colors.white
+                              : AppColors.onSurface,
+                          fontWeight: FontWeight.w700)),
+                ),
+              );
+            }).toList()),
+      ]);
 }
 
 // ─── Mood Card ────────────────────────────────────────────────────────────────
@@ -360,9 +727,14 @@ class _MoodCard extends StatelessWidget {
   final Map<String, dynamic>? todayMood;
   final Function(int) onMoodSelected;
   final VoidCallback onLog;
-  const _MoodCard({required this.moods, required this.selectedIndex,
-      required this.moodLogged, required this.isLogging, required this.todayMood,
-      required this.onMoodSelected, required this.onLog});
+  const _MoodCard(
+      {required this.moods,
+      required this.selectedIndex,
+      required this.moodLogged,
+      required this.isLogging,
+      required this.todayMood,
+      required this.onMoodSelected,
+      required this.onLog});
 
   @override
   Widget build(BuildContext context) {
@@ -374,61 +746,98 @@ class _MoodCard extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: selectedIndex != null
-            ? moods[selectedIndex!].color.withValues(alpha: 0.06) : AppColors.surface,
+            ? moods[selectedIndex!].color.withValues(alpha: 0.06)
+            : AppColors.surface,
         borderRadius: AppRadius.lg,
         border: Border.all(
-          color: selectedIndex != null
-              ? moods[selectedIndex!].color.withValues(alpha: 0.25) : AppColors.divider, width: 1.5),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 20)]),
+            color: selectedIndex != null
+                ? moods[selectedIndex!].color.withValues(alpha: 0.25)
+                : AppColors.divider,
+            width: 1.5),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 20)
+        ],
+      ),
       child: Column(children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-          for (int i = 0; i < firstRow; i++)
-            _MoodEmoji(mood: moods[i], isSelected: selectedIndex == i, onTap: () => onMoodSelected(i)),
-        ]),
+        Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              for (int i = 0; i < firstRow; i++)
+                _MoodEmoji(
+                    mood: moods[i],
+                    isSelected: selectedIndex == i,
+                    onTap: () => onMoodSelected(i)),
+            ]),
         if (secondRow > 0) ...[
           const SizedBox(height: 8),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-            for (int i = 0; i < secondRow; i++)
-              _MoodEmoji(mood: moods[i + 4], isSelected: selectedIndex == (i + 4), onTap: () => onMoodSelected(i + 4)),
-          ]),
+          Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                for (int i = 0; i < secondRow; i++)
+                  _MoodEmoji(
+                      mood: moods[i + 4],
+                      isSelected: selectedIndex == (i + 4),
+                      onTap: () => onMoodSelected(i + 4)),
+              ]),
         ],
         const SizedBox(height: 16),
         if (moodLogged)
           Container(
-            width: double.infinity, padding: const EdgeInsets.all(14),
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.secondary.withValues(alpha: 0.08), borderRadius: AppRadius.md,
-              border: Border.all(color: AppColors.secondary.withValues(alpha: 0.4), width: 1.5)),
+                color: AppColors.secondary.withValues(alpha: 0.08),
+                borderRadius: AppRadius.md,
+                border: Border.all(
+                    color: AppColors.secondary.withValues(alpha: 0.4),
+                    width: 1.5)),
             child: Column(children: [
               Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                 const Text('✅', style: TextStyle(fontSize: 18)),
                 const SizedBox(width: 8),
-                Text('Humeur enregistrée !', style: AppTextStyles.body.copyWith(
-                    color: AppColors.secondary, fontWeight: FontWeight.w800)),
+                Text('Humeur enregistrée !',
+                    style: AppTextStyles.body.copyWith(
+                        color: AppColors.secondary,
+                        fontWeight: FontWeight.w800)),
               ]),
               const SizedBox(height: 4),
               Text('Continue chaque jour pour suivre ton évolution',
-                  style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
-            ]))
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.onSurfaceMuted)),
+            ]),
+          )
         else
           SizedBox(
-            width: double.infinity, height: 52,
+            width: double.infinity,
+            height: 52,
             child: ElevatedButton(
-              onPressed: selectedIndex != null && !isLogging ? onLog : null,
+              onPressed:
+                  selectedIndex != null && !isLogging ? onLog : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: selectedIndex != null ? moods[selectedIndex!].color : AppColors.divider,
+                backgroundColor: selectedIndex != null
+                    ? moods[selectedIndex!].color
+                    : AppColors.divider,
                 foregroundColor: Colors.white,
-                disabledBackgroundColor: AppColors.divider),
+                disabledBackgroundColor: AppColors.divider,
+              ),
               child: isLogging
-                  ? const SizedBox(width: 20, height: 20,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  ? const SizedBox(
+                      width: 20, height: 20,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2))
                   : Text(
                       selectedIndex != null
                           ? 'Je me sens ${moods[selectedIndex!].label.toLowerCase()} — Enregistrer'
                           : 'Sélectionne comment tu te sens',
-                      style: AppTextStyles.button.copyWith(fontSize: 13,
-                          color: selectedIndex != null ? Colors.white : AppColors.onSurfaceMuted)),
-            )),
+                      style: AppTextStyles.button.copyWith(
+                          fontSize: 13,
+                          color: selectedIndex != null
+                              ? Colors.white
+                              : AppColors.onSurfaceMuted)),
+            ),
+          ),
       ]),
     );
   }
@@ -439,51 +848,81 @@ class _MoodEmoji extends StatelessWidget {
   final MoodDefinition mood;
   final bool isSelected;
   final VoidCallback onTap;
-  const _MoodEmoji({required this.mood, required this.isSelected, required this.onTap});
+  const _MoodEmoji(
+      {required this.mood,
+      required this.isSelected,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      width: 60, height: 68,
-      decoration: BoxDecoration(
-        color: isSelected ? mood.color.withValues(alpha: 0.15) : Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-        border: isSelected ? Border.all(color: mood.color.withValues(alpha: 0.5), width: 1.5) : null),
-      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        AnimatedScale(
-          scale: isSelected ? 1.3 : 1.0,
+        onTap: onTap,
+        child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          curve: Curves.elasticOut,
-          child: IconMapper.getIcon(mood.emoji, size: 28, color: mood.color)),
-        const SizedBox(height: 4),
-        AnimatedDefaultTextStyle(
-          duration: const Duration(milliseconds: 150),
-          style: TextStyle(
-            fontSize: isSelected ? 9 : 8,
-            fontWeight: isSelected ? FontWeight.w900 : FontWeight.w500,
-            color: isSelected ? mood.color : AppColors.onSurfaceMuted,
-            fontFamily: AppTextStyles.fontFamily),
-          child: Text(mood.label.split(' ').first, textAlign: TextAlign.center)),
-      ]),
-    ),
-  );
+          width: 60, height: 68,
+          decoration: BoxDecoration(
+            color: isSelected
+                ? mood.color.withValues(alpha: 0.15)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            border: isSelected
+                ? Border.all(
+                    color: mood.color.withValues(alpha: 0.5), width: 1.5)
+                : null,
+          ),
+          child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AnimatedScale(
+                  scale: isSelected ? 1.3 : 1.0,
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.elasticOut,
+                  child: IconMapper.getIcon(mood.emoji,
+                      size: 28, color: mood.color),
+                ),
+                const SizedBox(height: 4),
+                AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 150),
+                  style: TextStyle(
+                    fontSize: isSelected ? 9 : 8,
+                    fontWeight: isSelected
+                        ? FontWeight.w900
+                        : FontWeight.w500,
+                    color: isSelected
+                        ? mood.color
+                        : AppColors.onSurfaceMuted,
+                    fontFamily: AppTextStyles.fontFamily,
+                  ),
+                  child: Text(mood.label.split(' ').first,
+                      textAlign: TextAlign.center),
+                ),
+              ]),
+        ),
+      );
 }
 
-// ─── Weekly Chart (CORRIGÉ : plus d'overflow) ─────────────────────────────────
+// ─── Weekly Chart avec insight et lien journal ────────────────────────────────
 class _WeeklyMoodChart extends StatelessWidget {
   final List<Map<String, dynamic>> history;
   final Map<String, dynamic>? stats;
-  const _WeeklyMoodChart({required this.history, this.stats});
+  final String? insight;
+  final VoidCallback onViewJournal;
+
+  const _WeeklyMoodChart({
+    required this.history,
+    required this.onViewJournal,
+    this.stats,
+    this.insight,
+  });
 
   Map<String, double> _buildDayMap() {
     final map = <String, double>{};
     for (final e in history) {
-      final raw = e['createdAt']?.toString() ?? e['date']?.toString() ?? '';
-      final dt  = DateTime.tryParse(raw);
+      final raw =
+          e['createdAt']?.toString() ?? e['date']?.toString() ?? '';
+      final dt = DateTime.tryParse(raw);
       if (dt == null) continue;
-      final key = '${dt.year}-${dt.month.toString().padLeft(2,'0')}-${dt.day.toString().padLeft(2,'0')}';
+      final key =
+          '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
       map[key] = (e['score'] as num?)?.toDouble() ?? 0;
     }
     return map;
@@ -492,22 +931,28 @@ class _WeeklyMoodChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dayMap = _buildDayMap();
-    final today  = DateTime.now();
+    final today = DateTime.now();
     const dayLabels = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
     const maxBarHeight = 58.0;
 
     final days7 = List.generate(7, (i) {
-      final d   = today.subtract(Duration(days: 6 - i));
-      final key = '${d.year}-${d.month.toString().padLeft(2,'0')}-${d.day.toString().padLeft(2,'0')}';
-      return (score: dayMap[key] ?? 0.0, label: dayLabels[d.weekday - 1], isToday: i == 6, date: d);
+      final d = today.subtract(Duration(days: 6 - i));
+      final key =
+          '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+      return (
+        score: dayMap[key] ?? 0.0,
+        label: dayLabels[d.weekday - 1],
+        isToday: i == 6,
+        date: d,
+      );
     });
 
     String scoreEmoji(double s) {
       if (s == 0) return '';
-      if (s <= 1.5) return '😔'; 
+      if (s <= 1.5) return '😔';
       if (s <= 2.5) return '😕';
-      if (s <= 3.5) return '😐'; 
-      if (s <= 4.5) return '😊'; 
+      if (s <= 3.5) return '😐';
+      if (s <= 4.5) return '😊';
       return '😄';
     }
 
@@ -523,50 +968,95 @@ class _WeeklyMoodChart extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.surface, 
-        borderRadius: AppRadius.lg,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)]
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+          color: AppColors.surface,
+          borderRadius: AppRadius.lg,
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10)
+          ]),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           const Text('Ton évolution', style: AppTextStyles.h4),
-          const SizedBox(height: 16),
-          // Utilisation d'IntrinsicHeight pour éviter l'overflow
-          IntrinsicHeight(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: days7.map((d) {
-                final s = d.score;
-                final barHeight = s == 0 ? 8.0 : (s / 5.0) * maxBarHeight;
-                return Column(
+          GestureDetector(
+            onTap: onViewJournal,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: AppRadius.full),
+              child: Text('Mon journal →',
+                  style: AppTextStyles.caption.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w800)),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 16),
+        IntrinsicHeight(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: days7.map((d) {
+              final s = d.score;
+              final barHeight = s == 0 ? 8.0 : (s / 5.0) * maxBarHeight;
+              return Column(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    if (s > 0) Text(scoreEmoji(s), style: const TextStyle(fontSize: 14)),
+                    if (s > 0)
+                      Text(scoreEmoji(s),
+                          style: const TextStyle(fontSize: 14)),
                     const SizedBox(height: 4),
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 500),
                       curve: Curves.easeOut,
-                      width: 24, 
+                      width: 24,
                       height: barHeight,
                       decoration: BoxDecoration(
-                        color: scoreColor(s),
-                        borderRadius: BorderRadius.circular(6)
-                      )
+                          color: scoreColor(s),
+                          borderRadius: BorderRadius.circular(6)),
                     ),
                     const SizedBox(height: 8),
-                    Text(d.label, style: AppTextStyles.caption.copyWith(
-                      color: d.isToday ? AppColors.primary : AppColors.onSurfaceMuted,
-                      fontWeight: d.isToday ? FontWeight.w800 : FontWeight.w600
-                    ))
-                  ]
-                );
-              }).toList(),
-            )
-          )
-        ]
-      )
+                    Text(d.label,
+                        style: AppTextStyles.caption.copyWith(
+                            color: d.isToday
+                                ? AppColors.primary
+                                : AppColors.onSurfaceMuted,
+                            fontWeight: d.isToday
+                                ? FontWeight.w800
+                                : FontWeight.w600)),
+                  ]);
+            }).toList(),
+          ),
+        ),
+
+        // ── Insight phrase ──────────────────────────────────────────────
+        if (insight != null && insight!.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.06),
+                borderRadius: AppRadius.md,
+                border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.15))),
+            child: Row(children: [
+              Text('📊',
+                  style: const TextStyle(fontSize: 16)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(insight!,
+                    style: AppTextStyles.caption.copyWith(
+                        color: AppColors.onSurface,
+                        fontWeight: FontWeight.w600,
+                        height: 1.4)),
+              ),
+            ]),
+          ),
+        ],
+      ]),
     );
   }
 }
@@ -576,65 +1066,59 @@ class _WellnessTipsSection extends StatelessWidget {
   final List<_WellnessTip> tips;
   final String moodId;
   final Color moodColor;
-  
-  const _WellnessTipsSection({
-    required this.tips, 
-    required this.moodId, 
-    required this.moodColor
-  });
+
+  const _WellnessTipsSection(
+      {required this.tips,
+      required this.moodId,
+      required this.moodColor});
 
   @override
   Widget build(BuildContext context) {
     if (tips.isEmpty) return const SizedBox.shrink();
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Recommandé pour toi', style: AppTextStyles.h4),
-        const SizedBox(height: 12),
-        ...tips.map((t) => GestureDetector(
-          onTap: t.route != null ? () => context.push(t.route!) : null,
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: moodColor.withValues(alpha: 0.08),
-              borderRadius: AppRadius.md,
-              border: Border.all(color: moodColor.withValues(alpha: 0.2))
-            ),
-            child: Row(
-              children: [
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('Recommandé pour toi', style: AppTextStyles.h4),
+      const SizedBox(height: 12),
+      ...tips.map((t) => GestureDetector(
+            onTap: t.route != null ? () => context.push(t.route!) : null,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                  color: moodColor.withValues(alpha: 0.08),
+                  borderRadius: AppRadius.md,
+                  border: Border.all(
+                      color: moodColor.withValues(alpha: 0.2))),
+              child: Row(children: [
                 Text(t.icon, style: const TextStyle(fontSize: 24)),
                 const SizedBox(width: 14),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(t.title, style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w800)),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(t.title,
+                          style: AppTextStyles.bodySmall
+                              .copyWith(fontWeight: FontWeight.w800)),
                       const SizedBox(height: 2),
-                      Text(t.desc, style: AppTextStyles.caption.copyWith(
-                        color: AppColors.onSurfaceMuted, height: 1.3))
-                    ]
-                  )
-                ),
+                      Text(t.desc,
+                          style: AppTextStyles.caption.copyWith(
+                              color: AppColors.onSurfaceMuted,
+                              height: 1.3)),
+                    ])),
                 if (t.route != null) ...[
                   const SizedBox(width: 8),
-                  Icon(Icons.chevron_right, color: moodColor, size: 20)
-                ]
-              ]
+                  Icon(Icons.chevron_right, color: moodColor, size: 20),
+                ],
+              ]),
             ),
-          ),
-        ))
-      ]
-    );
+          )),
+    ]);
   }
 }
 
-// ─── Wellness Sheet (Bottom Sheet) ────────────────────────────────────────────
+// ─── Wellness Sheet ───────────────────────────────────────────────────────────
 class _WellnessSheet extends StatelessWidget {
   final String moodId;
   final List<_WellnessTip> tips;
-  
   const _WellnessSheet({required this.moodId, required this.tips});
 
   @override
@@ -642,9 +1126,9 @@ class _WellnessSheet extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
       decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28))
-      ),
+          color: AppColors.surface,
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(28))),
       child: SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -652,46 +1136,54 @@ class _WellnessSheet extends StatelessWidget {
           children: [
             Center(
               child: Container(
-                width: 40, height: 4,
-                decoration: const BoxDecoration(
-                  color: AppColors.divider, 
-                  borderRadius: AppRadius.full
-                )
-              )
+                  width: 40, height: 4,
+                  decoration: const BoxDecoration(
+                      color: AppColors.divider,
+                      borderRadius: AppRadius.full)),
             ),
             const SizedBox(height: 20),
-            const Text('Prends un moment pour toi', style: AppTextStyles.h3),
+            const Text('Prends un moment pour toi',
+                style: AppTextStyles.h3),
             const SizedBox(height: 16),
             ...tips.map((t) => ListTile(
-              leading: Container(
-                width: 40, height: 40,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceVariant,
-                  borderRadius: BorderRadius.circular(10)
-                ),
-                child: Center(child: Text(t.icon, style: const TextStyle(fontSize: 20)))
-              ),
-              title: Text(t.title, style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w800)),
-              subtitle: Text(t.desc, style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
-              contentPadding: const EdgeInsets.symmetric(vertical: 6),
-              trailing: t.route != null ? const Icon(Icons.chevron_right, size: 20) : null,
-              onTap: () {
-                Navigator.pop(context);
-                if (t.route != null) context.push(t.route!);
-              }
-            )),
+                  leading: Container(
+                    width: 40, height: 40,
+                    decoration: BoxDecoration(
+                        color: AppColors.surfaceVariant,
+                        borderRadius: BorderRadius.circular(10)),
+                    child: Center(
+                        child: Text(t.icon,
+                            style: const TextStyle(fontSize: 20))),
+                  ),
+                  title: Text(t.title,
+                      style: AppTextStyles.bodySmall
+                          .copyWith(fontWeight: FontWeight.w800)),
+                  subtitle: Text(t.desc,
+                      style: AppTextStyles.caption.copyWith(
+                          color: AppColors.onSurfaceMuted)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(vertical: 6),
+                  trailing: t.route != null
+                      ? const Icon(Icons.chevron_right, size: 20)
+                      : null,
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (t.route != null) context.push(t.route!);
+                  },
+                )),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
-                child: const Text('Compris')
-              )
-            )
-          ]
-        )
-      )
+                style: ElevatedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(50)),
+                child: const Text('Compris'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -702,10 +1194,13 @@ class _PointsBadge extends StatelessWidget {
   const _PointsBadge({required this.points});
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-    decoration: const BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.full),
-    child: Text('⚡ $points pts',
-        style: AppTextStyles.caption.copyWith(color: Colors.white, fontWeight: FontWeight.w800)));
+        padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: const BoxDecoration(
+            color: AppColors.primary, borderRadius: AppRadius.full),
+        child: Text('⚡ $points pts',
+            style: AppTextStyles.caption
+                .copyWith(color: Colors.white, fontWeight: FontWeight.w800)));
 }
 
 class _StreakBadge extends StatelessWidget {
@@ -713,11 +1208,134 @@ class _StreakBadge extends StatelessWidget {
   const _StreakBadge({required this.days});
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-    decoration: BoxDecoration(
-      color: AppColors.accentOrange.withValues(alpha: 0.12), borderRadius: AppRadius.full,
-      border: Border.all(color: AppColors.accentOrange.withValues(alpha: 0.3))),
-    child: Text('🔥 $days jours',
-        overflow: TextOverflow.ellipsis,
-        style: AppTextStyles.caption.copyWith(color: AppColors.accentOrange, fontWeight: FontWeight.w800)));
+        padding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+            color: AppColors.accentOrange.withValues(alpha: 0.12),
+            borderRadius: AppRadius.full,
+            border: Border.all(
+                color:
+                    AppColors.accentOrange.withValues(alpha: 0.3))),
+        child: Text('🔥 $days jours',
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.caption.copyWith(
+                color: AppColors.accentOrange,
+                fontWeight: FontWeight.w800)));
+}
+
+
+// ─── Recommendation Section (données backend) ────────────────────────────────
+class _RecommendationSection extends StatelessWidget {
+  final Map<String, dynamic> data;
+  const _RecommendationSection({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final message    = data['message'] as String? ?? '';
+    final tip        = data['tip']     as String? ?? '';
+    final challenges = data['challenges'] as List? ?? [];
+
+    if (message.isEmpty && challenges.isEmpty) return const SizedBox.shrink();
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('Pour toi maintenant', style: AppTextStyles.h4),
+      const SizedBox(height: 10),
+
+      // Message stratégique
+      if (message.isNotEmpty)
+        Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.07),
+            borderRadius: AppRadius.md,
+            border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
+          ),
+          child: Text(message,
+              style: AppTextStyles.bodySmall.copyWith(
+                  fontWeight: FontWeight.w600, height: 1.5)),
+        ),
+
+      // Conseil scientifique du jour
+      if (tip.isNotEmpty)
+        Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.accentOrange.withValues(alpha: 0.07),
+            borderRadius: AppRadius.md,
+            border: Border.all(
+                color: AppColors.accentOrange.withValues(alpha: 0.2)),
+          ),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('💡', style: TextStyle(fontSize: 16)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(tip,
+                  style: AppTextStyles.caption.copyWith(
+                      color: AppColors.onSurface,
+                      fontWeight: FontWeight.w600,
+                      height: 1.5)),
+            ),
+          ]),
+        ),
+
+      // Défis recommandés (max 2)
+      if (challenges.isNotEmpty) ...[
+        const SizedBox(height: 4),
+        Text('Défis suggérés',
+            style: AppTextStyles.caption.copyWith(
+                color: AppColors.onSurfaceMuted,
+                fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        ...challenges.take(2).map((ch) {
+          final map   = ch is Map ? Map<String, dynamic>.from(ch) : <String, dynamic>{};
+          final icon   = map['icon']   as String? ?? '⚡';
+          final title  = map['title']  as String? ?? '';
+          final reason = map['reason'] as String? ?? '';
+          final pts    = map['points'] as int?    ?? 0;
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: AppRadius.md,
+              border: Border.all(color: AppColors.divider),
+              boxShadow: [BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 6)],
+            ),
+            child: Row(children: [
+              Text(icon, style: const TextStyle(fontSize: 22)),
+              const SizedBox(width: 12),
+              Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(title,
+                    style: AppTextStyles.bodySmall
+                        .copyWith(fontWeight: FontWeight.w800)),
+                if (reason.isNotEmpty)
+                  Text(reason,
+                      style: AppTextStyles.caption
+                          .copyWith(color: AppColors.onSurfaceMuted)),
+              ])),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: AppRadius.full),
+                child: Text('+$pts pts',
+                    style: AppTextStyles.caption.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w800)),
+              ),
+            ]),
+          );
+        }),
+      ],
+    ]);
+  }
 }

@@ -104,7 +104,7 @@ String _errorMessage(Object e, {String fallback = 'Une erreur inattendue est sur
         final mins = e.data?['remainingMinutes'] ?? 15;
         return 'Compte verrouillé après trop de tentatives. Réessaie dans $mins min.';
       case SecurityErrorType.accountRestricted:
-        return 'Ton compte est restreint. Contacte le support LinkMind.';
+        return 'Ton compte est restreint. Contacte le support BASYAM.';
       case SecurityErrorType.unauthorized:
         return e.message.isNotEmpty
             ? e.message
@@ -135,12 +135,93 @@ String _errorMessage(Object e, {String fallback = 'Une erreur inattendue est sur
   return fallback;
 }
 
+// ─── Fonction utilitaire pour extraire les challenges ────────────────────────
+List<Map<String, dynamic>> _extractChallenges(dynamic data) {
+  // Si c'est déjà une liste
+  if (data is List) {
+    try {
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      debugPrint('⚠️ Erreur de cast de liste: $e');
+      return [];
+    }
+  }
+
+  // Si c'est un Map
+  if (data is Map<String, dynamic>) {
+    // Essayer différentes clés
+    final possibleKeys = ['challenges', 'daily', 'data', 'results', 'items'];
+    for (final key in possibleKeys) {
+      if (data.containsKey(key)) {
+        final value = data[key];
+        if (value is List) {
+          try {
+            return List<Map<String, dynamic>>.from(value);
+          } catch (e) {
+            debugPrint('⚠️ Erreur de cast pour la clé "$key": $e');
+            continue;
+          }
+        }
+      }
+    }
+  }
+
+  return [];
+}
+
+// ─── Fonction utilitaire pour extraire l'historique des moods ───────────────
+List<Map<String, dynamic>> _extractMoodHistory(dynamic data) {
+  // Si c'est déjà une liste
+  if (data is List) {
+    try {
+      return List<Map<String, dynamic>>.from(data);
+    } catch (e) {
+      debugPrint('⚠️ Erreur de cast de liste d\'historique: $e');
+      return [];
+    }
+  }
+
+  // Si c'est un Map
+  if (data is Map<String, dynamic>) {
+    // Essayer différentes clés
+    final possibleKeys = ['history', 'data', 'results', 'items', 'moods'];
+    for (final key in possibleKeys) {
+      if (data.containsKey(key)) {
+        final value = data[key];
+        if (value is List) {
+          try {
+            return List<Map<String, dynamic>>.from(value);
+          } catch (e) {
+            debugPrint('⚠️ Erreur de cast pour la clé "$key": $e');
+            continue;
+          }
+        }
+      }
+    }
+  }
+
+  return [];
+}
+
 // ─── Auth Notifier ────────────────────────────────────────────────────────────
 class AuthNotifier extends StateNotifier<AuthState> {
+  /// Appelé quand le compte est connecté sur un autre appareil.
+  /// Défini par le widget HomeShell pour afficher un dialog.
+  void Function()? _sessionReplacedCallback;
+
+  void setSessionReplacedCallback(void Function() cb) {
+    _sessionReplacedCallback = cb;
+  }
+
   final ApiService _api;
   final Ref _ref;
 
   AuthNotifier(this._api, this._ref) : super(const AuthState()) {
+    // Enregistrer le callback SESSION_REPLACED dès la construction
+    ApiService.setSessionReplacedCallback(() async {
+      await logout(silent: true);
+      _sessionReplacedCallback?.call();
+    });
     _init();
   }
 
@@ -149,7 +230,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final token = await _api.getAccessToken().timeout(const Duration(seconds: 5));
       if (token != null) {
         final data = await _api.getMe().timeout(const Duration(seconds: 8));
-        final user = UserModel.fromJson(data['user']);
+        final user = UserModel.fromJson(data);
         debugPrint('🔍 [AuthInit] legalAccepted=${user.legalAccepted}');
 
         if (user.legalAccepted == true) {
@@ -172,7 +253,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final data = await _api.login(email: email, password: password);
       await _api.saveTokens(data['accessToken'], data['refreshToken']);
-      final user = UserModel.fromJson(data['user']);
+      
+      final user = UserModel.fromJson(data);
       debugPrint('🔍 [Login] legalAccepted=${user.legalAccepted}');
 
       state = AuthState(isAuthenticated: true, isLoading: false, user: user);
@@ -180,7 +262,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       _ref.read(moodProvider.notifier).reset();
 
       if (user.legalAccepted == true) _saveLegalCache(user.id);
-      _sendPendingFcmToken(); // envoyer FCM token maintenant que JWT est disponible
+      _sendPendingFcmToken();
       return true;
     } catch (e) {
       debugPrint('❌ [Login] ${e.runtimeType}: $e');
@@ -208,7 +290,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         age: age, city: city, country: country, gender: gender,
       );
       await _api.saveTokens(data['accessToken'], data['refreshToken']);
-      final user = UserModel.fromJson(data['user']);
+      
+      final user = UserModel.fromJson(data);
       debugPrint('🔍 [Register] legalAccepted=${user.legalAccepted}');
 
       state = AuthState(isAuthenticated: true, isLoading: false, user: user);
@@ -223,7 +306,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   // ─── Logout ───────────────────────────────────────────────────────────────
-  Future<void> logout() async {
+  Future<void> logout({bool silent = false}) async {
     try { await _api.logout(); } catch (_) {}
     _ref.read(challengesProvider.notifier).reset();
     _ref.read(moodProvider.notifier).reset();
@@ -248,8 +331,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> refreshUser() async {
     try {
       final data = await _api.getMe();
-      if (data['user'] != null) {
-        final user = UserModel.fromJson(data['user']);
+      if (data.isNotEmpty) {
+        final user = UserModel.fromJson(data);
         state = state.copyWith(user: user);
         if (user.legalAccepted == true) _saveLegalCache(user.id);
         debugPrint('✅ User rafraîchi: isPremium=${user.isPremium}, legalAccepted=${user.legalAccepted}');
@@ -360,7 +443,7 @@ class MoodNotifier extends StateNotifier<MoodState> {
   Future<void> loadTodayMood() async {
     try {
       final data = await _api.getTodayMood();
-      state = state.copyWith(todayMood: data['mood']);
+      state = state.copyWith(todayMood: data);
     } catch (_) {}
   }
 
@@ -368,10 +451,22 @@ class MoodNotifier extends StateNotifier<MoodState> {
     state = state.copyWith(isLoading: true);
     try {
       final data = await _api.getMoodHistory(days: days);
+      
+      // 🔥 CORRECTION : Utilisation de _extractMoodHistory
+      final historyList = _extractMoodHistory(data);
+      
+      // Extraire les stats si présentes
+      Map<String, dynamic>? stats;
+      if (data is Map<String, dynamic>) {
+        if (data.containsKey('stats')) {
+          stats = data['stats'] is Map ? Map<String, dynamic>.from(data['stats']) : null;
+        }
+      }
+      
       state = state.copyWith(
         isLoading: false,
-        history: List<Map<String, dynamic>>.from(data['history'] ?? []),
-        stats: data['stats'],
+        history: historyList,
+        stats: stats,
       );
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -391,7 +486,7 @@ class MoodNotifier extends StateNotifier<MoodState> {
       );
       state = state.copyWith(
         isLoading: false,
-        todayMood: data['mood'],
+        todayMood: data,
         recommendations: data['recommendations'],
       );
       await loadHistory();
@@ -401,9 +496,32 @@ class MoodNotifier extends StateNotifier<MoodState> {
       return null;
     }
   }
+
+  // Rafraîchit l'historique sur 30 jours (pour le journal)
+  Future<void> loadExtendedHistory() async {
+    try {
+      final data = await _api.getMoodHistory(days: 30);
+      
+      // 🔥 CORRECTION : Utilisation de _extractMoodHistory
+      final historyList = _extractMoodHistory(data);
+      
+      // Extraire les stats si présentes
+      Map<String, dynamic>? stats;
+      if (data is Map<String, dynamic>) {
+        if (data.containsKey('stats')) {
+          stats = data['stats'] is Map ? Map<String, dynamic>.from(data['stats']) : null;
+        }
+      }
+      
+      state = state.copyWith(
+        history: historyList,
+        stats: stats,
+      );
+    } catch (_) {}
+  }
 }
 
-// ─── Challenges Notifier (VERSION DURABLE) ───────────────────────────────────
+// ─── Challenges Notifier ──────────────────────────────────────────────────────
 class ChallengesNotifier extends StateNotifier<ChallengesState> {
   final ApiService _api;
   final Ref _ref;
@@ -420,12 +538,14 @@ class ChallengesNotifier extends StateNotifier<ChallengesState> {
   Future<void> loadDaily({String? moodLabel}) async {
     state = state.copyWith(isLoading: true);
     try {
-      // 🔥 AUTO-MAGIQUE : Si pas de moodLabel fourni, on va le chercher
+      // Auto-détection de l'humeur
       String? finalMoodLabel = moodLabel;
       if (finalMoodLabel == null) {
         try {
           final todayData = await _api.getTodayMood();
-          finalMoodLabel = todayData['mood']?['label'];
+          if (todayData is Map) {
+            finalMoodLabel = todayData['label'] ?? todayData['mood']?['label'];
+          }
           if (finalMoodLabel != null) {
             debugPrint('📊 [Challenges] Auto-detected mood: $finalMoodLabel');
           }
@@ -435,9 +555,13 @@ class ChallengesNotifier extends StateNotifier<ChallengesState> {
       }
       
       final data = await _api.getDailyChallenges(moodLabel: finalMoodLabel);
+      
+      // 🔥 CORRECTION : Extraction sécurisée des challenges
+      final challengesList = _extractChallenges(data);
+      
       state = state.copyWith(
         isLoading: false,
-        daily: List<Map<String, dynamic>>.from(data['challenges'] ?? []),
+        daily: challengesList,
         error: null,
       );
       
@@ -481,7 +605,6 @@ final moodProvider = StateNotifierProvider<MoodNotifier, MoodState>(
   (ref) => MoodNotifier(ref.read(apiServiceProvider)),
 );
 
-// ✅ UNE SEULE DÉCLARATION - avec les 2 arguments (Ref)
 final challengesProvider = StateNotifierProvider<ChallengesNotifier, ChallengesState>(
   (ref) => ChallengesNotifier(ref.read(apiServiceProvider), ref),
 );

@@ -762,7 +762,7 @@ class _ProfessionalCard extends StatelessWidget {
                     children: [
                       Icon(Icons.medical_information, color: AppColors.accentRed, size: 18),
                       const SizedBox(width: 6),
-                      Text('Voir les professionnels LinkMind',
+                      Text('Voir les professionnels BASYAM',
                           style: AppTextStyles.bodySmall.copyWith(
                               color: AppColors.accent,
                               fontWeight: FontWeight.w800)),

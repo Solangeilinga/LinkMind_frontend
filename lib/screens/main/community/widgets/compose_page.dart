@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../utils/theme.dart';
 import '../models/post_type_config.dart';
 
@@ -29,6 +30,9 @@ class _ComposePageState extends State<ComposePage> {
   static const _maxChars = 1500;
   static const _types = ['feeling', 'question', 'support', 'success', 'tip'];
 
+  static const _kDraftContent = 'community_draft_content';
+  static const _kDraftType    = 'community_draft_type';
+
   @override
   void initState() {
     super.initState();
@@ -39,9 +43,65 @@ class _ComposePageState extends State<ComposePage> {
     if (widget.isEditing && widget.initialType != null) {
       _type = widget.initialType!;
     }
+
+    // Charger le brouillon sauvegardé (seulement en mode création)
+    if (!widget.isEditing) {
+      _loadDraft();
+    }
+
     _ctrl.addListener(() {
-      if (mounted) setState(() => _charCount = _ctrl.text.length);
+      if (mounted) {
+        setState(() => _charCount = _ctrl.text.length);
+        _saveDraft();
+      }
     });
+  }
+
+  Future<void> _loadDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final draft   = prefs.getString(_kDraftContent) ?? '';
+      final draftType = prefs.getString(_kDraftType) ?? 'feeling';
+      if (draft.isNotEmpty && mounted) {
+        setState(() {
+          _ctrl.text = draft;
+          _charCount = draft.length;
+          _type      = draftType;
+        });
+        // Montrer une snackbar discrète
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('📝 Brouillon restauré'),
+              duration: Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ));
+          }
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveDraft() async {
+    if (widget.isEditing) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (_ctrl.text.isEmpty) {
+        await prefs.remove(_kDraftContent);
+        await prefs.remove(_kDraftType);
+      } else {
+        await prefs.setString(_kDraftContent, _ctrl.text);
+        await prefs.setString(_kDraftType, _type);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _clearDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kDraftContent);
+      await prefs.remove(_kDraftType);
+    } catch (_) {}
   }
 
   @override
@@ -55,6 +115,7 @@ class _ComposePageState extends State<ComposePage> {
     setState(() => _isPosting = true);
     try {
       await widget.onSubmit!(_ctrl.text.trim(), _type, null);
+      await _clearDraft();    // Supprimer le brouillon après publication réussie
       if (mounted) Navigator.of(context).pop();
     } catch (_) {
       if (mounted) setState(() => _isPosting = false);
@@ -154,7 +215,7 @@ class _ComposePageState extends State<ComposePage> {
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: GestureDetector(
-                        onTap: () => setState(() => _type = id),
+                        onTap: () { setState(() => _type = id); _saveDraft(); },
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 180),
                           padding: const EdgeInsets.symmetric(

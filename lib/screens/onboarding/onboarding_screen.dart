@@ -50,11 +50,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   static const _slides = [
     _Slide(
       emoji: '🧠',
-      title: 'Bienvenue sur LinkMind',
+      title: 'Bienvenue sur BASYAM',
       body: 'Ton espace personnel pour prendre soin de ta santé mentale, chaque jour, à ton rythme.',
       color: AppColors.primary,
       gradientColor: AppColors.primaryLight,
-      lottieAnimation: 'assets/animations/yoga_mental_linkmind.json',
+      lottieAnimation: 'assets/animations/yoga_mental_basyam.json',
       features: [
         ('🔒', 'Anonymat total'),
         ('🌍', 'Conçu pour l\'Afrique'),
@@ -67,7 +67,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       body: 'Discute avec Mindo 24h/24. Il t\'écoute, te comprend et t\'accompagne à tout moment',
       color: AppColors.accent,
       gradientColor: AppColors.secondary,
-      lottieAnimation: 'assets/animations/love_linkmind.json',
+      lottieAnimation: 'assets/animations/love_basyam.json',
       features: [
         ('💙', 'Te comprend sans te juger'),
         ('⏰', 'Disponible à tout moment'),
@@ -80,7 +80,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       body: 'Psychologues, coachs et médecins à ta portée. Partage anonymement avec une communauté bienveillante.',
       color: AppColors.primaryDark,
       gradientColor: AppColors.primary,
-      lottieAnimation: 'assets/animations/community_linkmind.json',
+      lottieAnimation: 'assets/animations/community_basyam.json',
       features: [
         ('⭐', 'Accès facile'),
         ('🎭', 'Anonyme toujours'),
@@ -292,7 +292,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         children: [
           const Text('Tes objectifs ?', style: AppTextStyles.h2),
           const SizedBox(height: 12),
-          Text('Choisis ce qui te correspond. On adaptera ton expérience LinkMind.',
+          Text('Choisis ce qui te correspond. On adaptera ton expérience BASYAM.',
             style: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted, height: 1.5, fontSize: 15)),
           const SizedBox(height: 24),
           Wrap(

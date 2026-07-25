@@ -1,35 +1,35 @@
 // lib/utils/legal_texts.dart
-// Textes légaux LinkMind — Burkina Faso
+// Textes légaux BASYAM — Burkina Faso
 // Dernière mise à jour : 2025
 
 class LegalTexts {
 
   // ─── CONDITIONS GÉNÉRALES D'UTILISATION ──────────────────────────────────────
   static const String cgu = '''
-CONDITIONS GÉNÉRALES D'UTILISATION — LinkMind
+CONDITIONS GÉNÉRALES D'UTILISATION — BASYAM
 
 Dernière mise à jour : janvier 2025
 
 1. PRÉSENTATION
 
-LinkMind est une application mobile de bien-être mental destinée aux jeunes. Elle est éditée par LinkMind SAS, ci-après "LinkMind", "nous" ou "l'application".
+BASYAM est une application mobile de bien-être mental destinée aux jeunes. Elle est éditée par BASYAM SAS, ci-après "BASYAM", "nous" ou "l'application".
 
-En utilisant LinkMind, tu acceptes les présentes Conditions Générales d'Utilisation (CGU). Si tu n'es pas d'accord avec ces conditions, n'utilise pas l'application.
+En utilisant BASYAM, tu acceptes les présentes Conditions Générales d'Utilisation (CGU). Si tu n'es pas d'accord avec ces conditions, n'utilise pas l'application.
 
 2. CONDITIONS D'ACCÈS
 
-• Tu dois avoir au moins 15 ans pour utiliser LinkMind.
+• Tu dois avoir au moins 15 ans pour utiliser BASYAM.
 • Si tu as entre 15 et 18 ans, nous te recommandons d'informer un parent ou tuteur de ton utilisation.
 • Tu es responsable de la confidentialité de ton compte et de ton mot de passe.
 
 3. CE QUE LINKMIND EST — ET N'EST PAS
 
-LinkMind est un outil de soutien au bien-être mental. L'application :
+BASYAM est un outil de soutien au bien-être mental. L'application :
 ✓ Te propose des exercices et défis pour prendre soin de toi
 ✓ Te permet de partager avec une communauté bienveillante
 ✓ T'oriente vers des professionnels si nécessaire
 
-LinkMind N'EST PAS :
+BASYAM N'EST PAS :
 ✗ Un service médical ou psychiatrique
 ✗ Un substitut à une consultation professionnelle
 ✗ Un service d'urgence
@@ -42,7 +42,7 @@ Mindo est un assistant conversationnel basé sur l'intelligence artificielle. Se
 
 5. COMMUNAUTÉ
 
-En publiant dans la communauté LinkMind, tu t'engages à :
+En publiant dans la communauté BASYAM, tu t'engages à :
 • Respecter les autres membres
 • Ne pas partager de contenu offensant, violent ou illégal
 • Ne pas divulguer d'informations personnelles d'autres personnes
@@ -52,13 +52,13 @@ Tout contenu inapproprié peut être signalé et supprimé. En cas d'abus répé
 
 6. PROPRIÉTÉ INTELLECTUELLE
 
-L'application LinkMind, son design, ses textes et ses fonctionnalités sont protégés par le droit de la propriété intellectuelle. Toute reproduction non autorisée est interdite.
+L'application BASYAM, son design, ses textes et ses fonctionnalités sont protégés par le droit de la propriété intellectuelle. Toute reproduction non autorisée est interdite.
 
-Le contenu que tu publies dans la communauté reste ta propriété. En le publiant, tu accordes à LinkMind une licence non exclusive pour l'afficher dans l'application.
+Le contenu que tu publies dans la communauté reste ta propriété. En le publiant, tu accordes à BASYAM une licence non exclusive pour l'afficher dans l'application.
 
 7. MODIFICATIONS
 
-LinkMind se réserve le droit de modifier ces CGU. En cas de modification importante, tu seras informé dans l'application. La poursuite de l'utilisation après notification vaut acceptation des nouvelles CGU.
+BASYAM se réserve le droit de modifier ces CGU. En cas de modification importante, tu seras informé dans l'application. La poursuite de l'utilisation après notification vaut acceptation des nouvelles CGU.
 
 8. RÉSILIATION
 
@@ -66,22 +66,22 @@ Tu peux supprimer ton compte à tout moment depuis les paramètres de l'applicat
 
 9. LIMITATION DE RESPONSABILITÉ
 
-LinkMind ne peut être tenu responsable des décisions prises sur la base des conseils de l'assistant Mindo, ni des interactions entre membres de la communauté.
+BASYAM ne peut être tenu responsable des décisions prises sur la base des conseils de l'assistant Mindo, ni des interactions entre membres de la communauté.
 
 10. DROIT APPLICABLE
 
 Les présentes CGU sont soumises au droit burkinabè. Tout litige sera porté devant les juridictions compétentes de Ouagadougou.
 
-Contact : support@linkmind.app
+Contact : support@basyam.app
 ''';
 
   // ─── POLITIQUE DE CONFIDENTIALITÉ ────────────────────────────────────────────
   static const String privacy = '''
-POLITIQUE DE CONFIDENTIALITÉ — LinkMind
+POLITIQUE DE CONFIDENTIALITÉ — BASYAM
 
 Dernière mise à jour : janvier 2025
 
-Chez LinkMind, nous prenons la protection de tes données personnelles très au sérieux — surtout parce qu'elles concernent ta santé mentale.
+Chez BASYAM, nous prenons la protection de tes données personnelles très au sérieux — surtout parce qu'elles concernent ta santé mentale.
 
 1. DONNÉES COLLECTÉES
 
@@ -143,7 +143,7 @@ Tu as le droit de :
 • Supprimer ton compte et tes données
 • T'opposer à certains traitements
 
-Pour exercer ces droits : privacy@linkmind.app
+Pour exercer ces droits : privacy@basyam.app
 
 9. COOKIES ET DONNÉES LOCALES
 
@@ -153,7 +153,7 @@ L'application stocke localement sur ton appareil tes préférences et un token d
 
 Toute modification importante de cette politique sera notifiée dans l'application. La date de mise à jour est indiquée en haut de ce document.
 
-Contact : privacy@linkmind.app
+Contact : privacy@basyam.app
 Adresse : Ouagadougou, Burkina Faso
 ''';
 

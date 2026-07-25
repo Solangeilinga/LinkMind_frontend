@@ -23,7 +23,11 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   List<Map<String, dynamic>> _myPosts = [];
   bool _isLoadingAll = true;
   bool _isLoadingMine = true;
+  bool _isPaginating = false;
+  int _currentPage = 1;
+  bool _hasMore = true;
   String? _activeFilter;
+  String _sort = 'recent';   // 'recent' | 'popular'
   late final TabController _tabController;
 
   @override
@@ -43,32 +47,99 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
     super.dispose();
   }
 
-  Future<void> _loadFeed() async {
+  // ─── Méthode utilitaire pour extraire les posts ──────────────────────────
+  List<Map<String, dynamic>> _extractPosts(dynamic data) {
+    // Si c'est déjà une liste
+    if (data is List) {
+      try {
+        return data.cast<Map<String, dynamic>>();
+      } catch (e) {
+        debugPrint('⚠️ Erreur de cast de liste: $e');
+        return [];
+      }
+    }
+
+    // Si c'est un Map
+    if (data is Map<String, dynamic>) {
+      // Essayer différentes clés
+      final possibleKeys = ['posts', 'feed', 'data', 'results', 'items'];
+      for (final key in possibleKeys) {
+        if (data.containsKey(key)) {
+          final value = data[key];
+          if (value is List) {
+            try {
+              return value.cast<Map<String, dynamic>>();
+            } catch (e) {
+              continue;
+            }
+          }
+        }
+      }
+      
+      // Si le Map lui-même est un post
+      if (data.containsKey('_id') || data.containsKey('id')) {
+        return [data];
+      }
+    }
+
+    return [];
+  }
+
+  Future<void> _loadFeed({bool reset = true}) async {
     if (!mounted) return;
-    setState(() => _isLoadingAll = true);
+    if (reset) {
+      setState(() { _isLoadingAll = true; _currentPage = 1; _hasMore = true; });
+    } else {
+      if (_isPaginating || !_hasMore) return;
+      setState(() => _isPaginating = true);
+    }
     try {
-      final data = await ApiService().getFeed(page: 1);
+      final page = reset ? 1 : _currentPage + 1;
+      final data = await ApiService().getFeed(
+        page: page,
+        sort: _sort,
+        type: _activeFilter,
+      );
+      
+      // 🔥 CORRECTION : Extraction sécurisée des posts
+      final newPosts = _extractPosts(data);
+      
       if (mounted) {
         setState(() {
-          _allPosts = List<Map<String, dynamic>>.from(data['posts'] ?? []);
+          if (reset) {
+            _allPosts = newPosts;
+          } else {
+            // Déduplique par _id
+            final existing = _allPosts.map((p) => (p['_id'] ?? p['id']).toString()).toSet();
+            _allPosts.addAll(newPosts.where((p) => !existing.contains((p['_id'] ?? p['id']).toString())));
+            _currentPage = page;
+          }
+          _hasMore = newPosts.length >= 10;
           _isLoadingAll = false;
+          _isPaginating = false;
         });
         SecurityService.recordActivity(type: 'view_feed');
       }
     } catch (e) {
       debugPrint('❌ Erreur chargement feed: $e');
-      if (mounted) setState(() => _isLoadingAll = false);
+      if (mounted) setState(() { _isLoadingAll = false; _isPaginating = false; });
     }
   }
+
+  Future<void> _loadMore() => _loadFeed(reset: false);
 
   Future<void> _loadMyPosts() async {
     if (!mounted) return;
     setState(() => _isLoadingMine = true);
     try {
       final data = await ApiService().getMyPosts(page: 1);
+      
+      // 🔥 CORRECTION : Extraction sécurisée des posts
+      final myPosts = _extractPosts(data);
+      
       if (mounted) {
         setState(() {
-          _myPosts = List<Map<String, dynamic>>.from(data['posts'] ?? []);
+          _myPosts = myPosts;
           _isLoadingMine = false;
         });
       }
@@ -176,9 +247,41 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                               style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
                         ],
                       ),
-                      ActivityRecorder(
-                        activityType: 'create_post_click',
-                        child: ElevatedButton.icon(
+                      Row(children: [
+                        // Toggle Récents / Populaires
+                        GestureDetector(
+                          onTap: () {
+                            setState(() => _sort = _sort == 'recent' ? 'popular' : 'recent');
+                            _loadFeed();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _sort == 'popular'
+                                  ? AppColors.accentOrange.withValues(alpha: 0.12)
+                                  : AppColors.surfaceVariant,
+                              borderRadius: AppRadius.full,
+                              border: Border.all(
+                                color: _sort == 'popular'
+                                    ? AppColors.accentOrange.withValues(alpha: 0.4)
+                                    : AppColors.divider,
+                              ),
+                            ),
+                            child: Text(
+                              _sort == 'popular' ? '🔥 Populaires' : '🕐 Récents',
+                              style: AppTextStyles.caption.copyWith(
+                                color: _sort == 'popular'
+                                    ? AppColors.accentOrange
+                                    : AppColors.onSurfaceMuted,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ActivityRecorder(
+                          activityType: 'create_post_click',
+                          child: ElevatedButton.icon(
                           onPressed: _openComposePage,
                           icon: const Icon(Icons.edit_outlined, size: 16),
                           label: const Text('Partager'),
@@ -188,7 +291,8 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                           ),
                         ),
                       ),
-                    ],
+                    ]),
+                  ],
                   ),
                   const SizedBox(height: 14),
                   Container(
@@ -250,8 +354,10 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                   FeedList(
                     posts: _filtered(_allPosts),
                     isLoading: _isLoadingAll,
-                    onRefresh: _loadFeed,
-                    onLike: _toggleLike,   // conservé mais ne fait rien
+                    isPaginating: _isPaginating,
+                    onRefresh: () => _loadFeed(reset: true),
+                    onLoadMore: _hasMore ? _loadMore : null,
+                    onLike: _toggleLike,
                     onDelete: _deletePost,
                     onCompose: _openComposePage,
                     emptyMessage: _activeFilter != null

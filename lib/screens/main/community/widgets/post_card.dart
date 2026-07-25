@@ -44,11 +44,17 @@ class _PostCardState extends State<PostCard> {
 
   bool _isEditing = false;
 
+  // États pour "Moi aussi"
+  late bool _isSameFeeling;
+  late int _sameFeelingsCount;
+
   String get _postId =>
       (widget.post['_id'] ?? widget.post['id'] ?? '').toString();
   String get _content => widget.post['content'] as String? ?? '';
 
   void _updateReactionsFromPost() {
+    _isSameFeeling   = widget.post['isSameFeeling'] == true;
+    _sameFeelingsCount = (widget.post['sameFeelingsCount'] as int?) ?? 0;
     final reactions = widget.post['reactions'] as List? ?? [];
     _reactions = reactions.map((r) => Map<String, dynamic>.from(r)).toList();
     _totalReactions =
@@ -168,6 +174,27 @@ class _PostCardState extends State<PostCard> {
     }
   }
 
+  // ─── "Moi aussi" ────────────────────────────────────────────────────────────
+  Future<void> _handleSameFeeling() async {
+    final prev = _isSameFeeling;
+    final prevCount = _sameFeelingsCount;
+    setState(() {
+      _isSameFeeling    = !_isSameFeeling;
+      _sameFeelingsCount = (_isSameFeeling ? prevCount + 1 : prevCount - 1).clamp(0, 999999);
+    });
+    try {
+      final res = await ApiService().toggleSameFeeling(_postId);
+      if (mounted) {
+        setState(() {
+          _isSameFeeling    = res['sameFeeling'] as bool? ?? _isSameFeeling;
+          _sameFeelingsCount = res['sameFeelingsCount'] as int? ?? _sameFeelingsCount;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() { _isSameFeeling = prev; _sameFeelingsCount = prevCount; });
+    }
+  }
+
   // ==========================================================================
   // Commentaires
   // ==========================================================================
@@ -281,6 +308,10 @@ class _PostCardState extends State<PostCard> {
   // ==========================================================================
   void _onCommentPosted(Map<String, dynamic> comment, String? parentId) {
     setState(() {
+      // Met à jour le compteur local immédiatement
+      if (parentId == null) {
+        widget.post['commentsCount'] = ((widget.post['commentsCount'] ?? 0) as int) + 1;
+      }
       if (parentId != null) {
         final idx = _findComment(_comments, parentId);
         if (idx != null) {
@@ -295,8 +326,6 @@ class _PostCardState extends State<PostCard> {
         }
       } else {
         _comments.add({...comment, 'replies': []});
-        widget.post['commentsCount'] =
-            ((widget.post['commentsCount'] ?? 0) as int) + 1;
       }
     });
   }
@@ -497,6 +526,60 @@ class _PostCardState extends State<PostCard> {
               ),
           ]),
         ),
+        // Badge "Populaire"
+        if (post['isTrending'] == true)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: [
+                  AppColors.accentOrange.withValues(alpha: 0.15),
+                  AppColors.primary.withValues(alpha: 0.08),
+                ]),
+                borderRadius: AppRadius.full,
+                border: Border.all(
+                    color: AppColors.accentOrange.withValues(alpha: 0.4)),
+              ),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                Text('🔥', style: TextStyle(fontSize: 11)),
+                SizedBox(width: 4),
+                Text('Populaire',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.accentOrange)),
+              ]),
+            ),
+          ),
+
+        // Défi complété lié
+        if (post['challenge'] != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                  color: AppColors.secondary.withValues(alpha: 0.08),
+                  borderRadius: AppRadius.full,
+                  border: Border.all(
+                      color: AppColors.secondary.withValues(alpha: 0.25))),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text(
+                  (post['challenge'] as Map?)?['icon'] as String? ?? '⚡',
+                  style: const TextStyle(fontSize: 13),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Défi : ${(post['challenge'] as Map?)?['title'] ?? ''}',
+                  style: AppTextStyles.caption.copyWith(
+                      color: AppColors.secondary,
+                      fontWeight: FontWeight.w700),
+                ),
+              ]),
+            ),
+          ),
+
         if (moodEmoji != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
@@ -531,8 +614,9 @@ class _PostCardState extends State<PostCard> {
           ]),
         ),
         const Divider(color: AppColors.divider, height: 1),
-        // Boutons d'action : LikeButton gère l'affichage des réactions et du compteur
+        // Boutons d'action
         Row(children: [
+          // Réactions
           Expanded(
             child: LikeButton(
               isLiked: _isLiked,
@@ -544,6 +628,49 @@ class _PostCardState extends State<PostCard> {
             ),
           ),
           Container(width: 1, height: 24, color: AppColors.divider),
+
+          // "Moi aussi"
+          Expanded(
+            child: GestureDetector(
+              onTap: _handleSameFeeling,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: _isSameFeeling
+                      ? AppColors.primary.withValues(alpha: 0.06)
+                      : Colors.transparent,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _isSameFeeling ? '🤝' : '🤍',
+                      style: const TextStyle(fontSize: 18),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _sameFeelingsCount > 0
+                          ? '$_sameFeelingsCount'
+                          : 'Moi aussi',
+                      style: AppTextStyles.caption.copyWith(
+                        color: _isSameFeeling
+                            ? AppColors.primary
+                            : AppColors.onSurfaceMuted,
+                        fontWeight: _isSameFeeling
+                            ? FontWeight.w800
+                            : FontWeight.w600,
+                        fontSize: _sameFeelingsCount > 0 ? 13 : 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Container(width: 1, height: 24, color: AppColors.divider),
+
+          // Commentaires
           Expanded(
             child: GestureDetector(
               onTap: _toggleComments,
@@ -558,9 +685,9 @@ class _PostCardState extends State<PostCard> {
                             ? AppColors.primary
                             : AppColors.onSurfaceMuted),
                     const SizedBox(width: 4),
-                    if (commentsCount > 0)
+                    if ((widget.post['commentsCount'] ?? 0) > 0)
                       Text(
-                        '$commentsCount',
+                        '${widget.post['commentsCount']}',
                         style: AppTextStyles.caption.copyWith(
                           color: _showComments
                               ? AppColors.primary
@@ -576,8 +703,33 @@ class _PostCardState extends State<PostCard> {
           ),
           Container(width: 1, height: 24, color: AppColors.divider),
           if (!widget.isMine)
-            ReportButton(targetType: 'post', targetId: _postId, isSmall: true),
+            ReportButton(
+              targetType: 'post',
+              targetId: _postId,
+              isSmall: true,
+              onReported: () {
+                // Feedback visuel : griser le post
+                setState(() => widget.post['_reported'] = true);
+              },
+            ),
         ]),
+        // Post signalé — feedback visible
+        if (widget.post['_reported'] == true)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            color: AppColors.surfaceVariant,
+            child: Row(children: [
+              const Icon(Icons.check_circle_outline,
+                  size: 14, color: AppColors.secondary),
+              const SizedBox(width: 6),
+              Text(
+                'Signalement envoyé — notre équipe vérifie.',
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.onSurfaceMuted),
+              ),
+            ]),
+          ),
         if (_showComments)
           CommentsSection(
             postId: _postId,

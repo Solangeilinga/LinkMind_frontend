@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -260,7 +261,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                 children: [
                   IconMapper.getIcon('👑', size: 56, color: AppColors.primary),
                   const SizedBox(height: 8),
-                  const Text('Débloque tout le potentiel de LinkMind',
+                  const Text('Débloque tout le potentiel de BASYAM',
                       style: AppTextStyles.h2, textAlign: TextAlign.center),
                   const SizedBox(height: 8),
                   Text('Accède à toutes les fonctionnalités Premium',
@@ -609,4 +610,44 @@ class _PaymentWebViewState extends State<PaymentWebView> {
       ),
     );
   }
+}
+
+
+// ─── Contact support premium ──────────────────────────────────────────────────
+class _PremiumContactSection extends StatelessWidget {
+  const _PremiumContactSection();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.fromLTRB(0, 8, 0, 0),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceVariant,
+          borderRadius: AppRadius.lg,
+        ),
+        child: Column(children: [
+          Text('Un problème avec le paiement ?',
+              style: AppTextStyles.body
+                  .copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 6),
+          Text('Notre équipe répond dans les 24h',
+              style: AppTextStyles.caption
+                  .copyWith(color: AppColors.onSurfaceMuted)),
+          const SizedBox(height: 14),
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            OutlinedButton.icon(
+              onPressed: () async {
+                final uri = Uri.parse(
+                    'https://wa.me/22600000000?text=Bonjour%2C%20j%27ai%20un%20probl%C3%A8me%20avec%20mon%20abonnement%20BASYAM%20Premium.');
+                if (await canLaunchUrl(uri)) launchUrl(uri);
+              },
+              icon: const Text('💬', style: TextStyle(fontSize: 16)),
+              label: const Text('Écrire sur WhatsApp'),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: AppColors.divider),
+              ),
+            ),
+          ]),
+        ]),
+      );
 }

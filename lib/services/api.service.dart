@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
+import 'dart:io';
 import '../utils/theme.dart';
 import 'cache_manager.dart';
 
@@ -45,6 +47,12 @@ class ApiException implements Exception {
 // ============================================================================
 
 class ApiService {
+  static void Function()? _onSessionReplaced;
+
+  static void setSessionReplacedCallback(void Function() cb) {
+    _onSessionReplaced = cb;
+  }
+
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
   ApiService._internal();
@@ -55,18 +63,37 @@ class ApiService {
 
   static bool disableCache = kDebugMode;
 
+  // 🔧 Désactiver la vérification SSL UNIQUEMENT en debug (pour tester)
+  static bool _ignoreSSLCertificates = kDebugMode;
+
   // ─── Token Management ──────────────────────────────────────────────────────
-  Future<void> saveTokens(String access, String refresh) async {
+  Future<void> saveTokens(String access, [String? refresh]) async {
     _accessToken = access;
     await _storage.write(key: 'access_token', value: access);
-    await _storage.write(key: 'refresh_token', value: refresh);
+    if (refresh != null) {
+      await _storage.write(key: 'refresh_token', value: refresh);
+    } else {
+      await _storage.write(key: 'refresh_token', value: access);
+    }
+    if (kDebugMode) {
+      debugPrint('✅ TOKEN SAUVEGARDÉ : ${access.substring(0, 10)}...');
+    }
   }
 
   Future<String?> getAccessToken() async {
-    if (_accessToken != null) return _accessToken;
+    if (_accessToken != null) {
+      if (kDebugMode) {
+        debugPrint('🔑 Token en mémoire : ${_accessToken!.substring(0, 10)}...');
+      }
+      return _accessToken;
+    }
     try {
       _accessToken = await _storage.read(key: 'access_token');
-    } catch (_) {
+      if (kDebugMode) {
+        debugPrint('🔑 Token lu depuis storage : ${_accessToken?.substring(0, 10) ?? 'null'}...');
+      }
+    } catch (e) {
+      debugPrint('❌ Erreur lecture token : $e');
       try { await _storage.deleteAll(); } catch (_) {}
       _accessToken = null;
     }
@@ -92,8 +119,12 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        await saveTokens(data['accessToken'], data['refreshToken']);
-        return true;
+        final newAccess = data['accessToken'] ?? data['access_token'];
+        final newRefresh = data['refreshToken'] ?? data['refresh_token'];
+        if (newAccess != null) {
+          await saveTokens(newAccess, newRefresh);
+          return true;
+        }
       }
       return false;
     } catch (_) {
@@ -104,15 +135,86 @@ class ApiService {
   Future<void> clearTokens() async {
     _accessToken = null;
     await _storage.deleteAll();
+    if (kDebugMode) {
+      debugPrint('🗑️ Tous les tokens supprimés');
+    }
   }
 
   // ─── HTTP Helpers ──────────────────────────────────────────────────────────
   Future<Map<String, String>> _getHeaders() async {
     final token = await getAccessToken();
+    if (kDebugMode) {
+      debugPrint('📤 En-têtes : Authorization = ${token != null ? 'Bearer ${token.substring(0, 10)}...' : 'null'}');
+    }
     return {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'User-Agent': 'LinkMind-Mobile/1.0',
       if (token != null) 'Authorization': 'Bearer $token',
     };
+  }
+
+  Future<http.Client> _getClient() async {
+    if (kDebugMode && _ignoreSSLCertificates) {
+      final ioClient = HttpClient()
+        ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+      return IOClient(ioClient);
+    }
+    return http.Client();
+  }
+
+  // ─── Data Extraction Helper ──────────────────────────────────────────────
+  dynamic _extractData(dynamic response) {
+    if (response is Map<String, dynamic>) {
+      // Si la réponse a une structure avec 'data'
+      if (response.containsKey('data')) {
+        final data = response['data'];
+        if (data is Map || data is List) {
+          return data;
+        }
+      }
+      // Si la réponse a une structure avec 'user'
+      if (response.containsKey('user')) {
+        final user = response['user'];
+        if (user is Map) {
+          return user;
+        }
+      }
+      // Si la réponse a une structure avec 'challenge' ou 'challenges'
+      if (response.containsKey('challenges')) {
+        final challenges = response['challenges'];
+        if (challenges is List) {
+          return challenges;
+        }
+      }
+      if (response.containsKey('challenge')) {
+        final challenge = response['challenge'];
+        if (challenge is Map) {
+          return challenge;
+        }
+      }
+      // Si la réponse a une structure avec 'posts'
+      if (response.containsKey('posts')) {
+        final posts = response['posts'];
+        if (posts is List) {
+          return posts;
+        }
+      }
+      // Si la réponse a une structure avec 'feed'
+      if (response.containsKey('feed')) {
+        final feed = response['feed'];
+        if (feed is List) {
+          return feed;
+        }
+      }
+      // Sinon, retourner le Map tel quel
+      return response;
+    }
+    // Si c'est une liste, la retourner
+    if (response is List) {
+      return response;
+    }
+    return response;
   }
 
   dynamic _cleanPosts(dynamic response) {
@@ -136,14 +238,39 @@ class ApiService {
     return response;
   }
 
+  // ─── Response Handler ─────────────────────────────────────────────────────
   Future<dynamic> _handleResponse(http.Response response) async {
     final body = jsonDecode(response.body);
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      return _cleanPosts(body);
+      // Nettoyer les posts si présents
+      dynamic result = _cleanPosts(body);
+      
+      // 🔥 EXTRAIRE LES DONNÉES CORRECTEMENT
+      result = _extractData(result);
+      
+      // 🔍 DEBUG
+      if (kDebugMode) {
+        debugPrint('📦 Response type: ${result.runtimeType}');
+        if (result is Map) {
+          debugPrint('📦 Response keys: ${(result as Map).keys}');
+        }
+        if (result is List) {
+          debugPrint('📦 Response list length: ${result.length}');
+        }
+      }
+      
+      return result;
     }
 
     if (response.statusCode == 401) {
+      if (body['code'] == 'SESSION_REPLACED') {
+        _onSessionReplaced?.call();
+        throw SecurityException(
+          'Connexion détectée sur un autre appareil. Tu as été déconnecté(e).',
+          SecurityErrorType.sessionExpired,
+        );
+      }
       if (body['code'] == 'SESSION_EXPIRED') {
         throw SecurityException('Session expirée', SecurityErrorType.sessionExpired);
       }
@@ -181,8 +308,9 @@ class ApiService {
   Future<dynamic> _execute(
       Future<http.Response> Function(Map<String, String> headers) fn) async {
     final headers = await _getHeaders();
-    final response = await fn(headers);
+    final client = await _getClient();
     try {
+      final response = await fn(headers);
       return _handleResponse(response);
     } on ApiException catch (e) {
       if (e.retryable) {
@@ -191,6 +319,13 @@ class ApiService {
         return _handleResponse(retryResponse);
       }
       rethrow;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ ERREUR RÉSEAU dans _execute : $e');
+      }
+      rethrow;
+    } finally {
+      client.close();
     }
   }
 
@@ -246,6 +381,9 @@ class ApiService {
   Future<dynamic> _fetchFromNetwork(String path, Map<String, String>? queryParams) async {
     final uri = Uri.parse('${AppConstants.baseUrl}$path')
         .replace(queryParameters: queryParams);
+    if (kDebugMode) {
+      debugPrint('🌐 Appel réseau : $uri');
+    }
     final result = await _execute(
         (h) => http.get(uri, headers: h).timeout(const Duration(seconds: 15)));
 
@@ -275,6 +413,9 @@ class ApiService {
 
   Future<dynamic> post(String path, Map<String, dynamic> body) async {
     final uri = Uri.parse('${AppConstants.baseUrl}$path');
+    if (kDebugMode) {
+      debugPrint('🌐 POST $uri');
+    }
     return await _execute((h) => http
         .post(uri, headers: h, body: jsonEncode(body))
         .timeout(const Duration(seconds: 15)));
@@ -311,7 +452,7 @@ class ApiService {
     String? country,
     String? gender,
   }) async {
-    return await post('/auth/register', {
+    final result = await post('/auth/register', {
       'email': email,
       'password': password,
       if (anonymousAlias != null && anonymousAlias.isNotEmpty) 'anonymousAlias': anonymousAlias,
@@ -321,16 +462,55 @@ class ApiService {
       if (country != null && country.isNotEmpty) 'country': country,
       if (gender != null) 'gender': gender,
     });
+
+    final accessToken = result['accessToken'] ?? result['access_token'] ?? result['token'];
+    final refreshToken = result['refreshToken'] ?? result['refresh_token'] ?? result['refresh'];
+    if (accessToken != null) {
+      await saveTokens(accessToken, refreshToken);
+      invalidateCache('/users/me');
+    }
+    return result;
   }
 
-  Future<Map<String, dynamic>> login(
-      {String? email, required String password}) async {
-    final result = await post('/auth/login', {
-      if (email != null && email.isNotEmpty) 'email': email,
-      'password': password,
-    });
-    invalidateCache('/users/me');
-    return result;
+  Future<Map<String, dynamic>> login({String? email, required String password}) async {
+    try {
+      final uri = Uri.parse('${AppConstants.baseUrl}/auth/login');
+      if (kDebugMode) {
+        debugPrint('🌐 Tentative de connexion à : $uri');
+      }
+
+      final result = await post('/auth/login', {
+        if (email != null && email.isNotEmpty) 'email': email,
+        'password': password,
+      });
+
+      if (kDebugMode) {
+        debugPrint('📦 Réponse login brute : $result');
+      }
+
+      final accessToken = result['accessToken'] ?? result['access_token'] ?? result['token'];
+      final refreshToken = result['refreshToken'] ?? result['refresh_token'] ?? result['refresh'];
+
+      if (accessToken != null) {
+        await saveTokens(accessToken, refreshToken);
+        if (kDebugMode) {
+          debugPrint('✅ Tokens sauvegardés avec succès');
+        }
+      } else {
+        if (kDebugMode) {
+          debugPrint('⚠️ Aucun access token trouvé. Clés disponibles : ${result.keys}');
+        }
+      }
+
+      invalidateCache('/users/me');
+      return result;
+    } catch (e, stack) {
+      if (kDebugMode) {
+        debugPrint('❌ ERREUR LORS DU LOGIN : $e');
+        debugPrint(stack.toString());
+      }
+      rethrow;
+    }
   }
 
   Future<void> logout() async {
@@ -395,9 +575,24 @@ class ApiService {
       await get('/mood/insights');
 
   // ─── Challenges ────────────────────────────────────────────────────────────
-  Future<Map<String, dynamic>> getDailyChallenges({String? moodLabel}) async =>
-      await get('/challenges/daily',
-          queryParams: moodLabel != null ? {'moodLabel': moodLabel} : null);
+  Future<List<dynamic>> getDailyChallenges({String? moodLabel}) async {
+    final result = await get('/challenges/daily',
+        queryParams: moodLabel != null ? {'moodLabel': moodLabel} : null);
+    
+    // Si le résultat est déjà une liste, le retourner
+    if (result is List) {
+      return result;
+    }
+    // Si le résultat est un Map avec une clé 'challenges', l'extraire
+    if (result is Map && result.containsKey('challenges')) {
+      final challenges = result['challenges'];
+      if (challenges is List) {
+        return challenges;
+      }
+    }
+    // Sinon, retourner une liste vide
+    return [];
+  }
 
   Future<Map<String, dynamic>> completeChallenge(
     String challengeId, {
@@ -428,22 +623,46 @@ class ApiService {
   }
 
   // ─── Community ─────────────────────────────────────────────────────────────
-  Future<Map<String, dynamic>> getFeed(
-      {int page = 1, int limit = 20, String? type, bool forceRefresh = false}) async {
+  Future<List<dynamic>> getFeed({
+    int page = 1,
+    int limit = 20,
+    String? type,
+    String sort = 'recent',
+    bool forceRefresh = false,
+  }) async {
     final Map<String, String> params = {
       'page': page.toString(),
       'limit': limit.toString(),
+      'sort': sort,
     };
-    if (type != null && type.isNotEmpty) params['type'] = type;
-    return await get('/community/feed', queryParams: params, forceRefresh: forceRefresh);
+    if (type != null && type.isNotEmpty) params['postType'] = type;
+    final result = await get('/community/feed', queryParams: params, forceRefresh: forceRefresh);
+    
+    if (result is List) return result;
+    if (result is Map && result.containsKey('feed')) {
+      final feed = result['feed'];
+      if (feed is List) return feed;
+    }
+    if (result is Map && result.containsKey('posts')) {
+      final posts = result['posts'];
+      if (posts is List) return posts;
+    }
+    return [];
   }
 
-  Future<Map<String, dynamic>> getMyPosts(
+  Future<List<dynamic>> getMyPosts(
       {int page = 1, int limit = 20, bool forceRefresh = false}) async {
-    return await get('/community/my-posts', queryParams: {
+    final result = await get('/community/my-posts', queryParams: {
       'page': page.toString(),
       'limit': limit.toString(),
     }, forceRefresh: forceRefresh);
+    
+    if (result is List) return result;
+    if (result is Map && result.containsKey('posts')) {
+      final posts = result['posts'];
+      if (posts is List) return posts;
+    }
+    return [];
   }
 
   Future<Map<String, dynamic>> createPost({
@@ -574,8 +793,30 @@ class ApiService {
   }
 
   // ─── User ──────────────────────────────────────────────────────────────────
-  Future<Map<String, dynamic>> getMe({bool forceRefresh = false}) async =>
-      await get('/users/me', forceRefresh: forceRefresh);
+  Future<Map<String, dynamic>> getMe({bool forceRefresh = false}) async {
+    final result = await get('/users/me', forceRefresh: forceRefresh);
+    
+    // 🔍 DEBUG
+    if (kDebugMode) {
+      debugPrint('📦 getMe result type: ${result.runtimeType}');
+      if (result is Map) {
+        debugPrint('📦 getMe keys: ${(result as Map).keys}');
+      }
+    }
+    
+    // Si le résultat est déjà un Map, le retourner
+    if (result is Map<String, dynamic>) {
+      return result;
+    }
+    
+    // Si le résultat est un Map mais pas typé, le convertir
+    if (result is Map) {
+      return Map<String, dynamic>.from(result);
+    }
+    
+    // Sinon, retourner un Map vide
+    return {};
+  }
 
   Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
     final result = await patch('/users/me', data);

@@ -16,28 +16,32 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 2), _navigate);
+    // Aucun timer fixe — on navigue dès que l'auth est résolue.
+    // ref.listen est attaché dans build(), donc on attend juste
+    // que le premier build ait lieu.
   }
 
-  void _navigate() {
+  void _navigate(bool isAuthenticated) {
     if (!mounted) return;
-    final authState = ref.read(authProvider);
-    if (!authState.isLoading) {
-      context.go(authState.isAuthenticated ? '/home' : '/auth/login');
-    } else {
-      // Attendre un frame supplémentaire pour laisser le temps à l'initialisation
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          final newAuthState = ref.read(authProvider);
-          context.go(newAuthState.isAuthenticated ? '/home' : '/auth/login');
-        }
-      });
-    }
+    context.go(isAuthenticated ? '/home' : '/auth/login');
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    // Naviguer dès que isLoading passe à false, sans délai artificiel
+    ref.listen<AuthState>(authProvider, (prev, next) {
+      if (!next.isLoading) {
+        _navigate(next.isAuthenticated);
+      }
+    });
+
+    // Aussi vérifier l'état courant au premier build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = ref.read(authProvider);
+      if (!auth.isLoading && mounted) _navigate(auth.isAuthenticated);
+    });
+
     return Scaffold(
       backgroundColor: AppColors.primary,
       body: Center(
@@ -60,7 +64,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            Text('LinkMind',
+            Text('BASYAM',
                 style: AppTextStyles.h1.copyWith(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900)),
             const SizedBox(height: 8),
             Text('Where Minds Connect',

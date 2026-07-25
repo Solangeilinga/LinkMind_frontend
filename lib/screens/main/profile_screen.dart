@@ -1239,12 +1239,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                   helperText: 'Utilisé pour la connexion uniquement',
                 ),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                ),
-              ),
               const SizedBox(height: 16),
               const Text('Localisation', style: AppTextStyles.h4),
               const SizedBox(height: 12),
@@ -1273,11 +1267,13 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
                   labelText: 'Âge',
+                  prefixIcon: Icon(Icons.cake_outlined),
                   border: OutlineInputBorder(),
                 ),
               ),
-              const SizedBox(height: 12),
-              const Text('Genre', style: AppTextStyles.body),
+              const SizedBox(height: 16),
+              const Text('Genre', style: AppTextStyles.h4),
+              const SizedBox(height: 4),
               ..._genders.map((g) => RadioListTile<String>(
                     value: g.$1,
                     groupValue: _gender,

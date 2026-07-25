@@ -1551,7 +1551,7 @@ class _NoSlotsBox extends StatelessWidget {
       const SizedBox(height: 8),
       Text('Aucun créneau disponible en ligne', style: AppTextStyles.bodySmall.copyWith(color: AppColors.onSurfaceMuted)),
       const SizedBox(height: 4),
-      Text('Ta demande sera traitée manuellement par l\'équipe LinkMind.',
+      Text('Ta demande sera traitée manuellement par l\'équipe BASYAM.',
         style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted),
         textAlign: TextAlign.center),
     ]),

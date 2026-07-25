@@ -1,22 +1,78 @@
-// lib/models/user.model.dart
+// ============================================================================
+// FICHIER: lib/models/user_model.dart
+// ============================================================================
+
+// ─── Fonctions utilitaires pour la sécurité des types ──────────────────────
+String _safeString(Map<String, dynamic> json, String key, [String defaultValue = '']) {
+  final value = json[key];
+  if (value == null) return defaultValue;
+  return value.toString();
+}
+
+int _safeInt(Map<String, dynamic> json, String key, [int defaultValue = 0]) {
+  final value = json[key];
+  if (value == null) return defaultValue;
+  if (value is int) return value;
+  if (value is double) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? defaultValue;
+  return defaultValue;
+}
+
+bool _safeBool(Map<String, dynamic> json, String key, [bool defaultValue = false]) {
+  final value = json[key];
+  if (value == null) return defaultValue;
+  if (value is bool) return value;
+  if (value is String) return value.toLowerCase() == 'true';
+  if (value is num) return value != 0;
+  return defaultValue;
+}
+
+String? _safeStringNullable(Map<String, dynamic> json, String key) {
+  final value = json[key];
+  if (value == null) return null;
+  return value.toString();
+}
+
+List<String> _safeStringList(Map<String, dynamic> json, String key) {
+  final value = json[key];
+  if (value == null) return [];
+  if (value is List) {
+    return value.map((e) => e?.toString() ?? '').toList();
+  }
+  return [];
+}
+
+List<UserBadge> _safeBadgeList(Map<String, dynamic> json, String key) {
+  final value = json[key];
+  if (value == null) return [];
+  if (value is List) {
+    return value
+        .whereType<Map<String, dynamic>>()
+        .map((b) => UserBadge.fromJson(b))
+        .toList();
+  }
+  return [];
+}
+
+// ─── UserModel ───────────────────────────────────────────────────────────────
 class UserModel {
   final String id;
   final String name;
   final String? firstName;
   final String? lastName;
   final String? email;
-  final int?    age;
+  final int? age;
   final String? city;
   final String? country;
   final String? gender;
   final String? avatar;
   final String? anonymousAlias;
-  final int     totalPoints;
-  final String  level;
-  final int     streakDays;
-  final bool    isPremium;
-  final bool    isEmailVerified;      // ✅ Vérification email
-  final bool    legalAccepted;        // ✅ CGU acceptées
+  final int totalPoints;
+  final String level;
+  final int streakDays;
+  final bool isPremium;
+  final bool isEmailVerified;
+  final bool legalAccepted;
   final UserPreferences preferences;
   final List<UserBadge> badges;
 
@@ -42,31 +98,44 @@ class UserModel {
     this.badges = const [],
   });
 
-  factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
-    id:        json['id'] ?? json['_id'] ?? '',
-    name:      json['name'] ?? '',
-    firstName: json['firstName'],
-    lastName:  json['lastName'],
-    email:     json['email'],
-    age:       json['age'],
-    city:      json['city'],
-    country:   json['country'],
-    gender:    json['gender'],
-    avatar:    json['avatar'],
-    anonymousAlias: json['anonymousAlias'],
-    totalPoints: json['totalPoints'] ?? 0,
-    level:       json['level'] ?? 'bronze',
-    streakDays:  json['streakDays'] ?? 0,
-    isPremium:   json['isPremium'] ?? false,
-    isEmailVerified: json['isEmailVerified'] ?? false,
-    legalAccepted:   json['legalAccepted'] ?? false,
-    preferences: json['preferences'] != null
-        ? UserPreferences.fromJson(json['preferences'])
-        : const UserPreferences(),
-    badges: (json['badges'] as List?)
-        ?.map((b) => UserBadge.fromJson(b))
-        .toList() ?? [],
-  );
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    // 🔒 Extraction sécurisée des données
+    final userData = json;
+    
+    // Si le JSON contient une clé 'data', l'utiliser
+    final data = userData.containsKey('data') && userData['data'] is Map
+        ? Map<String, dynamic>.from(userData['data'])
+        : userData;
+
+    // Si le JSON contient une clé 'user', l'utiliser
+    final user = data.containsKey('user') && data['user'] is Map
+        ? Map<String, dynamic>.from(data['user'])
+        : data;
+
+    return UserModel(
+      id: _safeString(user, 'id', _safeString(user, '_id', '')),
+      name: _safeString(user, 'name'),
+      firstName: _safeStringNullable(user, 'firstName'),
+      lastName: _safeStringNullable(user, 'lastName'),
+      email: _safeStringNullable(user, 'email'),
+      age: _safeInt(user, 'age'),
+      city: _safeStringNullable(user, 'city'),
+      country: _safeStringNullable(user, 'country'),
+      gender: _safeStringNullable(user, 'gender'),
+      avatar: _safeStringNullable(user, 'avatar'),
+      anonymousAlias: _safeStringNullable(user, 'anonymousAlias'),
+      totalPoints: _safeInt(user, 'totalPoints'),
+      level: _safeString(user, 'level', 'bronze'),
+      streakDays: _safeInt(user, 'streakDays'),
+      isPremium: _safeBool(user, 'isPremium'),
+      isEmailVerified: _safeBool(user, 'isEmailVerified'),
+      legalAccepted: _safeBool(user, 'legalAccepted'),
+      preferences: user.containsKey('preferences') && user['preferences'] is Map
+          ? UserPreferences.fromJson(Map<String, dynamic>.from(user['preferences']))
+          : const UserPreferences(),
+      badges: _safeBadgeList(user, 'badges'),
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -149,7 +218,7 @@ class UserModel {
   }
 }
 
-// ─── Le reste du fichier (UserPreferences, UserBadge, MoodEntry, ChallengeModel, PostModel) est inchangé ───
+// ─── UserPreferences ─────────────────────────────────────────────────────────
 class UserPreferences {
   final bool notificationsEnabled;
   final String reminderTime;
@@ -164,10 +233,10 @@ class UserPreferences {
   });
 
   factory UserPreferences.fromJson(Map<String, dynamic> json) => UserPreferences(
-    notificationsEnabled: json['notificationsEnabled'] ?? true,
-    reminderTime: json['reminderTime'] ?? '20:00',
-    anonymousInCommunity: json['anonymousInCommunity'] ?? false,
-    theme: json['theme'] ?? 'auto',
+    notificationsEnabled: _safeBool(json, 'notificationsEnabled', true),
+    reminderTime: _safeString(json, 'reminderTime', '20:00'),
+    anonymousInCommunity: _safeBool(json, 'anonymousInCommunity', false),
+    theme: _safeString(json, 'theme', 'auto'),
   );
 
   Map<String, dynamic> toJson() => {
@@ -178,6 +247,7 @@ class UserPreferences {
   };
 }
 
+// ─── UserBadge ──────────────────────────────────────────────────────────────
 class UserBadge {
   final String badgeId;
   final DateTime? earnedAt;
@@ -185,8 +255,10 @@ class UserBadge {
   const UserBadge({required this.badgeId, this.earnedAt});
 
   factory UserBadge.fromJson(Map<String, dynamic> json) => UserBadge(
-    badgeId: json['badgeId'],
-    earnedAt: json['earnedAt'] != null ? DateTime.parse(json['earnedAt']) : null,
+    badgeId: _safeString(json, 'badgeId', _safeString(json, 'id', '')),
+    earnedAt: json['earnedAt'] != null 
+        ? DateTime.tryParse(json['earnedAt'].toString()) 
+        : null,
   );
 
   Map<String, dynamic> toJson() => {
@@ -195,7 +267,7 @@ class UserBadge {
   };
 }
 
-// ─── Mood Model ──────────────────────────────────────────────────────────────
+// ─── MoodEntry ──────────────────────────────────────────────────────────────
 class MoodEntry {
   final String? id;
   final int? score;
@@ -218,14 +290,16 @@ class MoodEntry {
   });
 
   factory MoodEntry.fromJson(Map<String, dynamic> json) => MoodEntry(
-    id: json['_id'],
-    score: json['score'],
-    label: json['label'],
-    note: json['note'],
-    factors: (json['factors'] as List?)?.map((f) => f.toString()).toList() ?? [],
-    energyLevel: json['energyLevel'],
-    date: json['date'],
-    recordedAt: json['recordedAt'] != null ? DateTime.parse(json['recordedAt']) : null,
+    id: _safeStringNullable(json, '_id') ?? _safeStringNullable(json, 'id'),
+    score: _safeInt(json, 'score'),
+    label: _safeStringNullable(json, 'label'),
+    note: _safeStringNullable(json, 'note'),
+    factors: _safeStringList(json, 'factors'),
+    energyLevel: _safeInt(json, 'energyLevel'),
+    date: _safeString(json, 'date'),
+    recordedAt: json['recordedAt'] != null 
+        ? DateTime.tryParse(json['recordedAt'].toString()) 
+        : null,
   );
 
   Map<String, dynamic> toJson() => {
@@ -240,7 +314,7 @@ class MoodEntry {
   };
 }
 
-// ─── Challenge Model ─────────────────────────────────────────────────────────
+// ─── ChallengeModel ──────────────────────────────────────────────────────────
 class ChallengeModel {
   final String id;
   final String title;
@@ -273,19 +347,19 @@ class ChallengeModel {
   });
 
   factory ChallengeModel.fromJson(Map<String, dynamic> json) => ChallengeModel(
-    id: json['_id'] ?? json['id'],
-    title: json['title'],
-    description: json['description'],
-    instructions: (json['instructions'] as List?)?.map((i) => i.toString()).toList() ?? [],
-    category: json['category'],
-    difficulty: json['difficulty'] ?? 'easy',
-    durationMinutes: json['durationMinutes'] ?? 5,
-    points: json['points'] ?? 10,
-    icon: json['icon'] ?? '⚡',
-    targetMoods: (json['targetMoods'] as List?)?.map((m) => m.toString()).toList() ?? [],
-    isPremium: json['isPremium'] ?? false,
-    isCompleted: json['isCompleted'] ?? false,
-    reason: json['reason'],
+    id: _safeString(json, '_id', _safeString(json, 'id', '')),
+    title: _safeString(json, 'title'),
+    description: _safeString(json, 'description'),
+    instructions: _safeStringList(json, 'instructions'),
+    category: _safeString(json, 'category'),
+    difficulty: _safeString(json, 'difficulty', 'easy'),
+    durationMinutes: _safeInt(json, 'durationMinutes', 5),
+    points: _safeInt(json, 'points', 10),
+    icon: _safeString(json, 'icon', '⚡'),
+    targetMoods: _safeStringList(json, 'targetMoods'),
+    isPremium: _safeBool(json, 'isPremium'),
+    isCompleted: _safeBool(json, 'isCompleted'),
+    reason: _safeStringNullable(json, 'reason'),
   );
 
   Map<String, dynamic> toJson() => {
@@ -305,7 +379,7 @@ class ChallengeModel {
   };
 }
 
-// ─── Community Post Model ─────────────────────────────────────────────────────
+// ─── PostModel ──────────────────────────────────────────────────────────────
 class PostModel {
   final String id;
   final Map<String, dynamic>? author;
@@ -332,16 +406,18 @@ class PostModel {
   });
 
   factory PostModel.fromJson(Map<String, dynamic> json) => PostModel(
-    id: json['_id'] ?? json['id'],
-    author: json['author'],
-    content: json['content'],
-    postType: json['postType'] ?? 'general',
-    moodScore: json['moodScore'],
-    isAnonymous: json['isAnonymous'] ?? false,
-    likesCount: json['likesCount'] ?? 0,
-    commentsCount: json['commentsCount'] ?? 0,
-    isLiked: json['isLiked'] ?? false,
-    createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : DateTime.now(),
+    id: _safeString(json, '_id', _safeString(json, 'id', '')),
+    author: json['author'] is Map ? Map<String, dynamic>.from(json['author']) : null,
+    content: _safeString(json, 'content'),
+    postType: _safeString(json, 'postType', 'general'),
+    moodScore: _safeInt(json, 'moodScore'),
+    isAnonymous: _safeBool(json, 'isAnonymous'),
+    likesCount: _safeInt(json, 'likesCount'),
+    commentsCount: _safeInt(json, 'commentsCount'),
+    isLiked: _safeBool(json, 'isLiked'),
+    createdAt: json['createdAt'] != null 
+        ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
+        : DateTime.now(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -355,5 +431,114 @@ class PostModel {
     'commentsCount': commentsCount,
     'isLiked': isLiked,
     'createdAt': createdAt.toIso8601String(),
+  };
+}
+
+// ─── CompletionTypeConfig ──────────────────────────────────────────────────
+class CompletionTypeConfig {
+  final String type;
+  final Map<String, dynamic> config;
+
+  CompletionTypeConfig({required this.type, required this.config});
+
+  factory CompletionTypeConfig.fromJson(Map<String, dynamic> json) {
+    Map<String, dynamic> safeConfig = {};
+    final configValue = json['config'];
+    if (configValue is Map) {
+      safeConfig = Map<String, dynamic>.from(configValue);
+    }
+    
+    return CompletionTypeConfig(
+      type: _safeString(json, 'type', 'action'),
+      config: safeConfig,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'type': type,
+    'config': config,
+  };
+}
+
+// ─── Challenge (complet) ────────────────────────────────────────────────────
+class Challenge {
+  final String id;
+  final String title;
+  final String description;
+  final List<String> instructions;
+  final String category;
+  final String difficulty;
+  final int durationMinutes;
+  final int points;
+  final String icon;
+  final CompletionTypeConfig completionType;
+  final List<String> targetMoods;
+  final String requiredLevel;
+  final bool isPremium;
+  final bool isActive;
+  final int order;
+  final bool isCompleted;
+
+  Challenge({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.instructions,
+    required this.category,
+    required this.difficulty,
+    required this.durationMinutes,
+    required this.points,
+    required this.icon,
+    required this.completionType,
+    required this.targetMoods,
+    required this.requiredLevel,
+    required this.isPremium,
+    required this.isActive,
+    required this.order,
+    this.isCompleted = false,
+  });
+
+  factory Challenge.fromJson(Map<String, dynamic> json) {
+    final completionTypeData = json['completionType'] is Map
+        ? Map<String, dynamic>.from(json['completionType'])
+        : {'type': 'action', 'config': {}};
+    
+    return Challenge(
+      id: _safeString(json, '_id', _safeString(json, 'id', '')),
+      title: _safeString(json, 'title'),
+      description: _safeString(json, 'description'),
+      instructions: _safeStringList(json, 'instructions'),
+      category: _safeString(json, 'category'),
+      difficulty: _safeString(json, 'difficulty', 'easy'),
+      durationMinutes: _safeInt(json, 'durationMinutes', 5),
+      points: _safeInt(json, 'points', 10),
+      icon: _safeString(json, 'icon', '⚡'),
+      completionType: CompletionTypeConfig.fromJson(completionTypeData),
+      targetMoods: _safeStringList(json, 'targetMoods'),
+      requiredLevel: _safeString(json, 'requiredLevel', 'all'),
+      isPremium: _safeBool(json, 'isPremium'),
+      isActive: _safeBool(json, 'isActive', true),
+      order: _safeInt(json, 'order'),
+      isCompleted: _safeBool(json, 'isCompleted'),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    '_id': id,
+    'title': title,
+    'description': description,
+    'instructions': instructions,
+    'category': category,
+    'difficulty': difficulty,
+    'durationMinutes': durationMinutes,
+    'points': points,
+    'icon': icon,
+    'completionType': completionType.toJson(),
+    'targetMoods': targetMoods,
+    'requiredLevel': requiredLevel,
+    'isPremium': isPremium,
+    'isActive': isActive,
+    'order': order,
+    'isCompleted': isCompleted,
   };
 }

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
@@ -44,6 +45,7 @@ import 'firebase_options.dart';
 
 // Services
 import 'services/lazy_init_service.dart';
+import 'services/cache_manager.dart';
 
 // ✅ Provider pour SharedPreferences (préchargé une fois)
 final sharedPrefsProvider = FutureProvider<SharedPreferences>((ref) async {
@@ -72,7 +74,11 @@ void main() async {
     statusBarIconBrightness: Brightness.dark,
   ));
 
-  // ✅ 4. Initialisation notifications locales (asynchrone, non-bloquante)
+  // ✅ 4. Initialisation Hive (cache persistant)
+  await Hive.initFlutter();
+  await ApiCacheManager().init();
+
+  // ✅ 5. Initialisation notifications locales (asynchrone, non-bloquante)
   LocalNotificationService.init().then((_) {
     LocalNotificationService.setupAllReminders();
     debugPrint('✅ Notifications locales initialisées');
@@ -80,24 +86,24 @@ void main() async {
     debugPrint('⚠️ Erreur notifications: $e');
   });
 
-  // ✅ 5. LANCER L'APP IMMÉDIATEMENT (sans attendre Firebase!)
-  runApp(const ProviderScope(child: LinkMindApp()));
+  // ✅ 6. LANCER L'APP IMMÉDIATEMENT (sans attendre Firebase!)
+  runApp(const ProviderScope(child: BASYAMApp()));
 
-  // ✅ 6. Initialiser Firebase en BACKGROUND (après affichage de l'app)
+  // ✅ 7. Initialiser Firebase en BACKGROUND (après affichage de l'app)
   Future.delayed(const Duration(milliseconds: 500), () async {
     debugPrint('🚀 Starting background Firebase initialization...');
     await LazyInitService().initializeFirebase();
   });
 }
 
-class LinkMindApp extends ConsumerStatefulWidget {
-  const LinkMindApp({super.key});
+class BASYAMApp extends ConsumerStatefulWidget {
+  const BASYAMApp({super.key});
 
   @override
-  ConsumerState<LinkMindApp> createState() => _LinkMindAppState();
+  ConsumerState<BASYAMApp> createState() => _BASYAMAppState();
 }
 
-class _LinkMindAppState extends ConsumerState<LinkMindApp>
+class _BASYAMAppState extends ConsumerState<BASYAMApp>
     with WidgetsBindingObserver {
   late final GoRouter _router;
 
@@ -330,7 +336,7 @@ class _LinkMindAppState extends ConsumerState<LinkMindApp>
     }
 
     return MaterialApp.router(
-      title: 'LinkMind',
+      title: 'BASYAM',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
@@ -386,7 +392,7 @@ class _SplashLoader extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             Text(
-              'LinkMind',
+              'BASYAM',
               style: AppTextStyles.h1.copyWith(
                 color: Colors.white,
                 fontSize: 36,

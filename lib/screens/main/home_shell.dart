@@ -5,6 +5,7 @@ import '../../providers/content_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/professionals_provider.dart';
 import '../../utils/theme.dart';
+import '../../widgets/sos_widgets.dart';
 
 class HomeShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -26,10 +27,42 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   @override
   void initState() {
     super.initState();
-    // Charger les données dynamiques (moods, types pros)
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Charger les données dynamiques (moods, types pros)
       ref.read(contentProvider.notifier).load();
+      // Enregistrer le callback de kick session
+      ref.read(authProvider.notifier).setSessionReplacedCallback(() {
+        if (mounted) _showSessionReplacedDialog();
+      });
     });
+  }
+
+  void _showSessionReplacedDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
+        title: const Row(children: [
+          Text('📵', style: TextStyle(fontSize: 24)),
+          SizedBox(width: 10),
+          Expanded(child: Text('Connexion détectée ailleurs')),
+        ]),
+        content: const Text(
+          'Ton compte a été connecté sur un autre appareil. '
+          'Pour protéger tes données, tu as été déconnecté(e) de cet appareil.',
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.go('/auth/login');
+            },
+            child: const Text('Se reconnecter'),
+          ),
+        ],
+      ),
+    );
   }
 
   int _currentIndex(BuildContext context) {
@@ -43,7 +76,17 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final currentIndex = _currentIndex(context);
 
     return Scaffold(
-      body: widget.child,
+      body: Stack(
+        children: [
+          widget.child,
+          // Bouton SOS discret — accessible depuis tous les écrans
+          const Positioned(
+            top: 8,
+            right: 12,
+            child: SafeArea(child: SosButton()),
+          ),
+        ],
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: AppColors.surface,

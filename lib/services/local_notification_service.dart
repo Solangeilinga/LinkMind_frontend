@@ -26,24 +26,50 @@ class LocalNotificationService {
     _initialized = true;
   }
 
-  // ─── Rappel humeur quotidien ───────────────────────────────────────────────
-  static Future<void> scheduleDailyMoodReminder(String time) async {
+  // ─── Rappel humeur — texte contextuel selon dernière humeur ───────────────
+  static Future<void> scheduleDailyMoodReminder(
+    String time, {
+    String? lastMoodLabel,
+    int? streakDays,
+    int? badgesNeeded,  // combien de jours manquent pour le prochain badge
+  }) async {
     final parts = time.split(':');
-    final hour = int.tryParse(parts[0]) ?? 20;
+    final hour   = int.tryParse(parts[0]) ?? 20;
     final minute = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
 
     await _plugin.cancel(1);
 
-    final now = tz.TZDateTime.now(tz.local);
-    var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+    // Titre et corps contextuels
+    String title;
+    String body;
+
+    if (streakDays != null && streakDays >= 3) {
+      title = '🔥 $streakDays jours de suite !';
+      body  = 'Note ton humeur pour garder ton streak et ne pas tout perdre.';
+    } else if (lastMoodLabel == 'sad' || lastMoodLabel == 'anxious' || lastMoodLabel == 'stressed') {
+      title = 'Comment tu vas aujourd\'hui ? 💙';
+      body  = 'Hier tu traversais une période difficile. On est là si tu veux en parler.';
+    } else if (lastMoodLabel == 'happy' || lastMoodLabel == 'excited') {
+      title = 'Tu étais de bonne humeur hier 😊';
+      body  = 'Note ton humeur d\'aujourd\'hui et suis ton évolution !';
+    } else if (badgesNeeded != null && badgesNeeded <= 3) {
+      title = 'Plus que $badgesNeeded jour${badgesNeeded > 1 ? 's' : ''} pour ton badge 🏅';
+      body  = 'Note ton humeur maintenant et débloque ta prochaine récompense.';
+    } else {
+      title = 'Comment tu te sens aujourd\'hui ? 😊';
+      body  = 'Note ton humeur en 10 secondes et garde ton streak !';
+    }
+
+    final now       = tz.TZDateTime.now(tz.local);
+    var scheduled   = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
     if (scheduled.isBefore(now)) {
       scheduled = scheduled.add(const Duration(days: 1));
     }
 
     await _plugin.zonedSchedule(
       1,
-      'Comment tu te sens aujourd\'hui ? 😊',
-      'Note ton humeur en 10 secondes et garde ton streak !',
+      title,
+      body,
       scheduled,
       const NotificationDetails(
         android: AndroidNotificationDetails(
@@ -56,21 +82,29 @@ class LocalNotificationService {
         iOS: DarwinNotificationDetails(),
       ),
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time,
     );
   }
 
   // ─── Alerte streak en danger ───────────────────────────────────────────────
-  static Future<void> scheduleStreakWarning() async {
-    final now = tz.TZDateTime.now(tz.local);
+  static Future<void> scheduleStreakWarning({int streakDays = 0}) async {
+    final now     = tz.TZDateTime.now(tz.local);
     final tonight = tz.TZDateTime(tz.local, now.year, now.month, now.day, 22, 0);
     if (tonight.isBefore(now)) return;
 
+    final title = streakDays >= 7
+        ? '🔥 $streakDays jours — ne laisse pas tomber !'
+        : '🔥 Ton streak est en danger !';
+    final body = streakDays >= 7
+        ? 'Tu as construit quelque chose d\'impressionnant. Note ton humeur avant minuit.'
+        : 'Tu n\'as pas encore noté ton humeur aujourd\'hui. Il te reste encore du temps !';
+
     await _plugin.zonedSchedule(
       2,
-      '🔥 Ton streak est en danger !',
-      'Tu n\'as pas encore noté ton humeur aujourd\'hui. Il reste ${tonight.difference(now).inHours}h.',
+      title,
+      body,
       tonight,
       const NotificationDetails(
         android: AndroidNotificationDetails(
@@ -82,13 +116,14 @@ class LocalNotificationService {
         iOS: DarwinNotificationDetails(),
       ),
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
     );
   }
 
   // ─── Rappel défi non complété ──────────────────────────────────────────────
   static Future<void> scheduleChallengeReminder() async {
-    final now = tz.TZDateTime.now(tz.local);
+    final now      = tz.TZDateTime.now(tz.local);
     final reminder = tz.TZDateTime(tz.local, now.year, now.month, now.day, 18, 0);
     if (reminder.isBefore(now)) return;
 
@@ -106,8 +141,49 @@ class LocalNotificationService {
         iOS: DarwinNotificationDetails(),
       ),
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
     );
+  }
+
+  // ─── Notification retour J+3 ──────────────────────────────────────────────
+  // Planifiée une seule fois après inscription, à J+3 à 19h.
+  static Future<void> scheduleJ3ReturnNotif({
+    required int currentStreak,
+    required int badgeThreshold, // ex: 7 pour le premier badge streak
+  }) async {
+    final prefs       = await SharedPreferences.getInstance();
+    final alreadySent = prefs.getBool('j3_notif_sent') ?? false;
+    if (alreadySent) return;
+
+    final now  = tz.TZDateTime.now(tz.local);
+    final j3   = tz.TZDateTime(tz.local, now.year, now.month, now.day + 3, 19, 0);
+
+    final remaining = badgeThreshold - currentStreak;
+    final body = remaining > 0
+        ? 'Tu as $currentStreak entrée${currentStreak > 1 ? 's' : ''}. '
+          'Encore $remaining jour${remaining > 1 ? 's' : ''} pour ton badge Streak !'
+        : 'Tu progresses bien ! Ouvre BASYAM pour voir ton évolution.';
+
+    await _plugin.zonedSchedule(
+      5,
+      '🌱 Tu construis quelque chose',
+      body,
+      j3,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'engagement', 'Engagement',
+          channelDescription: 'Notifications d\'engagement et de progression',
+          importance: Importance.defaultImportance,
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+    );
+
+    await prefs.setBool('j3_notif_sent', true);
   }
 
   // ─── Message bienveillant du soir ─────────────────────────────────────────
@@ -120,14 +196,14 @@ class LocalNotificationService {
     ];
     final msg = messages[DateTime.now().weekday % messages.length];
 
-    final now = tz.TZDateTime.now(tz.local);
-    var evening = tz.TZDateTime(tz.local, now.year, now.month, now.day, 21, 30);
+    final now     = tz.TZDateTime.now(tz.local);
+    var evening   = tz.TZDateTime(tz.local, now.year, now.month, now.day, 21, 30);
     if (evening.isBefore(now)) evening = evening.add(const Duration(days: 1));
 
     await _plugin.cancel(4);
     await _plugin.zonedSchedule(
       4,
-      'LinkMind 💙',
+      'BASYAM 💙',
       msg,
       evening,
       const NotificationDetails(
@@ -139,16 +215,21 @@ class LocalNotificationService {
         iOS: DarwinNotificationDetails(),
       ),
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time,
     );
   }
 
-  // ─── Configurer tous les rappels selon les préférences ────────────────────
-  static Future<void> setupAllReminders() async {
+  // ─── Configurer tous les rappels selon les préférences ───────────────────
+  static Future<void> setupAllReminders({
+    String? lastMoodLabel,
+    int? streakDays,
+    int? badgesNeeded,
+  }) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final enabled = prefs.getBool('notifications_enabled') ?? true;
+      final prefs       = await SharedPreferences.getInstance();
+      final enabled     = prefs.getBool('notifications_enabled') ?? true;
       final reminderTime = prefs.getString('reminder_time') ?? '20:00';
 
       if (!enabled) {
@@ -156,67 +237,60 @@ class LocalNotificationService {
         return;
       }
 
-      await scheduleDailyMoodReminder(reminderTime).catchError((e) {
-        _log.warning('Erreur scheduleDailyMoodReminder', e);
-      });
+      await scheduleDailyMoodReminder(
+        reminderTime,
+        lastMoodLabel: lastMoodLabel,
+        streakDays: streakDays,
+        badgesNeeded: badgesNeeded,
+      ).catchError((e) => _log.warning('scheduleDailyMoodReminder error', e));
 
-      await scheduleEveningMessage().catchError((e) {
-        _log.warning('Erreur scheduleEveningMessage', e);
-      });
+      await scheduleEveningMessage()
+          .catchError((e) => _log.warning('scheduleEveningMessage error', e));
+
+      if (streakDays != null) {
+        await scheduleStreakWarning(streakDays: streakDays)
+            .catchError((e) => _log.warning('scheduleStreakWarning error', e));
+      }
     } catch (e) {
-      _log.warning('Erreur setupAllReminders', e);
+      _log.warning('setupAllReminders error', e);
     }
   }
 
-  // ─── Afficher une notification immédiate (pour FCM foreground) ─────────────
+  // ─── Afficher une notification immédiate (FCM foreground) ─────────────────
   static Future<void> showNotification({
     required String title,
     required String body,
     int id = 0,
   }) async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'fcm_channel',
-      'Notifications push',
-      channelDescription: 'Notifications reçues depuis le serveur',
-      importance: Importance.high,
-      priority: Priority.high,
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'fcm_channel', 'Notifications push',
+        channelDescription: 'Notifications reçues depuis le serveur',
+        importance: Importance.high,
+        priority: Priority.high,
+      ),
+      iOS: DarwinNotificationDetails(),
     );
-    const DarwinNotificationDetails iosDetails = DarwinNotificationDetails();
-    const NotificationDetails details = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
-    
     await _plugin.show(id, title, body, details);
   }
 
-  static Future<void> cancelAll() async => await _plugin.cancelAll();
-  static Future<void> cancel(int id) async => await _plugin.cancel(id);
+  static Future<void> cancelAll() async => _plugin.cancelAll();
+  static Future<void> cancel(int id) async => _plugin.cancel(id);
 
- // ─── Demander la permission (Android 13+ et iOS) ─────────────────────────────────
   static Future<bool> requestPermission() async {
     bool granted = false;
-    
-    // Pour Android
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
     if (android != null) {
-      final result = await android.requestNotificationsPermission();
-      granted = result ?? false;
+      granted = (await android.requestNotificationsPermission()) ?? false;
     }
-    
-    // Pour iOS
     final ios = _plugin.resolvePlatformSpecificImplementation<
         IOSFlutterLocalNotificationsPlugin>();
     if (ios != null) {
-      final result = await ios.requestPermissions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-      granted = result ?? false;
+      granted = (await ios.requestPermissions(
+            alert: true, badge: true, sound: true)) ??
+          false;
     }
-    
     return granted;
   }
 }

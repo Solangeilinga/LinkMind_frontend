@@ -77,7 +77,7 @@ class ReportService {
       // Sauvegarde ou partage selon la plateforme
       if (Platform.isAndroid) {
         // Sauvegarder dans Téléchargements
-        final fileName = 'LinkMind_Report_${DateTime.now().toIso8601String()}.pdf';
+        final fileName = 'BASYAM_Report_${DateTime.now().toIso8601String()}.pdf';
         final result = await FileSaveDirectory.instance.saveFile(
           fileName: fileName,
           fileBytes: pdfBytes,
@@ -95,7 +95,7 @@ class ReportService {
       } else {
         // iOS / autres : partage natif
         await Printing.layoutPdf(
-          name: 'LinkMind_Report_${DateTime.now().toIso8601String()}.pdf',
+          name: 'BASYAM_Report_${DateTime.now().toIso8601String()}.pdf',
           format: PdfPageFormat.a4,
           onLayout: (format) async => pdfBytes,
         );
@@ -151,7 +151,7 @@ class ReportService {
         child: pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.Text('LinkMind',
+            pw.Text('BASYAM',
                 style: pw.TextStyle(
                     fontSize: 28,
                     fontWeight: pw.FontWeight.bold,
@@ -271,7 +271,7 @@ class ReportService {
     // FOOTER
     widgets.add(pw.Divider(color: mutedColor));
     widgets.add(pw.Text(
-      'LinkMind — Ton espace confidentiel de bien-être',
+      'BASYAM — Ton espace confidentiel de bien-être',
       textAlign: pw.TextAlign.center,
       style: const pw.TextStyle(fontSize: 8, color: mutedColor),
     ));
