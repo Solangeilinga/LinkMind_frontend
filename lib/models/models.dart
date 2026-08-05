@@ -434,111 +434,16 @@ class PostModel {
   };
 }
 
-// ─── CompletionTypeConfig ──────────────────────────────────────────────────
-class CompletionTypeConfig {
-  final String type;
-  final Map<String, dynamic> config;
-
-  CompletionTypeConfig({required this.type, required this.config});
-
-  factory CompletionTypeConfig.fromJson(Map<String, dynamic> json) {
-    Map<String, dynamic> safeConfig = {};
-    final configValue = json['config'];
-    if (configValue is Map) {
-      safeConfig = Map<String, dynamic>.from(configValue);
-    }
-    
-    return CompletionTypeConfig(
-      type: _safeString(json, 'type', 'action'),
-      config: safeConfig,
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'type': type,
-    'config': config,
-  };
-}
-
-// ─── Challenge (complet) ────────────────────────────────────────────────────
-class Challenge {
-  final String id;
-  final String title;
-  final String description;
-  final List<String> instructions;
-  final String category;
-  final String difficulty;
-  final int durationMinutes;
-  final int points;
-  final String icon;
-  final CompletionTypeConfig completionType;
-  final List<String> targetMoods;
-  final String requiredLevel;
-  final bool isPremium;
-  final bool isActive;
-  final int order;
-  final bool isCompleted;
-
-  Challenge({
-    required this.id,
-    required this.title,
-    required this.description,
-    required this.instructions,
-    required this.category,
-    required this.difficulty,
-    required this.durationMinutes,
-    required this.points,
-    required this.icon,
-    required this.completionType,
-    required this.targetMoods,
-    required this.requiredLevel,
-    required this.isPremium,
-    required this.isActive,
-    required this.order,
-    this.isCompleted = false,
-  });
-
-  factory Challenge.fromJson(Map<String, dynamic> json) {
-    final completionTypeData = json['completionType'] is Map
-        ? Map<String, dynamic>.from(json['completionType'])
-        : {'type': 'action', 'config': {}};
-    
-    return Challenge(
-      id: _safeString(json, '_id', _safeString(json, 'id', '')),
-      title: _safeString(json, 'title'),
-      description: _safeString(json, 'description'),
-      instructions: _safeStringList(json, 'instructions'),
-      category: _safeString(json, 'category'),
-      difficulty: _safeString(json, 'difficulty', 'easy'),
-      durationMinutes: _safeInt(json, 'durationMinutes', 5),
-      points: _safeInt(json, 'points', 10),
-      icon: _safeString(json, 'icon', '⚡'),
-      completionType: CompletionTypeConfig.fromJson(completionTypeData),
-      targetMoods: _safeStringList(json, 'targetMoods'),
-      requiredLevel: _safeString(json, 'requiredLevel', 'all'),
-      isPremium: _safeBool(json, 'isPremium'),
-      isActive: _safeBool(json, 'isActive', true),
-      order: _safeInt(json, 'order'),
-      isCompleted: _safeBool(json, 'isCompleted'),
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    '_id': id,
-    'title': title,
-    'description': description,
-    'instructions': instructions,
-    'category': category,
-    'difficulty': difficulty,
-    'durationMinutes': durationMinutes,
-    'points': points,
-    'icon': icon,
-    'completionType': completionType.toJson(),
-    'targetMoods': targetMoods,
-    'requiredLevel': requiredLevel,
-    'isPremium': isPremium,
-    'isActive': isActive,
-    'order': order,
-    'isCompleted': isCompleted,
-  };
-}
+// ⚠️ CORRECTION : les classes `CompletionTypeConfig` et `Challenge` qui étaient
+// ici en fin de fichier ont été SUPPRIMÉES. Elles existent déjà, avec la même
+// logique défensive, dans lib/models/challenge.dart. Comme
+// challenges_screen.dart et challenge_detail_screen.dart importent à la fois
+// challenge.dart (directement) et models.dart (indirectement, via
+// auth_provider.dart), avoir les deux classes définies deux fois provoquait un
+// conflit d'import ambigu ("The name 'Challenge' is defined in the libraries
+// models.dart and challenge.dart"), qui empêchait purement et simplement la
+// compilation. Vérifié : ces deux classes n'étaient utilisées nulle part
+// ailleurs dans le code en passant par models.dart, donc la suppression ici
+// est sans risque. Si un jour un autre écran a besoin de Challenge sans
+// dépendre de challenge.dart, il vaut mieux faire
+// `import '../models/challenge.dart';` que de redéfinir la classe ici.

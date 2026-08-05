@@ -60,12 +60,22 @@ class _ChallengeDetailScreenState extends ConsumerState<ChallengeDetailScreen>
     setState(() { _isLoading = true; _error = null; });
     try {
       final response = await ApiService().get('/challenges/${widget.challengeId}');
-      final challengeData = response['challenge'];
+      // ⚠️ CORRECTION : _extractData() dans api.service.dart dé-enveloppe déjà
+      // automatiquement toute réponse de la forme { challenge: {...} } vers
+      // l'objet challenge à plat (voir la branche `containsKey('challenge')`).
+      // Refaire response['challenge'] ici cherchait une clé 'challenge' À
+      // L'INTÉRIEUR de l'objet déjà dé-enveloppé — qui n'existe pas — d'où
+      // `challengeData` valant null et le crash "NoSuchMethodError: the
+      // method '[]' was called on null" sur challengeData['isCompleted'].
+      // Ce bug existait depuis le début mais était masqué : l'appel échouait
+      // toujours plus tôt à cause de l'ID de défi corrompu (voir le correctif
+      // deepOmit) avant même d'atteindre ce code.
+      final challengeData = response;
       
       // ✅ Conversion correcte - utilise la fonction générique à 2 paramètres
       final challengeMap = _castMap<String, dynamic>(challengeData);
       final challenge = Challenge.fromJson(challengeMap);
-      final isCompleted = challengeData['isCompleted'] ?? false;
+      final isCompleted = challengeMap['isCompleted'] ?? false;
       
       setState(() {
         _challenge = challenge;
@@ -186,13 +196,29 @@ class _ChallengeDetailScreenState extends ConsumerState<ChallengeDetailScreen>
     } catch (e) {
       if (!mounted) return;
       setState(() => _isCompleting = false);
+      // ⚠️ CORRECTION : le backend renvoie déjà un message précis et utile
+      // (ex. "Already completed today", "A reflection is required for this
+      // challenge") dans ApiException.message, mais il était jeté au profit
+      // d'un texte générique qui masquait la vraie cause de l'échec — aussi
+      // bien pour l'utilisateur que pour le débogage.
+      final message = e is ApiException
+          ? _friendlyCompletionError(e.message)
+          : 'Une erreur est survenue';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Une erreur est survenue'),
+        SnackBar(
+          content: Text(message),
           backgroundColor: AppColors.accent,
         ),
       );
     }
+  }
+
+  String _friendlyCompletionError(String backendMessage) {
+    final msg = backendMessage.toLowerCase();
+    if (msg.contains('already completed')) return 'Tu as déjà complété ce défi aujourd\'hui.';
+    if (msg.contains('reflection is required')) return 'Ajoute une réflexion avant de valider ce défi.';
+    if (msg.contains('not found')) return 'Ce défi n\'est plus disponible.';
+    return backendMessage.isNotEmpty ? backendMessage : 'Une erreur est survenue';
   }
 
  

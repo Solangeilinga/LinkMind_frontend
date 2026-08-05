@@ -28,16 +28,27 @@ class LazyInitService {
     try {
       debugPrint('🔥 Initializing Firebase...');
 
-      // Timeout court pour éviter bloquer app
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      ).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () {
-          debugPrint('⚠️ Firebase init timeout (continuing anyway)');
-          throw TimeoutException('Firebase initialization timeout');
-        },
-      );
+      // ⚠️ CORRECTION : sur Android, le plugin Gradle "Google Services" (lié à
+      // google-services.json) enregistre déjà une FirebaseApp nommée
+      // "[DEFAULT]" au démarrage natif, AVANT que ce code Dart ne s'exécute.
+      // Appeler Firebase.initializeApp() ici levait alors systématiquement
+      // [core/duplicate-app], et comme cette exception tombait dans le
+      // `catch` générique ci-dessous, _initializeMessaging() n'était JAMAIS
+      // appelée : les notifications push (FCM) ne s'initialisaient donc
+      // jamais, sur aucun lancement de l'app.
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        ).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            debugPrint('⚠️ Firebase init timeout (continuing anyway)');
+            throw TimeoutException('Firebase initialization timeout');
+          },
+        );
+      } else {
+        debugPrint('ℹ️ Firebase déjà initialisé nativement (app "[DEFAULT]" existante)');
+      }
 
       _firebaseInitialized = true;
       debugPrint('✅ Firebase initialized');

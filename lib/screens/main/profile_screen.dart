@@ -1036,7 +1036,12 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
         if (_gender != null) 'gender': _gender,
       });
 
-      final updated = UserModel.fromJson(data['user']);
+      // ⚠️ CORRECTION : même bug que dans challenge_detail_screen.dart —
+      // _extractData() dé-enveloppe déjà { user: {...} } vers l'objet user à
+      // plat. Refaire data['user'] cherchait une clé 'user' à l'intérieur de
+      // l'objet déjà dé-enveloppé (null), ce qui aurait planté à la sauvegarde
+      // du profil.
+      final updated = UserModel.fromJson(data);
       widget.onSaved(updated);
 
       if (mounted) {

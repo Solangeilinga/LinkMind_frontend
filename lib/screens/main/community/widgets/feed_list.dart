@@ -98,8 +98,13 @@ class _FeedListState extends State<FeedList> {
             child: PostCard(
               post: post,
               isMine: post['isMine'] == true,
-              onLike: () => widget.onLike(post['_id'] ?? post['id']),
-              onDelete: () => widget.onDelete(post['_id'] ?? post['id']),
+              // ⚠️ CORRECTION : post['_id'] doit être un String. Le correctif
+              // backend (serializePost/serializeComment) garantit maintenant
+              // que c'est le cas, mais .toString() ici protège aussi contre
+              // du contenu déjà en cache côté app avant la mise à jour du
+              // serveur, ou tout autre cas de figure inattendu.
+              onLike: () => widget.onLike((post['_id'] ?? post['id']).toString()),
+              onDelete: () => widget.onDelete((post['_id'] ?? post['id']).toString()),
             ),
           );
         },

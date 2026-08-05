@@ -166,6 +166,21 @@ class ApiService {
   // ─── Data Extraction Helper ──────────────────────────────────────────────
   dynamic _extractData(dynamic response) {
     if (response is Map<String, dynamic>) {
+      // ⚠️ CORRECTION : les réponses de /auth/login et /auth/register ont la
+      // forme { message, accessToken, refreshToken, user, newBadges }. Comme
+      // elles contiennent aussi une clé 'user', les branches ci-dessous
+      // renvoyaient SEULEMENT response['user'] et jetaient accessToken /
+      // refreshToken avec le reste — d'où "Aucun access token trouvé" puis
+      // le crash `type 'Null' is not a subtype of type 'String'` dans
+      // saveTokens(). Si la réponse porte un token d'authentification, elle
+      // doit être renvoyée telle quelle, sans être "dépouillée".
+      final looksLikeAuthResponse = response.containsKey('accessToken') ||
+          response.containsKey('access_token') ||
+          response.containsKey('token');
+      if (looksLikeAuthResponse) {
+        return response;
+      }
+
       // Si la réponse a une structure avec 'data'
       if (response.containsKey('data')) {
         final data = response['data'];

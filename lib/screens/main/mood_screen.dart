@@ -74,6 +74,14 @@ class _MoodScreenState extends ConsumerState<MoodScreen>
             _todayMessage = '${msg['text'] ?? ''} ${msg['emoji'] ?? ''}';
           final grouped =
               _castMap<String, dynamic>(results[1]['tips'] ?? {});
+          // 🔍 DIAGNOSTIC TEMPORAIRE — à retirer une fois le bug de la page
+          // Mood résolu. Affiche la structure brute reçue pour vérifier si
+          // les tips arrivent bien groupés par humeur avec title/description.
+          debugPrint('🔍 [WellnessTips] raw results[1]: ${results[1]}');
+          debugPrint('🔍 [WellnessTips] grouped keys: ${grouped.keys}');
+          grouped.forEach((moodKey, tipsForMood) {
+            debugPrint('🔍 [WellnessTips] "$moodKey" -> $tipsForMood');
+          });
           _wellnessTips = grouped.map((mood, tips) {
             final tipsList = (tips as List?)?.map((t) {
                   final tip = _castMap<String, dynamic>(t);
@@ -265,6 +273,12 @@ class _MoodScreenState extends ConsumerState<MoodScreen>
     final stressFactors = content.loaded && content.stressFactors.isNotEmpty
         ? content.stressFactors
         : <StressFactorDef>[];
+
+    // 🔍 DIAGNOSTIC TEMPORAIRE — à retirer une fois le bug résolu.
+    debugPrint('🔍 [WellnessTips] moodState.todayMood: ${moodState.todayMood}');
+    debugPrint('🔍 [WellnessTips] lookup key used: '
+        '${_selectedMoodIndex != null ? moods[_selectedMoodIndex!].id : (moodState.todayMood?['label'] ?? 'neutral')}');
+    debugPrint('🔍 [WellnessTips] available _wellnessTips keys: ${_wellnessTips.keys}');
 
     if (!content.loaded) {
       return const Scaffold(body: SafeArea(child: SkeletonMoodScreen()));

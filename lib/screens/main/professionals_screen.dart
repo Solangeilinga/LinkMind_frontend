@@ -128,7 +128,7 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
 
   Future<void> _hideBooking(Map<String, dynamic> booking) async {
     try {
-      await ApiService().patch('/professionals/bookings/${booking['_id']}/hide', {});
+      await ApiService().patch('/professionals/bookings/${(booking['_id'] ?? booking['id']).toString()}/hide', {});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Rendez-vous masqué'), backgroundColor: Color(0xFF27AE60)),
@@ -268,7 +268,7 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
 
     if (confirm == true) {
       try {
-        await ApiService().delete('/professionals/bookings/${booking['_id']}');
+        await ApiService().delete('/professionals/bookings/${(booking['_id'] ?? booking['id']).toString()}');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Demande annulée avec succès'), backgroundColor: AppColors.secondary),
@@ -521,7 +521,13 @@ class _ProfessionalCard extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                Flexible(child: Text(pro['fullName'] ?? '', style: AppTextStyles.h4, overflow: TextOverflow.ellipsis)),
+                // ⚠️ CORRECTION : Text() exige un String ; si le backend renvoie
+                // un jour autre chose qu'une chaîne pour 'fullName' (objet
+                // imbriqué, nombre...), ça plantait toute la liste des
+                // professionnels avec "type '_Map<String, dynamic>' is not a
+                // subtype of type 'String'". .toString() sécurise l'affichage
+                // sans changer le rendu normal.
+                Flexible(child: Text(pro['fullName']?.toString() ?? '', style: AppTextStyles.h4, overflow: TextOverflow.ellipsis)),
                 if (pro['isVerified'] == true) ...[
                   const SizedBox(width: 6),
                   const Icon(Icons.verified, color: AppColors.secondary, size: 16),
@@ -541,7 +547,7 @@ class _ProfessionalCard extends StatelessWidget {
                   Flexible(child: Text(
                     pro['address'] != null
                         ? '${pro['city']} — ${pro['address']}'
-                        : pro['city'],
+                        : pro['city'].toString(),
                     style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -552,7 +558,7 @@ class _ProfessionalCard extends StatelessWidget {
 
           if (pro['bio'] != null) ...[
             const SizedBox(height: 10),
-            Text(pro['bio'], style: AppTextStyles.bodySmall.copyWith(color: AppColors.onSurfaceMuted, height: 1.4), maxLines: 2, overflow: TextOverflow.ellipsis),
+            Text(pro['bio'].toString(), style: AppTextStyles.bodySmall.copyWith(color: AppColors.onSurfaceMuted, height: 1.4), maxLines: 2, overflow: TextOverflow.ellipsis),
           ],
 
 
@@ -619,7 +625,7 @@ class _BookingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = booking['status'] as String? ?? 'pending';
+    final status = booking['status']?.toString() ?? 'pending';
     final statusConf = _statusConfig[status] ?? _statusConfig['pending']!;
     final pro = booking['professional'] as Map<String, dynamic>?;
     final typeConf = _typeConfigDefault[pro?['type']] ?? _typeConfigDefault['psychologist']!;
@@ -640,7 +646,7 @@ class _BookingCard extends StatelessWidget {
           const Text('👤', style: TextStyle(fontSize: 22)),
           const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(pro?['fullName'] ?? 'Professionnel', style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w800)),
+            Text(pro?['fullName']?.toString() ?? 'Professionnel', style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w800)),
             Text(typeConf.label, style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
           ])),
           Container(
@@ -674,7 +680,7 @@ class _BookingCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: const BoxDecoration(color: AppColors.surfaceVariant, borderRadius: AppRadius.md),
-            child: Text(booking['message'], style: AppTextStyles.bodySmall.copyWith(color: AppColors.onSurfaceMuted, fontSize: 12),
+            child: Text(booking['message'].toString(), style: AppTextStyles.bodySmall.copyWith(color: AppColors.onSurfaceMuted, fontSize: 12),
               maxLines: 2, overflow: TextOverflow.ellipsis),
           ),
         ],
@@ -705,7 +711,7 @@ class _BookingCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Lien de visioconférence', style: AppTextStyles.caption.copyWith(color: const Color(0xFF2563EB), fontWeight: FontWeight.w700)),
-                Text(booking['meetingLink'], style: AppTextStyles.caption.copyWith(color: const Color(0xFF2563EB)), overflow: TextOverflow.ellipsis, maxLines: 1),
+                Text(booking['meetingLink'].toString(), style: AppTextStyles.caption.copyWith(color: const Color(0xFF2563EB)), overflow: TextOverflow.ellipsis, maxLines: 1),
               ])),
             ]),
           ),
@@ -719,7 +725,7 @@ class _BookingCard extends StatelessWidget {
             child: Row(children: [
               const Icon(Icons.info_outline, size: 14, color: AppColors.secondary),
               const SizedBox(width: 6),
-              Expanded(child: Text(booking['adminNote'], style: AppTextStyles.caption.copyWith(color: AppColors.secondary))),
+              Expanded(child: Text(booking['adminNote'].toString(), style: AppTextStyles.caption.copyWith(color: AppColors.secondary))),
             ]),
           ),
         ],
@@ -785,12 +791,17 @@ class _BookingCard extends StatelessWidget {
                 style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w700),
               )),
               if (booking['userFeedback']['rating'] != null) ...[
-                ...List.generate((booking['userFeedback']['rating'] as int), (_) =>
+                ...List.generate(
+                    // ⚠️ CORRECTION : cast rigide 'as int' remplacé par une
+                    // conversion sûre (un rating stocké en double, ex. 4.0,
+                    // ferait planter 'as int').
+                    (num.tryParse(booking['userFeedback']['rating'].toString()) ?? 0).toInt(),
+                    (_) =>
                   const Icon(Icons.star, color: Color(0xFFF5B731), size: 14)),
               ],
             ]),
           ),
-          if (booking['userFeedback']['comment'] != null && (booking['userFeedback']['comment'] as String).isNotEmpty) ...[
+          if (booking['userFeedback']['comment'] != null && booking['userFeedback']['comment'].toString().isNotEmpty) ...[
             const SizedBox(height: 4),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),

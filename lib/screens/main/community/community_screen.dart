@@ -239,15 +239,27 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Communauté 🌍', style: AppTextStyles.h2),
-                          Text('Espace sécurisé · Tout est anonyme',
-                              style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
-                        ],
+                      // ⚠️ CORRECTION : ce Column n'était pas contraint, donc sur
+                      // un écran étroit (ex. 720px logiques) son sous-titre
+                      // "Espace sécurisé · Tout est anonyme" poussait le bloc
+                      // Récents+Partager hors de l'écran → RenderFlex overflow.
+                      // Flexible permet au Column de rétrécir, et l'ellipsis sur
+                      // le sous-titre évite qu'il force quand même une largeur trop
+                      // grande.
+                      Flexible(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Communauté 🌍', style: AppTextStyles.h2),
+                            Text('Espace sécurisé · Tout est anonyme',
+                                style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis),
+                          ],
+                        ),
                       ),
-                      Row(children: [
+                      const SizedBox(width: 8),
+                      Row(mainAxisSize: MainAxisSize.min, children: [
                         // Toggle Récents / Populaires
                         GestureDetector(
                           onTap: () {

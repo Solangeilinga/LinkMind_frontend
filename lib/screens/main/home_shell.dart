@@ -5,7 +5,6 @@ import '../../providers/content_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/professionals_provider.dart';
 import '../../utils/theme.dart';
-import '../../widgets/sos_widgets.dart';
 
 class HomeShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -76,17 +75,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final currentIndex = _currentIndex(context);
 
     return Scaffold(
-      body: Stack(
-        children: [
-          widget.child,
-          // Bouton SOS discret — accessible depuis tous les écrans
-          const Positioned(
-            top: 8,
-            right: 12,
-            child: SafeArea(child: SosButton()),
-          ),
-        ],
-      ),
+      body: widget.child,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: AppColors.surface,

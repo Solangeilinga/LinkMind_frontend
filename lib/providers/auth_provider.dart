@@ -253,8 +253,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final data = await _api.login(email: email, password: password);
       await _api.saveTokens(data['accessToken'], data['refreshToken']);
-      
-      final user = UserModel.fromJson(data);
+
+      // ⚠️ CORRECTION : `data` est désormais l'enveloppe complète renvoyée par
+      // /auth/login ({ message, accessToken, refreshToken, user, newBadges }),
+      // plus l'objet utilisateur "à plat" (ça, c'était un effet de bord d'un
+      // bug côté _extractData qui vient d'être corrigé). Il faut donc lire
+      // l'utilisateur dans data['user'].
+      final user = UserModel.fromJson(
+        data['user'] is Map ? Map<String, dynamic>.from(data['user']) : data,
+      );
       debugPrint('🔍 [Login] legalAccepted=${user.legalAccepted}');
 
       state = AuthState(isAuthenticated: true, isLoading: false, user: user);
@@ -290,8 +297,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
         age: age, city: city, country: country, gender: gender,
       );
       await _api.saveTokens(data['accessToken'], data['refreshToken']);
-      
-      final user = UserModel.fromJson(data);
+
+      // ⚠️ CORRECTION : même raison que dans login() ci-dessus — `data` est
+      // désormais l'enveloppe complète { accessToken, refreshToken, user, ... }.
+      final user = UserModel.fromJson(
+        data['user'] is Map ? Map<String, dynamic>.from(data['user']) : data,
+      );
       debugPrint('🔍 [Register] legalAccepted=${user.legalAccepted}');
 
       state = AuthState(isAuthenticated: true, isLoading: false, user: user);
