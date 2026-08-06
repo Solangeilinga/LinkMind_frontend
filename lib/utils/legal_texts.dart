@@ -18,7 +18,7 @@ En utilisant BASYAM, tu acceptes les présentes Conditions Générales d'Utilisa
 
 2. CONDITIONS D'ACCÈS
 
-• Tu dois avoir au moins 15 ans pour utiliser BASYAM.
+• Tu dois avoir au moins 18 ans pour utiliser BASYAM.
 • Si tu as entre 15 et 18 ans, nous te recommandons d'informer un parent ou tuteur de ton utilisation.
 • Tu es responsable de la confidentialité de ton compte et de ton mot de passe.
 

@@ -18,15 +18,34 @@ class PremiumScreen extends ConsumerStatefulWidget {
 class _PremiumScreenState extends ConsumerState<PremiumScreen> {
   bool _isLoading = false;
   bool _isChecking = false;
+  bool _isLoadingOperators = false;
   String? _error;
-  String _selectedProvider = 'cinetpay';
   String _selectedPlan = 'monthly';
+  String _selectedCountry = 'BF';
+  String? _selectedOperatorSlug;
+  bool _otpRequired = false;
+  String? _ussdCode;
+  List<dynamic> _operators = [];
+  final _phoneController = TextEditingController();
+  final _otpController = TextEditingController();
   Map<String, dynamic>? _userStatus;
 
-  static const Map<String, Map<String, dynamic>> _providers = {
-    'cinetpay': {'name': 'CinetPay', 'emoji': '💳', 'color': AppColors.primary},
-    'orange': {'name': 'Orange Money', 'emoji': '📱', 'color': Color(0xFFFF6600)},
-  };
+  // Pays pris en charge par SebPay (Afrique de l'Ouest/Centrale francophone).
+  // BF (Burkina Faso) présélectionné car c'est le marché principal de BASYAM.
+  static const List<Map<String, String>> _countries = [
+    {'code': 'BF', 'name': 'Burkina Faso'},
+    {'code': 'CI', 'name': 'Côte d\'Ivoire'},
+    {'code': 'SN', 'name': 'Sénégal'},
+    {'code': 'BJ', 'name': 'Bénin'},
+    {'code': 'TG', 'name': 'Togo'},
+    {'code': 'ML', 'name': 'Mali'},
+    {'code': 'NE', 'name': 'Niger'},
+    {'code': 'GN', 'name': 'Guinée'},
+    {'code': 'CM', 'name': 'Cameroun'},
+    {'code': 'GA', 'name': 'Gabon'},
+    {'code': 'TD', 'name': 'Tchad'},
+    {'code': 'CD', 'name': 'RD Congo'},
+  ];
 
   static const Map<String, Map<String, dynamic>> _plans = {
     'monthly': {
@@ -52,6 +71,51 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
   void initState() {
     super.initState();
     _loadUserStatus();
+    _fetchOperators();
+  }
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    _otpController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchOperators() async {
+    setState(() {
+      _isLoadingOperators = true;
+      _selectedOperatorSlug = null;
+      _otpRequired = false;
+      _ussdCode = null;
+    });
+    try {
+      final response = await ApiService().get(
+        '/payment/operators',
+        queryParams: {'country': _selectedCountry},
+        forceRefresh: true, // ne jamais servir une liste d'opérateurs périmée en cache
+      );
+      if (mounted) {
+        setState(() {
+          _operators = (response['operators'] as List<dynamic>?) ?? [];
+          _isLoadingOperators = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _operators = [];
+          _isLoadingOperators = false;
+        });
+      }
+    }
+  }
+
+  void _onOperatorSelected(Map<String, dynamic> operator) {
+    setState(() {
+      _selectedOperatorSlug = operator['slug'] as String?;
+      _otpRequired = operator['otp_required'] == true;
+      _ussdCode = operator['ussd_code'] as String?;
+    });
   }
 
   Future<void> _loadUserStatus() async {
@@ -64,31 +128,56 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
   }
 
   Future<void> _initiatePayment() async {
+    if (_selectedOperatorSlug == null) {
+      setState(() => _error = 'Choisis ton opérateur Mobile Money.');
+      return;
+    }
+    if (_phoneController.text.trim().isEmpty) {
+      setState(() => _error = 'Entre ton numéro de téléphone.');
+      return;
+    }
+    if (_otpRequired && _otpController.text.trim().isEmpty) {
+      setState(() => _error = 'Entre le code reçu par USSD.');
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _error = null;
     });
 
     try {
-      final plan = _plans[_selectedPlan]!;
       final response = await ApiService().post('/payment/initiate', {
-        'provider': _selectedProvider,
-        'amount': plan['price'],
         'plan': _selectedPlan,
+        'phone': _phoneController.text.trim(),
+        'operatorSlug': _selectedOperatorSlug,
+        'countryCode': _selectedCountry,
+        if (_otpRequired) 'otpCode': _otpController.text.trim(),
       });
 
       if (mounted) {
-        if (response['paymentUrl'] != null) {
-          await _openPaymentWebView(
-            response['paymentUrl'] as String,
-            response['paymentData'] as Map<String, dynamic>?,
-            response['transactionId'] as String,
-          );
-        } else {
+        final transactionId = response['transactionId'] as String?;
+        if (transactionId == null) {
           setState(() {
             _error = 'Erreur d\'initiation du paiement';
             _isLoading = false;
           });
+          return;
+        }
+
+        if (response['providerLink'] != null) {
+          // Cas Wave & consorts : redirection nécessaire vers une page de
+          // validation externe.
+          await _openPaymentWebView(
+            response['providerLink'] as String,
+            transactionId,
+          );
+        } else {
+          // Cas standard (Orange Money, MTN, Moov...) : le client valide
+          // directement sur son téléphone via USSD, on attend juste la
+          // confirmation du webhook signé.
+          setState(() => _isLoading = false);
+          _checkPaymentStatus(transactionId);
         }
       }
     } catch (e) {
@@ -101,7 +190,6 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
 
   Future<void> _openPaymentWebView(
     String url,
-    Map<String, dynamic>? paymentData,
     String transactionId,
   ) async {
     setState(() => _isLoading = false);
@@ -111,7 +199,6 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
       MaterialPageRoute(
         builder: (context) => PaymentWebView(
           url: url,
-          paymentData: paymentData,
           transactionId: transactionId,
           onComplete: (success) {
             if (success) {
@@ -229,15 +316,24 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
     final isAlreadyPremium = _userStatus?['isPremium'] == true;
 
     if (_isChecking) {
-      return const Scaffold(
+      return Scaffold(
         body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(color: AppColors.primary),
-              SizedBox(height: 16),
-              Text('Vérification du paiement...'),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const CircularProgressIndicator(color: AppColors.primary),
+                const SizedBox(height: 20),
+                const Text('Vérifie ton téléphone 📲', style: AppTextStyles.h3, textAlign: TextAlign.center),
+                const SizedBox(height: 8),
+                Text(
+                  'Une demande de validation vient de t\'être envoyée par USSD. Confirme le paiement sur ton téléphone.',
+                  style: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -312,47 +408,142 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
                 ),
               )
             else ...[
-              // Choix du fournisseur
-              const Text('Moyen de paiement', style: AppTextStyles.h3),
+              // Choix du pays
+              const Text('Ton pays', style: AppTextStyles.h3),
               const SizedBox(height: 12),
-              Row(
-                children: _providers.keys.map((provider) {
-                  final data = _providers[provider]!;
-                  final isSelected = _selectedProvider == provider;
-                  final color = data['color'] as Color;
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _selectedProvider = provider),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: AppRadius.lg,
+                  border: Border.all(color: AppColors.divider),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedCountry,
+                    isExpanded: true,
+                    items: _countries
+                        .map((c) => DropdownMenuItem(
+                              value: c['code'],
+                              child: Text(c['name']!),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => _selectedCountry = value);
+                      _fetchOperators();
+                    },
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Choix de l'opérateur (récupéré dynamiquement depuis SebPay)
+              const Text('Opérateur Mobile Money', style: AppTextStyles.h3),
+              const SizedBox(height: 12),
+              if (_isLoadingOperators)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  ),
+                )
+              else if (_operators.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceVariant,
+                    borderRadius: AppRadius.md,
+                  ),
+                  child: const Text(
+                    'Aucun opérateur disponible pour ce pays pour le moment.',
+                    style: AppTextStyles.caption,
+                  ),
+                )
+              else
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: _operators.map((op) {
+                    final operator = op as Map<String, dynamic>;
+                    final isSelected = _selectedOperatorSlug == operator['slug'];
+                    return GestureDetector(
+                      onTap: () => _onOperatorSelected(operator),
                       child: Container(
-                        margin: const EdgeInsets.only(right: 12),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? color.withValues(alpha: 0.1)
+                              ? AppColors.primary.withValues(alpha: 0.1)
                               : AppColors.surfaceVariant,
-                          borderRadius: AppRadius.md,
+                          borderRadius: AppRadius.full,
                           border: Border.all(
-                            color: isSelected ? color : Colors.transparent,
+                            color: isSelected ? AppColors.primary : Colors.transparent,
                             width: 2,
                           ),
                         ),
-                        child: Column(
-                          children: [
-                            IconMapper.getIcon(data['emoji'] as String, size: 28, color: data['color'] as Color),
-                            const SizedBox(height: 4),
-                            Text(
-                              data['name'] as String,
-                              style: AppTextStyles.caption.copyWith(
-                                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          (operator['name'] as String?) ?? '',
+                          style: AppTextStyles.caption.copyWith(
+                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }).toList(),
+                    );
+                  }).toList(),
+                ),
+
+              const SizedBox(height: 20),
+
+              // Numéro de téléphone
+              const Text('Numéro de téléphone', style: AppTextStyles.h3),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(
+                  hintText: 'Ex : 70123456',
+                  filled: true,
+                  fillColor: AppColors.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: AppRadius.lg,
+                    borderSide: const BorderSide(color: AppColors.divider),
+                  ),
+                ),
               ),
+
+              // Champ OTP conditionnel selon l'opérateur sélectionné
+              if (_otpRequired) ...[
+                const SizedBox(height: 20),
+                if (_ussdCode != null && _ussdCode!.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.08),
+                      borderRadius: AppRadius.md,
+                    ),
+                    child: Text(
+                      'Compose $_ussdCode sur ton téléphone pour obtenir le code de validation.',
+                      style: AppTextStyles.caption,
+                    ),
+                  ),
+                const Text('Code de validation', style: AppTextStyles.h3),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _otpController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    hintText: 'Code reçu par USSD',
+                    filled: true,
+                    fillColor: AppColors.surface,
+                    border: OutlineInputBorder(
+                      borderRadius: AppRadius.lg,
+                      borderSide: const BorderSide(color: AppColors.divider),
+                    ),
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 24),
 
@@ -464,7 +655,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
 
             Center(
               child: Text(
-                'Paiement sécurisé par ${_providers[_selectedProvider]!['name']}',
+                'Paiement sécurisé par SebPay',
                 style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted),
               ),
             ),
@@ -540,14 +731,12 @@ class _PopularBadge extends StatelessWidget {
 // ─── WebView pour le paiement ─────────────────────────────────────────────────
 class PaymentWebView extends StatefulWidget {
   final String url;
-  final Map<String, dynamic>? paymentData;
   final String transactionId;
   final Function(bool) onComplete;
 
   const PaymentWebView({
     super.key,
     required this.url,
-    this.paymentData,
     required this.transactionId,
     required this.onComplete,
   });

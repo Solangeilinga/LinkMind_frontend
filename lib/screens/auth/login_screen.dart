@@ -373,7 +373,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   void _validateAge() {
     final v = _ageCtrl.text.trim();
-    setState(() => _ageError = v.isEmpty ? null : (Validators.isValidAge(v) ? null : "L'âge doit être entre 13 et 120 ans"));
+    setState(() => _ageError = v.isEmpty ? null : (Validators.isValidAge(v) ? null : "L'âge doit être entre 18 et 120 ans"));
   }
 
   String? _validateStep() {
@@ -387,7 +387,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
     if (_step == 1) {
       if (_ageCtrl.text.trim().isEmpty) return 'L\'âge est obligatoire';
-      if (!Validators.isValidAge(_ageCtrl.text.trim())) return "L'âge doit être entre 13 et 120 ans";
+      if (!Validators.isValidAge(_ageCtrl.text.trim())) return "L'âge doit être entre 18 et 120 ans";
       if (_cityCtrl.text.trim().isEmpty) return 'La ville est obligatoire';
       if (_selectedCountry == null) return 'Sélectionne ton pays';
     }

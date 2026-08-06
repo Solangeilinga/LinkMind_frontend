@@ -8,7 +8,7 @@ class Validators {
   
   static bool isValidAge(String age) {
     final ageInt = int.tryParse(age);
-    return ageInt != null && ageInt >= 15 && ageInt <= 120;
+    return ageInt != null && ageInt >= 18 && ageInt <= 120;
   }
   
   static bool isValidPassword(String password) {
