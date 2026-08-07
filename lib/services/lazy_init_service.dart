@@ -1,11 +1,8 @@
 import 'dart:async'; // ← AJOUT OBLIGATOIRE
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../firebase_options.dart';
-import 'local_notification_service.dart';
-import 'api.service.dart';
+import 'messaging/messaging_platform.dart';
 import '../utils/theme.dart' show AppConstants;
 
 /// 🚀 Lazy Initialization Service
@@ -66,110 +63,21 @@ class LazyInitService {
   Future<void> _initializeMessaging() async {
     if (_notificationsInitialized) return;
 
-    try {
-      debugPrint('📱 Initializing FCM...');
-
-      final messaging = FirebaseMessaging.instance;
-
-      final settings = await messaging.requestPermission(
-        alert: true,
-        announcement: false,
-        badge: true,
-        carPlay: false,
-        criticalAlert: false,
-        provisional: false,
-        sound: true,
-      );
-
-      debugPrint('🔔 FCM permission status: ${settings.authorizationStatus}');
-
-      // Token FCM stocké localement — envoyé au backend après login
-      // ⚠️ Sur le web, `vapidKey` est OBLIGATOIRE : sans lui, getToken()
-      // retourne null silencieusement (contrairement à mobile où il est ignoré).
-      final token = await messaging.getToken(
-        vapidKey: kIsWeb ? AppConstants.fcmVapidKey : null,
-      );
-      if (token != null) {
-        debugPrint(
-            '🎫 FCM Token obtenu, stocké en attente de l\'authentification');
-        pendingFcmToken = token;
-        try {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('pending_fcm_token', token);
-        } catch (_) {}
-      } else {
-        debugPrint('⚠️ FCM Token null — notifications push impossibles');
-      }
-
-      // Écouter le refresh du token
-      messaging.onTokenRefresh.listen((newToken) async {
-        debugPrint('🔄 FCM Token rafraîchi');
-        pendingFcmToken = newToken;
-        try {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('pending_fcm_token', newToken);
-          await ApiService().registerFcmToken(newToken);
-        } catch (_) {}
-      });
-
-      FirebaseMessaging.onMessage.listen(_onForegroundMessage);
-      // Sur le web, les messages reçus app fermée/onglet en arrière-plan sont
-      // gérés entièrement par le service worker (web/firebase-messaging-sw.js),
-      // pas par ce callback Dart — qui n'a de sens que sur mobile.
-      if (!kIsWeb) {
-        FirebaseMessaging.onBackgroundMessage(_onBackgroundMessage);
-      }
-      FirebaseMessaging.onMessageOpenedApp.listen(_onMessageOpenedApp);
-
-      _notificationsInitialized = true;
-      debugPrint('✅ FCM initialized');
-    } catch (e, stack) {
-      debugPrint('⚠️ FCM init failed: $e\n$stack');
-    }
-  }
-
-  /// ✅ FIX: Envoyer le token FCM au backend avec retry
-  Future<void> _registerTokenToBackend(String token) async {
-    const maxRetries = 3;
-    for (int attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        await ApiService().registerFcmToken(token);
-        debugPrint('✅ FCM Token enregistré sur le backend');
-        return;
-      } catch (e) {
-        debugPrint('⚠️ Tentative $attempt/$maxRetries échouée: $e');
-        if (attempt < maxRetries) {
-          await Future.delayed(Duration(seconds: attempt * 2));
-        }
-      }
-    }
-    debugPrint(
-        '❌ Impossible d\'enregistrer le FCM token après $maxRetries tentatives');
-  }
-
-  /// Handle foreground messages
-  void _onForegroundMessage(RemoteMessage message) {
-    debugPrint('📬 Foreground message: ${message.messageId}');
-
-    LocalNotificationService.showNotification(
-      title: message.notification?.title ?? 'Notification',
-      body: message.notification?.body ?? '',
+    // ⚠️ Sur le web, `vapidKey` est OBLIGATOIRE : sans lui, getToken()
+    // retourne null silencieusement (contrairement à mobile où il est ignoré).
+    // Toute la logique réelle (permission, token, listeners) vit désormais
+    // dans messaging/messaging_platform.dart, qui bascule automatiquement
+    // entre l'implémentation mobile (Firebase) et le stub web — voir ce
+    // fichier pour le détail de pourquoi le web est temporairement exclu.
+    final token = await PlatformMessaging.initialize(
+      vapidKey: kIsWeb ? AppConstants.fcmVapidKey : null,
     );
-  }
 
-  /// Handle background messages
-  @pragma('vm:entry-point')
-  static Future<void> _onBackgroundMessage(RemoteMessage message) async {
-    debugPrint('📬 Background message: ${message.messageId}');
-  }
-
-  /// Handle message tap
-  void _onMessageOpenedApp(RemoteMessage message) {
-    debugPrint('🔗 Message opened: ${message.messageId}');
-    final link = message.data['link'];
-    if (link != null) {
-      debugPrint('🔗 Navigate to: $link');
+    if (token != null) {
+      pendingFcmToken = token;
     }
+
+    _notificationsInitialized = true;
   }
 
   /// Get initialization status
