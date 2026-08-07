@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../utils/theme.dart';
@@ -30,6 +31,13 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   String _sort = 'recent';   // 'recent' | 'popular'
   late final TabController _tabController;
 
+  // Recherche par mots-clés (débounced), branchée sur GET /community/search
+  final _searchController = TextEditingController();
+  Timer? _searchDebounce;
+  String _searchQuery = '';
+  bool _isSearching = false;
+  List<Map<String, dynamic>> _searchResults = [];
+
   @override
   void initState() {
     super.initState();
@@ -44,7 +52,43 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
+  }
+
+  // ─── Recherche par mots-clés ──────────────────────────────────────────────
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () => _performSearch(value.trim()));
+  }
+
+  Future<void> _performSearch(String query) async {
+    if (!mounted) return;
+    setState(() => _searchQuery = query);
+
+    if (query.isEmpty) {
+      setState(() { _isSearching = false; _searchResults = []; });
+      return;
+    }
+
+    setState(() => _isSearching = true);
+    try {
+      final data = await ApiService().searchPosts(query, postType: _activeFilter);
+      final results = _extractPosts(data);
+      if (mounted && _searchQuery == query) {
+        setState(() { _searchResults = results; _isSearching = false; });
+      }
+    } catch (e) {
+      debugPrint('❌ Erreur recherche communauté: $e');
+      if (mounted) setState(() => _isSearching = false);
+    }
+  }
+
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    setState(() { _searchQuery = ''; _searchResults = []; _isSearching = false; });
   }
 
   // ─── Méthode utilitaire pour extraire les posts ──────────────────────────
@@ -238,14 +282,8 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ⚠️ CORRECTION : ce Column n'était pas contraint, donc sur
-                      // un écran étroit (ex. 720px logiques) son sous-titre
-                      // "Espace sécurisé · Tout est anonyme" poussait le bloc
-                      // Récents+Partager hors de l'écran → RenderFlex overflow.
-                      // Flexible permet au Column de rétrécir, et l'ellipsis sur
-                      // le sous-titre évite qu'il force quand même une largeur trop
-                      // grande.
                       Flexible(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -259,41 +297,9 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Row(mainAxisSize: MainAxisSize.min, children: [
-                        // Toggle Récents / Populaires
-                        GestureDetector(
-                          onTap: () {
-                            setState(() => _sort = _sort == 'recent' ? 'popular' : 'recent');
-                            _loadFeed();
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: _sort == 'popular'
-                                  ? AppColors.accentOrange.withValues(alpha: 0.12)
-                                  : AppColors.surfaceVariant,
-                              borderRadius: AppRadius.full,
-                              border: Border.all(
-                                color: _sort == 'popular'
-                                    ? AppColors.accentOrange.withValues(alpha: 0.4)
-                                    : AppColors.divider,
-                              ),
-                            ),
-                            child: Text(
-                              _sort == 'popular' ? '🔥 Populaires' : '🕐 Récents',
-                              style: AppTextStyles.caption.copyWith(
-                                color: _sort == 'popular'
-                                    ? AppColors.accentOrange
-                                    : AppColors.onSurfaceMuted,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        ActivityRecorder(
-                          activityType: 'create_post_click',
-                          child: ElevatedButton.icon(
+                      ActivityRecorder(
+                        activityType: 'create_post_click',
+                        child: ElevatedButton.icon(
                           onPressed: _openComposePage,
                           icon: const Icon(Icons.edit_outlined, size: 16),
                           label: const Text('Partager'),
@@ -303,8 +309,43 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                           ),
                         ),
                       ),
-                    ]),
-                  ],
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  // Recherche par mots-clés
+                  Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceVariant,
+                      borderRadius: AppRadius.full,
+                    ),
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: _onSearchChanged,
+                      textInputAction: TextInputAction.search,
+                      style: AppTextStyles.body,
+                      decoration: InputDecoration(
+                        hintText: 'Rechercher un post...',
+                        hintStyle: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted),
+                        prefixIcon: const Icon(Icons.search, size: 20, color: AppColors.onSurfaceMuted),
+                        suffixIcon: _isSearching
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: SizedBox(
+                                  width: 16, height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              )
+                            : (_searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.close, size: 18, color: AppColors.onSurfaceMuted),
+                                    onPressed: _clearSearch,
+                                  )
+                                : null),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 14),
                   Container(
@@ -334,6 +375,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                           onTap: () {
                             setState(() => _activeFilter = null);
                             _loadFeed();
+                            if (_searchQuery.isNotEmpty) _performSearch(_searchQuery);
                           },
                         ),
                         const SizedBox(width: 8),
@@ -348,7 +390,42 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                               onTap: () {
                                 setState(() => _activeFilter = _activeFilter == e.key ? null : e.key);
                                 _loadFeed();
+                                if (_searchQuery.isNotEmpty) _performSearch(_searchQuery);
                               },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Toggle Récents / Populaires — déplacé ici, hors de
+                        // l'entête, pour ne plus entrer en concurrence avec le
+                        // titre sur les écrans étroits (c'était la cause du
+                        // texte "Communauté" tronqué).
+                        GestureDetector(
+                          onTap: () {
+                            setState(() => _sort = _sort == 'recent' ? 'popular' : 'recent');
+                            _loadFeed();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: _sort == 'popular'
+                                  ? AppColors.accentOrange.withValues(alpha: 0.12)
+                                  : AppColors.surfaceVariant,
+                              borderRadius: AppRadius.full,
+                              border: Border.all(
+                                color: _sort == 'popular'
+                                    ? AppColors.accentOrange.withValues(alpha: 0.4)
+                                    : AppColors.divider,
+                              ),
+                            ),
+                            child: Text(
+                              _sort == 'popular' ? '🔥 Populaires' : '🕐 Récents',
+                              style: AppTextStyles.caption.copyWith(
+                                color: _sort == 'popular'
+                                    ? AppColors.accentOrange
+                                    : AppColors.onSurfaceMuted,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ),
@@ -364,17 +441,21 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
                 controller: _tabController,
                 children: [
                   FeedList(
-                    posts: _filtered(_allPosts),
-                    isLoading: _isLoadingAll,
-                    isPaginating: _isPaginating,
-                    onRefresh: () => _loadFeed(reset: true),
-                    onLoadMore: _hasMore ? _loadMore : null,
+                    posts: _searchQuery.isNotEmpty ? _searchResults : _filtered(_allPosts),
+                    isLoading: _searchQuery.isNotEmpty ? _isSearching && _searchResults.isEmpty : _isLoadingAll,
+                    isPaginating: _searchQuery.isNotEmpty ? false : _isPaginating,
+                    onRefresh: _searchQuery.isNotEmpty
+                        ? () => _performSearch(_searchQuery)
+                        : () => _loadFeed(reset: true),
+                    onLoadMore: _searchQuery.isNotEmpty ? null : (_hasMore ? _loadMore : null),
                     onLike: _toggleLike,
                     onDelete: _deletePost,
                     onCompose: _openComposePage,
-                    emptyMessage: _activeFilter != null
-                        ? 'Aucun partage de ce type'
-                        : 'La communauté t\'attend',
+                    emptyMessage: _searchQuery.isNotEmpty
+                        ? 'Aucun résultat pour "$_searchQuery"'
+                        : (_activeFilter != null
+                            ? 'Aucun partage de ce type'
+                            : 'La communauté t\'attend'),
                   ),
                   FeedList(
                     posts: _filtered(_myPosts),

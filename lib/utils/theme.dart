@@ -418,4 +418,10 @@ class AppConstants {
   static const String baseUrl =
       'https://linkmind-backend-sub4.onrender.com/api';
   static const int tokenRefreshThreshold = 300;
+
+  // Clé VAPID pour les notifications push sur le web (Firebase Console >
+  // Paramètres du projet > Cloud Messaging > Configuration Web Push >
+  // "Générer une paire de clés"). OBLIGATOIRE pour que getToken() fonctionne
+  // sur navigateur — actuellement un placeholder, à remplacer avant le test web.
+  static const String fcmVapidKey = 'REMPLACER_PAR_LA_VRAIE_CLE_VAPID';
 }

@@ -727,7 +727,13 @@ class ApiService {
     return result;
   }
 
-  Future<Map<String, dynamic>> searchPosts(String query, {String? postType}) async =>
+  // ⚠️ Le type de retour déclaré doit être `dynamic` (pas Map<String, dynamic>) :
+  // _extractData() dans _handleResponse déballe automatiquement toute réponse
+  // contenant une clé `posts` en List brute (même logique que getFeed/getMyPosts),
+  // donc à l'exécution cette méthode reçoit une List, pas un Map — un type Map
+  // ici provoque un cast exception silencieuse et la recherche paraît "ne rien
+  // trouver" alors que l'API répond correctement.
+  Future<dynamic> searchPosts(String query, {String? postType}) async =>
       await get('/community/search',
           queryParams: {'q': query, if (postType != null) 'type': postType});
 

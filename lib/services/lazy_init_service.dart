@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../firebase_options.dart';
 import 'local_notification_service.dart';
 import 'api.service.dart';
+import '../utils/theme.dart' show AppConstants;
 
 /// 🚀 Lazy Initialization Service
 /// Initialise services critiques en background
@@ -83,7 +84,11 @@ class LazyInitService {
       debugPrint('🔔 FCM permission status: ${settings.authorizationStatus}');
 
       // Token FCM stocké localement — envoyé au backend après login
-      final token = await messaging.getToken();
+      // ⚠️ Sur le web, `vapidKey` est OBLIGATOIRE : sans lui, getToken()
+      // retourne null silencieusement (contrairement à mobile où il est ignoré).
+      final token = await messaging.getToken(
+        vapidKey: kIsWeb ? AppConstants.fcmVapidKey : null,
+      );
       if (token != null) {
         debugPrint(
             '🎫 FCM Token obtenu, stocké en attente de l\'authentification');
@@ -108,7 +113,12 @@ class LazyInitService {
       });
 
       FirebaseMessaging.onMessage.listen(_onForegroundMessage);
-      FirebaseMessaging.onBackgroundMessage(_onBackgroundMessage);
+      // Sur le web, les messages reçus app fermée/onglet en arrière-plan sont
+      // gérés entièrement par le service worker (web/firebase-messaging-sw.js),
+      // pas par ce callback Dart — qui n'a de sens que sur mobile.
+      if (!kIsWeb) {
+        FirebaseMessaging.onBackgroundMessage(_onBackgroundMessage);
+      }
       FirebaseMessaging.onMessageOpenedApp.listen(_onMessageOpenedApp);
 
       _notificationsInitialized = true;

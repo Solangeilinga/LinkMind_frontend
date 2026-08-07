@@ -1,0 +1,28 @@
+[build]
+  publish = "build/web"
+  command = "flutter build web --release"
+
+[[plugins]]
+  # Netlify n'a pas Flutter préinstallé sur son image de build — ce plugin
+  # l'installe avant la commande de build. Sans lui, `flutter build web`
+  # échoue avec "flutter: command not found".
+  package = "netlify-plugin-flutter"
+
+  [plugins.inputs]
+    channel = "stable"
+
+# Indispensable pour une SPA : sans ça, rafraîchir l'app sur une route type
+# /community ou /profile renvoie un 404 Netlify au lieu de laisser GoRouter
+# gérer la navigation côté client.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  # Le service worker Firebase DOIT être servi depuis la racine, sans cache
+  # agressif, sinon les navigateurs continuent d'utiliser une version périmée
+  # après un déploiement.
+  for = "/firebase-messaging-sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"

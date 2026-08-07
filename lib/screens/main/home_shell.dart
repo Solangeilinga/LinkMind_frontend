@@ -14,6 +14,9 @@ class HomeShell extends ConsumerStatefulWidget {
 }
 
 class _HomeShellState extends ConsumerState<HomeShell> {
+  // Mindo reste dans la navigation sur toutes les plateformes, y compris web :
+  // l'écran affiche déjà son propre état "Bientôt disponible" (v2), pas besoin
+  // de le cacher séparément ici — ça resterait cohérent avec le mobile.
   static const _tabs = [
     _NavItem('/home', Icons.mood_outlined, Icons.mood, 'Mood'),
     _NavItem('/assistant', Icons.psychology_outlined, Icons.psychology, 'Mindo'),

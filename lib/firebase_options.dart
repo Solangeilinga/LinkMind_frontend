@@ -44,9 +44,9 @@ class DefaultFirebaseOptions {
     apiKey: 'AIzaSyB3h-OutEla4kU3SFwi1KTM79XVXrC1R5M',
     appId: '1:20517091319:web:8dc5006a6240766556a0f2',
     messagingSenderId: '20517091319',
-    projectId: 'basyam-917b4',
-    authDomain: 'basyam-917b4.firebaseapp.com',
-    storageBucket: 'basyam-917b4.firebasestorage.app',
+    projectId: 'linkmind-917b4',
+    authDomain: 'linkmind-917b4.firebaseapp.com',
+    storageBucket: 'linkmind-917b4.firebasestorage.app',
     measurementId: 'G-J3GRBNG40B',
   );
 
@@ -54,16 +54,16 @@ class DefaultFirebaseOptions {
     apiKey: 'AIzaSyDU1Zq0Y-uweOYmACbPNMr18FMVJLSFexM',
     appId: '1:20517091319:android:73f7d0fd55cd4ba056a0f2',
     messagingSenderId: '20517091319',
-    projectId: 'basyam-917b4',
-    storageBucket: 'basyam-917b4.firebasestorage.app',
+    projectId: 'linkmind-917b4',
+    storageBucket: 'linkmind-917b4.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyBPK-iwFxgNg-2Gct-n1RgGNnRvuvQIuQc',
     appId: '1:20517091319:ios:2b32fcec531a74ff56a0f2',
     messagingSenderId: '20517091319',
-    projectId: 'basyam-917b4',
-    storageBucket: 'basyam-917b4.firebasestorage.app',
+    projectId: 'linkmind-917b4',
+    storageBucket: 'linkmind-917b4.firebasestorage.app',
     iosBundleId: 'com.BASYAM.BASYAM',
   );
 
@@ -71,8 +71,8 @@ class DefaultFirebaseOptions {
     apiKey: 'AIzaSyBPK-iwFxgNg-2Gct-n1RgGNnRvuvQIuQc',
     appId: '1:20517091319:ios:2b32fcec531a74ff56a0f2',
     messagingSenderId: '20517091319',
-    projectId: 'basyam-917b4',
-    storageBucket: 'basyam-917b4.firebasestorage.app',
+    projectId: 'linkmind-917b4',
+    storageBucket: 'linkmind-917b4.firebasestorage.app',
     iosBundleId: 'com.BASYAM.BASYAM',
   );
 
@@ -80,9 +80,9 @@ class DefaultFirebaseOptions {
     apiKey: 'AIzaSyB3h-OutEla4kU3SFwi1KTM79XVXrC1R5M',
     appId: '1:20517091319:web:f960f3ba3559749f56a0f2',
     messagingSenderId: '20517091319',
-    projectId: 'basyam-917b4',
-    authDomain: 'basyam-917b4.firebaseapp.com',
-    storageBucket: 'basyam-917b4.firebasestorage.app',
+    projectId: 'linkmind-917b4',
+    authDomain: 'linkmind-917b4.firebaseapp.com',
+    storageBucket: 'linkmind-917b4.firebasestorage.app',
     measurementId: 'G-Q4R6LWGZGH',
   );
 }
