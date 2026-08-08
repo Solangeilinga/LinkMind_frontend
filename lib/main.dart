@@ -51,12 +51,6 @@ final sharedPrefsProvider = FutureProvider<SharedPreferences>((ref) async {
   return await SharedPreferences.getInstance();
 });
 
-// ✅ Handler pour messages background FCM
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  debugPrint('📨 Message background: ${message.notification?.title}');
-}
-
 void main() async {
   // ✅ 1. Initialisation Flutter (obligatoire avant tout)
   WidgetsFlutterBinding.ensureInitialized();
