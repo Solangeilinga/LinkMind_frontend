@@ -416,7 +416,7 @@ const List<MoodDefinition> kMoods = [
 class AppConstants {
   static const appName = 'BASYAM';
   static const String baseUrl =
-      'https://linkmind-backend-sub4.onrender.com/api';
+      'https://api.basyam.com/api';
   static const int tokenRefreshThreshold = 300;
 
   // Clé VAPID pour les notifications push sur le web (Firebase Console >
