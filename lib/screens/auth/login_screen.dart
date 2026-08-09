@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/gestures.dart';
 import 'package:lottie/lottie.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import '../../utils/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/validators.dart';
@@ -329,33 +327,54 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _loadCountries();
   }
 
+  // Liste de pays intégrée directement dans l'app — plus de dépendance à une
+  // API externe pour une donnée quasi-statique (restcountries.com est
+  // maintenant payant/à quota et bloqué par CORS sur le web de toute façon).
+  static const List<String> _allCountries = [
+    'Afghanistan', 'Afrique du Sud', 'Albanie', 'Algérie', 'Allemagne',
+    'Andorre', 'Angola', 'Antigua-et-Barbuda', 'Arabie saoudite', 'Argentine',
+    'Arménie', 'Australie', 'Autriche', 'Azerbaïdjan', 'Bahamas', 'Bahreïn',
+    'Bangladesh', 'Barbade', 'Belgique', 'Belize', 'Bénin', 'Bhoutan',
+    'Biélorussie', 'Birmanie', 'Bolivie', 'Bosnie-Herzégovine', 'Botswana',
+    'Brésil', 'Brunei', 'Bulgarie', 'Burkina Faso', 'Burundi', 'Cambodge',
+    'Cameroun', 'Canada', 'Cap-Vert', 'Chili', 'Chine', 'Chypre', 'Colombie',
+    'Comores', 'Congo-Brazzaville', 'Corée du Nord', 'Corée du Sud',
+    'Costa Rica', 'Côte d\'Ivoire', 'Croatie', 'Cuba', 'Danemark', 'Djibouti',
+    'Dominique', 'Égypte', 'Émirats arabes unis', 'Équateur', 'Érythrée',
+    'Espagne', 'Estonie', 'Eswatini', 'États-Unis', 'Éthiopie', 'Fidji',
+    'Finlande', 'France', 'Gabon', 'Gambie', 'Géorgie', 'Ghana', 'Grèce',
+    'Grenade', 'Guatemala', 'Guinée', 'Guinée équatoriale', 'Guinée-Bissau',
+    'Guyana', 'Haïti', 'Honduras', 'Hongrie', 'Inde', 'Indonésie', 'Irak',
+    'Iran', 'Irlande', 'Islande', 'Israël', 'Italie', 'Jamaïque', 'Japon',
+    'Jordanie', 'Kazakhstan', 'Kenya', 'Kirghizistan', 'Kiribati', 'Kosovo',
+    'Koweït', 'Laos', 'Lesotho', 'Lettonie', 'Liban', 'Liberia', 'Libye',
+    'Liechtenstein', 'Lituanie', 'Luxembourg', 'Macédoine du Nord',
+    'Madagascar', 'Malaisie', 'Malawi', 'Maldives', 'Mali', 'Malte', 'Maroc',
+    'Marshall (Îles)', 'Maurice', 'Mauritanie', 'Mexique', 'Micronésie',
+    'Moldavie', 'Monaco', 'Mongolie', 'Monténégro', 'Mozambique', 'Namibie',
+    'Nauru', 'Népal', 'Nicaragua', 'Niger', 'Nigeria', 'Norvège',
+    'Nouvelle-Zélande', 'Oman', 'Ouganda', 'Ouzbékistan', 'Pakistan',
+    'Palaos', 'Palestine', 'Panama', 'Papouasie-Nouvelle-Guinée', 'Paraguay',
+    'Pays-Bas', 'Pérou', 'Philippines', 'Pologne', 'Portugal', 'Qatar',
+    'République centrafricaine', 'République démocratique du Congo',
+    'République dominicaine', 'République tchèque', 'Roumanie',
+    'Royaume-Uni', 'Russie', 'Rwanda', 'Saint-Kitts-et-Nevis',
+    'Saint-Marin', 'Saint-Vincent-et-les-Grenadines', 'Sainte-Lucie',
+    'Salomon (Îles)', 'Salvador', 'Samoa', 'São Tomé-et-Príncipe',
+    'Sénégal', 'Serbie', 'Seychelles', 'Sierra Leone', 'Singapour',
+    'Slovaquie', 'Slovénie', 'Somalie', 'Soudan', 'Soudan du Sud',
+    'Sri Lanka', 'Suède', 'Suisse', 'Suriname', 'Syrie', 'Tadjikistan',
+    'Tanzanie', 'Tchad', 'Thaïlande', 'Timor oriental', 'Togo', 'Tonga',
+    'Trinité-et-Tobago', 'Tunisie', 'Turkménistan', 'Turquie', 'Tuvalu',
+    'Ukraine', 'Uruguay', 'Vanuatu', 'Vatican', 'Venezuela', 'Vietnam',
+    'Yémen', 'Zambie', 'Zimbabwe',
+  ];
+
   Future<void> _loadCountries() async {
-    setState(() => _loadingCountries = true);
-    try {
-      final res = await http
-          .get(Uri.parse('https://restcountries.com/v3.1/all?fields=name,translations'))
-          .timeout(const Duration(seconds: 10));
-      if (res.statusCode == 200) {
-        final List data = jsonDecode(res.body);
-        final names = data.map<String>((c) {
-          final fra = c['translations']?['fra']?['common'];
-          final eng = c['name']?['common'];
-          return (fra ?? eng ?? '').toString();
-        }).where((n) => n.isNotEmpty).toList()..sort();
-        setState(() { _countries = names; _loadingCountries = false; });
-      }
-    } catch (_) {
-      setState(() {
-        _countries = [
-          'Algérie','Bénin','Burkina Faso','Cameroun','Canada',
-          'Côte d\'Ivoire','Égypte','États-Unis','France','Ghana',
-          'Guinée','Kenya','Mali','Maroc','Mauritanie','Niger',
-          'Nigeria','République démocratique du Congo','Sénégal',
-          'Suisse','Belgique','Togo','Tunisie','Afrique du Sud',
-        ]..sort();
-        _loadingCountries = false;
-      });
-    }
+    setState(() {
+      _countries = List<String>.from(_allCountries)..sort();
+      _loadingCountries = false;
+    });
   }
 
   @override
