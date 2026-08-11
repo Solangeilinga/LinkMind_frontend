@@ -392,7 +392,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 _SettingRow(
                   icon: Icons.privacy_tip_outlined,
                   title: 'Politique de confidentialité',
-                  onTap: () => _launchUrl('https://basyam.app/legal/privacy'),
+                  onTap: () => _launchUrl('https://basyamsite.netlify.app/legal/privacy'),
                 ),
                 const Divider(height: 1),
                 _SettingRow(
@@ -407,7 +407,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   title: 'Support WhatsApp',
                   subtitle: 'Répond sous 24h',
                   onTap: () => _launchUrl(
-                      'https://wa.me/22600000000?text=Bonjour%2C%20j%27ai%20besoin%20d%27aide%20avec%20BASYAM.'),
+                      'https://wa.me/22661645069?text=Bonjour%2C%20j%27ai%20besoin%20d%27aide%20avec%20BASYAM.'),
                 ),
               ]),
 

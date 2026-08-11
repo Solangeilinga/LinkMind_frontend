@@ -401,7 +401,7 @@ class _SplashLoader extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Where Minds Connect',
+              'Pour un esprit plus apaisé',
               style: AppTextStyles.body.copyWith(color: Colors.white70),
             ),
             const SizedBox(height: 60),

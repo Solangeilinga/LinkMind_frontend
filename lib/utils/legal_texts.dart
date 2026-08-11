@@ -72,7 +72,7 @@ BASYAM ne peut être tenu responsable des décisions prises sur la base des cons
 
 Les présentes CGU sont soumises au droit burkinabè. Tout litige sera porté devant les juridictions compétentes de Ouagadougou.
 
-Contact : support@basyam.app
+Contact : support@basyam.com
 ''';
 
   // ─── POLITIQUE DE CONFIDENTIALITÉ ────────────────────────────────────────────
