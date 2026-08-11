@@ -67,7 +67,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             Text('BASYAM',
                 style: AppTextStyles.h1.copyWith(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900)),
             const SizedBox(height: 8),
-            Text('Where Minds Connect',
+            Text('Pour un esprit plus apaisé',
                 style: AppTextStyles.body.copyWith(color: Colors.white70)),
             const SizedBox(height: 60),
             if (authState.isLoading)

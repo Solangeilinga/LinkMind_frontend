@@ -2,15 +2,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:dio/dio.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:open_file/open_file.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_mapper.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api.service.dart';
-import '../../services/report_service.dart';
 import '../../models/models.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -21,8 +17,6 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   List<Map<String, dynamic>> _allBadges = [];
-  bool _exportingReport = false;
-  String? _reportPath;
 
   @override
   void initState() {
@@ -39,191 +33,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         });
       }
     } catch (_) {}
-  }
-
-  /// Nettoie l'historique d'humeur pour éviter les nulls
-  List<Map<String, dynamic>> _cleanMoodHistory(List<Map<String, dynamic>> raw) {
-    return raw.map((entry) {
-      return {
-        'score': (entry['score'] as num?)?.toInt() ?? 3,
-        'date': entry['date'] ?? DateTime.now().toIso8601String(),
-      };
-    }).toList();
-  }
-
-  /// Nettoie la liste des défis complétés
-  List<Map<String, dynamic>> _cleanChallenges(List<Map<String, dynamic>> raw) {
-    return raw.map((challengeEntry) {
-      // ✅ Conversion sécurisée de Map<dynamic, dynamic> -> Map<String, dynamic>
-      final challengeData = challengeEntry['challenge'];
-      final challengeMap =
-          _castMap<dynamic>(challengeData) as Map<String, dynamic>? ?? {};
-      return {
-        'challenge': {
-          'category': (challengeMap['category'] as String?) ?? 'Général',
-        },
-      };
-    }).toList();
-  }
-
-  /// Convertir Map<dynamic, dynamic> en Map<String, T> de manière sécurisée
-  static Map<String, T> _castMap<T>(dynamic data) {
-    if (data is Map<String, T>) return data;
-    if (data is Map) {
-      return Map<String, T>.from(
-          data.map((k, v) => MapEntry(k.toString(), v as T)));
-    }
-    return {};
-  }
-
-  /// Nettoie la liste des badges
-  List<UserBadge> _cleanBadges(List<dynamic> raw) {
-    return raw.map((json) {
-      // Convertit en Map sécurisée
-      final map = json is Map<String, dynamic> ? json : {};
-      return UserBadge(
-        badgeId: (map['badgeId'] as String?) ?? 'inconnu',
-        earnedAt: map['earnedAt'] != null
-            ? DateTime.tryParse(map['earnedAt'].toString())
-            : null,
-      );
-    }).toList();
-  }
-
-  Future<void> _exportReport() async {
-    setState(() => _exportingReport = true);
-    try {
-      final user = ref.read(authProvider).user;
-      if (user == null) throw Exception('Utilisateur non trouvé');
-
-      // Récupérer les données depuis l'API
-      final api = ApiService();
-      final userData = await api.getMe();
-
-      // Nettoyer les données
-      final rawMoodHistory =
-          List<Map<String, dynamic>>.from(userData['moodHistory'] ?? []);
-      final rawChallenges = List<Map<String, dynamic>>.from(
-          userData['completedChallenges'] ?? []);
-      final rawBadges = userData['badges'] as List? ?? [];
-
-      final moodHistory = _cleanMoodHistory(rawMoodHistory);
-      final challenges = _cleanChallenges(rawChallenges);
-      final badges = _cleanBadges(rawBadges);
-
-      // ✅ Vérifier qu'il y a assez de données
-      if (moodHistory.isEmpty && challenges.isEmpty && badges.isEmpty) {
-        if (mounted) {
-          setState(() => _exportingReport = false);
-          _showInsufficientDataDialog();
-        }
-        return;
-      }
-
-      if (mounted) {
-        setState(() => _exportingReport = false);
-      }
-
-      // Appel au service de rapport (normalement robuste, mais on a déjà nettoyé)
-      await ReportService.generateAndShowReport(
-        user: user,
-        moodHistory: moodHistory,
-        challenges: challenges,
-        badges: badges,
-        personalizedMessage: userData['wellnessMessage'] as String?,
-      );
-
-      if (mounted) {
-        _showSuccessSnackBar('Rapport généré et prêt à partager!');
-      }
-    } catch (e, stack) {
-      debugPrint('❌ Erreur export: $e');
-      debugPrint(stack.toString());
-      if (mounted) {
-        setState(() => _exportingReport = false);
-        _showErrorSnackBar('Erreur : ${e.toString()}');
-      }
-    }
-  }
-
-  void _showSuccessDialog(String path) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
-        title: const Row(
-          children: [
-            Icon(Icons.check_circle, color: AppColors.secondary, size: 28),
-            SizedBox(width: 8),
-            Text('Rapport généré avec succès!'),
-          ],
-        ),
-        content: const Text(
-          'Ton rapport PDF a été généré et est prêt à être partagé ou imprimé.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Fermer'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ✅ Alerte données insuffisantes
-  void _showInsufficientDataDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
-        title: const Row(
-          children: [
-            Icon(Icons.info, color: AppColors.accentOrange, size: 28),
-            SizedBox(width: 8),
-            Text('Pas assez de données'),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Pour générer un rapport personnalisé, tu dois avoir :'),
-            SizedBox(height: 12),
-            Text('✓ Au moins une entrée d\'humeur', style: AppTextStyles.body),
-            Text('✓ Quelques défis complétés', style: AppTextStyles.body),
-            Text('✓ Ou des badges débloqués', style: AppTextStyles.body),
-            SizedBox(height: 12),
-            Text('Reviens plus tard après avoir utilisé l\'app un peu plus.',
-                style: AppTextStyles.bodySmall),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('D\'accord'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.error, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
-            Expanded(child: Text(message)),
-          ],
-        ),
-        backgroundColor: AppColors.accent,
-        behavior: SnackBarBehavior.floating,
-        shape: const RoundedRectangleBorder(borderRadius: AppRadius.md),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
   }
 
   void _showSuccessSnackBar(String message) {
@@ -788,58 +597,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _buildActionsSection(UserModel user) {
     return Column(
       children: [
-        // 🔴 COMMENTÉ POUR PHASE DE TEST - Toutes les fonctionnalités accessibles
-        // if (user.isPremium)
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton.icon(
-            onPressed: _exportingReport ? null : _exportReport,
-            icon: _exportingReport
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Icon(Icons.picture_as_pdf_outlined),
-            label: Text(
-              _exportingReport
-                  ? 'Génération en cours...'
-                  : 'Exporter mon rapport PDF',
-              style: AppTextStyles.button,
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              shape: const RoundedRectangleBorder(
-                borderRadius: AppRadius.md,
-              ),
-            ),
-          ),
-        )
-        // else
-        //   const SizedBox.shrink(),
-        ,
-        const SizedBox(height: 12),
-        // 🔴 COMMENTÉ POUR PHASE DE TEST - Toutes les fonctionnalités accessibles
-        // if (!user.isPremium)
-        //   Container(
-        //     width: double.infinity,
-        //     height: 52,
-        //     margin: const EdgeInsets.only(bottom: 12),
-        //     child: ElevatedButton.icon(
-        //       onPressed: () => context.push('/premium'),
-        //       icon: const Text('👑', style: TextStyle(fontSize: 16)),
-        //       label: const Text('Passer en Premium'),
-        //       style: ElevatedButton.styleFrom(
-        //         backgroundColor: AppColors.secondary,
-        //         foregroundColor: Colors.white,
-        //       ),
-        //     ),
-        //   ),
         SizedBox(
           width: double.infinity,
           height: 52,
@@ -945,7 +702,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 }
 
-// ─── Edit Profile Sheet (inchangé) ──────────────────────────────────────────
+// ─── Edit Profile Sheet ──────────────────────────────────────────
 class _EditProfileSheet extends StatefulWidget {
   final UserModel user;
   final Function(UserModel) onSaved;
@@ -1036,11 +793,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
         if (_gender != null) 'gender': _gender,
       });
 
-      // ⚠️ CORRECTION : même bug que dans challenge_detail_screen.dart —
-      // _extractData() dé-enveloppe déjà { user: {...} } vers l'objet user à
-      // plat. Refaire data['user'] cherchait une clé 'user' à l'intérieur de
-      // l'objet déjà dé-enveloppé (null), ce qui aurait planté à la sauvegarde
-      // du profil.
+      // CORRECTION: data est déjà l'objet utilisateur dé-enveloppé
       final updated = UserModel.fromJson(data);
       widget.onSaved(updated);
 

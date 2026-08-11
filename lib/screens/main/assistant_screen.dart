@@ -182,7 +182,7 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen>
       debugPrint('📦 Réponse API brute: $response');
       debugPrint('📦 Type de response: ${response.runtimeType}');
       debugPrint('📦 Clés de la réponse: ${response.keys}');
-    
+
       // Extraction ultra-robuste
       String aiMessage = '';
       Map<String, dynamic>? data;
@@ -326,14 +326,22 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen>
         title: Row(
           children: [
             Container(
-              width: 36, height: 36,
-              decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-              child: ClipOval(child: Image.asset('assets/images/logo.png', width: 36, height: 36, fit: BoxFit.cover)),
+              width: 36,
+              height: 36,
+              decoration: const BoxDecoration(
+                  color: AppColors.primary, shape: BoxShape.circle),
+              child: ClipOval(
+                  child: Image.asset('assets/images/logo.png',
+                      width: 36, height: 36, fit: BoxFit.cover)),
             ),
             const SizedBox(width: 10),
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Mindo', style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w800)),
-              Text('Bientôt disponible', style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
+              Text('Mindo',
+                  style:
+                      AppTextStyles.body.copyWith(fontWeight: FontWeight.w800)),
+              Text('Bientôt disponible',
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.onSurfaceMuted)),
             ]),
           ],
         ),
@@ -345,58 +353,26 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen>
           child: Column(children: [
             // Illustration
             Container(
-              width: 120, height: 120,
+              width: 120,
+              height: 120,
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.psychology_outlined, size: 60, color: AppColors.primary),
+              child: const Icon(Icons.psychology_outlined,
+                  size: 60, color: AppColors.primary),
             ),
             const SizedBox(height: 28),
 
             // Titre
-            Text('Mindo arrive bientôt', style: AppTextStyles.h2.copyWith(fontWeight: FontWeight.w800)),
+            Text('Mindo arrive bientôt',
+                style: AppTextStyles.h2.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 12),
             Text(
-              'Mindo sera ton compagnon de bien-être mental. '
-              'Nous préparons une expérience sérieuse et bienveillante, '
-              'conçue avec des professionnels de santé.',
-              style: AppTextStyles.body.copyWith(color: AppColors.onSurfaceMuted, height: 1.6),
+              'Bientôt disponible.',
+              style: AppTextStyles.body
+                  .copyWith(color: AppColors.onSurfaceMuted, height: 1.6),
               textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-
-            // Ce qui arrive
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
-              ),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Ce qui arrive en v2', style: AppTextStyles.bodySmall.copyWith(
-                  fontWeight: FontWeight.w800, color: AppColors.primary)),
-                const SizedBox(height: 14),
-                ...[
-                  ('📋', 'Check-in quotidien', '5 questions courtes sur ton humeur, sommeil et énergie'),
-                  ('📊', 'Bilan émotionnel', 'Suivi de tes tendances sur 7 jours, présenté avec bienveillance'),
-                  ('🤝', 'Orientation douce', 'Si tu traverses une période difficile, Mindo te propose du soutien sans t\'alarmer'),
-                  ('🔒', 'Confidentialité totale', 'Tes réponses restent privées et ne sont jamais partagées'),
-                ].map((item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(item.$1, style: const TextStyle(fontSize: 20)),
-                    const SizedBox(width: 12),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(item.$2, style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 2),
-                      Text(item.$3, style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted, height: 1.4)),
-                    ])),
-                  ]),
-                )),
-              ]),
             ),
             const SizedBox(height: 24),
 
@@ -411,31 +387,42 @@ class _AssistantScreenState extends ConsumerState<AssistantScreen>
               ),
               child: Row(children: [
                 Container(
-                  width: 44, height: 44,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     color: AppColors.secondary.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.people_outline, color: AppColors.secondary, size: 22),
+                  child: const Icon(Icons.people_outline,
+                      color: AppColors.secondary, size: 22),
                 ),
                 const SizedBox(width: 14),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Tu veux parler à quelqu\'un maintenant ?',
-                    style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 2),
-                  Text('Des professionnels de santé mentale sont disponibles.',
-                    style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
-                ])),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text('Tu veux parler à quelqu\'un maintenant ?',
+                          style: AppTextStyles.bodySmall
+                              .copyWith(fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 2),
+                      Text(
+                          'Des professionnels de santé mentale sont disponibles.',
+                          style: AppTextStyles.caption
+                              .copyWith(color: AppColors.onSurfaceMuted)),
+                    ])),
                 const SizedBox(width: 8),
                 GestureDetector(
                   onTap: () => context.go('/professionals'),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
                       color: AppColors.primary,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text('Voir', style: AppTextStyles.caption.copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
+                    child: Text('Voir',
+                        style: AppTextStyles.caption.copyWith(
+                            color: Colors.white, fontWeight: FontWeight.w700)),
                   ),
                 ),
               ]),
@@ -742,9 +729,12 @@ class _ProfessionalCard extends StatelessWidget {
                     style: AppTextStyles.caption.copyWith(
                         color: Colors.white, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 6),
-                _helpItem(Icons.school, 'Service de santé universitaire (SUMP)'),
-                _helpItem(Icons.phone, 'Ligne d\'écoute étudiante de ton université'),
-                _helpItem(Icons.local_hospital, 'Centre Médical le plus proche'),
+                _helpItem(
+                    Icons.school, 'Service de santé universitaire (SUMP)'),
+                _helpItem(
+                    Icons.phone, 'Ligne d\'écoute étudiante de ton université'),
+                _helpItem(
+                    Icons.local_hospital, 'Centre Médical le plus proche'),
               ],
             ),
           ),
@@ -757,17 +747,18 @@ class _ProfessionalCard extends StatelessWidget {
               decoration: const BoxDecoration(
                   color: Colors.white, borderRadius: AppRadius.md),
               child: Center(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.medical_information, color: AppColors.accentRed, size: 18),
-                      const SizedBox(width: 6),
-                      Text('Voir les professionnels BASYAM',
-                          style: AppTextStyles.bodySmall.copyWith(
-                              color: AppColors.accent,
-                              fontWeight: FontWeight.w800)),
-                    ],
-                  ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.medical_information,
+                        color: AppColors.accentRed, size: 18),
+                    const SizedBox(width: 6),
+                    Text('Voir les professionnels BASYAM',
+                        style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.accent,
+                            fontWeight: FontWeight.w800)),
+                  ],
+                ),
               ),
             ),
           ),

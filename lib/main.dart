@@ -16,9 +16,9 @@ import 'services/local_notification_service.dart';
 import 'services/security.service.dart';
 import 'services/api.service.dart';
 
-// Screens
+// Screens - Utiliser des alias pour éviter les conflits
 import 'screens/auth/login_screen.dart';
-// ✅ IMPORT AJOUTÉ
+import 'screens/auth/register_screen.dart';
 import 'screens/auth/forgot_password_screen.dart';
 import 'screens/auth/verify_email_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
@@ -27,7 +27,8 @@ import 'screens/main/mood_screen.dart';
 import 'screens/main/challenges_screen.dart';
 import 'screens/main/community/community_screen.dart';
 import 'screens/main/professionals_screen.dart';
-import 'screens/main/profile_screen.dart';
+// ✅ ALIAS pour ProfileScreen pour éviter le conflit
+import 'screens/main/profile_screen.dart' as profile;
 import 'screens/main/assistant_screen.dart';
 import 'screens/main/settings_screen.dart';
 import 'screens/detail/challenge_detail_screen.dart';
@@ -229,7 +230,7 @@ class _BASYAMAppState extends ConsumerState<BASYAMApp>
         ),
         GoRoute(
           path: '/auth/register',
-          builder: (_, __) => RegisterScreen(),
+          builder: (_, __) => const RegisterScreen(),
         ),
         GoRoute(
           path: '/auth/forgot-password',
@@ -278,7 +279,8 @@ class _BASYAMAppState extends ConsumerState<BASYAMApp>
             ),
             GoRoute(
               path: '/profile',
-              builder: (_, __) => const ProfileScreen(),
+              // ✅ Utiliser l'alias pour ProfileScreen
+              builder: (_, __) => const profile.ProfileScreen(),
             ),
           ],
         ),
@@ -380,6 +382,11 @@ class _SplashLoader extends StatelessWidget {
                 child: Image.asset(
                   'assets/images/logo.png',
                   fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.psychology,
+                    size: 60,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
@@ -399,7 +406,9 @@ class _SplashLoader extends StatelessWidget {
             ),
             const SizedBox(height: 60),
             const CircularProgressIndicator(
-                color: Colors.white, strokeWidth: 2),
+              color: Colors.white,
+              strokeWidth: 2,
+            ),
           ],
         ),
       ),

@@ -817,7 +817,7 @@ class _MoodCard extends StatelessWidget {
                         fontWeight: FontWeight.w800)),
               ]),
               const SizedBox(height: 4),
-              Text('Continue chaque jour pour suivre ton évolution',
+              Text('Bravo!! Continue chaque jour pour suivre ton évolution',
                   style: AppTextStyles.caption
                       .copyWith(color: AppColors.onSurfaceMuted)),
             ]),
