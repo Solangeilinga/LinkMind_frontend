@@ -9,6 +9,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/api.service.dart';
 import '../../providers/content_provider.dart';
 import '../../services/local_notification_service.dart';
+import '../../services/sound_service.dart';
 
 class _WellnessTip {
   final String icon, title, desc;
@@ -215,6 +216,7 @@ class _MoodScreenState extends ConsumerState<MoodScreen>
   // ── Célébration après enregistrement ──────────────────────────────────────
   void _showPostLogCelebration(
       String moodId, Map<String, dynamic> result) {
+    SoundService.instance.play(AppSound.checkinConfirm);
     final user = ref.read(authProvider).user;
     final streak = user?.streakDays ?? 0;
     final moodState = ref.read(moodProvider);
@@ -817,7 +819,7 @@ class _MoodCard extends StatelessWidget {
                         fontWeight: FontWeight.w800)),
               ]),
               const SizedBox(height: 4),
-              Text('Bravo!! Continue chaque jour pour suivre ton évolution',
+              Text('Continue chaque jour pour suivre ton évolution',
                   style: AppTextStyles.caption
                       .copyWith(color: AppColors.onSurfaceMuted)),
             ]),

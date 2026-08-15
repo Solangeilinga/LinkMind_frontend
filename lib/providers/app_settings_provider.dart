@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/sound_service.dart';
 
 // ─── État ─────────────────────────────────────────────────────────────────────
 class AppSettings {
   final ThemeMode themeMode;
   final double textScale;
   final String language;
+  final bool soundsEnabled;
 
   const AppSettings({
     this.themeMode = ThemeMode.light,
     this.textScale  = 1.0,
     this.language   = 'fr',
+    this.soundsEnabled = true,
   });
 
   Locale get locale => Locale(language);
@@ -20,10 +23,12 @@ class AppSettings {
     ThemeMode? themeMode,
     double?    textScale,
     String?    language,
+    bool?      soundsEnabled,
   }) => AppSettings(
     themeMode: themeMode ?? this.themeMode,
     textScale:  textScale  ?? this.textScale,
     language:   language   ?? this.language,
+    soundsEnabled: soundsEnabled ?? this.soundsEnabled,
   );
 }
 
@@ -32,6 +37,7 @@ class AppSettingsNotifier extends Notifier<AppSettings> {
   static const _kTheme    = 'theme_mode';   // 'light' | 'dark' | 'system'
   static const _kScale    = 'text_scale';
   static const _kLanguage = 'language';
+  static const _kSounds   = 'sounds_enabled';
 
   @override
   AppSettings build() {
@@ -44,10 +50,13 @@ class AppSettingsNotifier extends Notifier<AppSettings> {
     final themeStr = prefs.getString(_kTheme) ?? 'light';
     final scale    = prefs.getDouble(_kScale)  ?? 1.0;
     final lang     = prefs.getString(_kLanguage) ?? 'fr';
+    final sounds   = prefs.getBool(_kSounds) ?? true;
+    SoundService.instance.setEnabled(sounds);
     state = AppSettings(
       themeMode: _parseTheme(themeStr),
       textScale:  scale,
       language:   lang,
+      soundsEnabled: sounds,
     );
   }
 
@@ -90,6 +99,13 @@ class AppSettingsNotifier extends Notifier<AppSettings> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kLanguage, lang);
     state = state.copyWith(language: lang);
+  }
+
+  Future<void> setSoundsEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kSounds, enabled);
+    SoundService.instance.setEnabled(enabled);
+    state = state.copyWith(soundsEnabled: enabled);
   }
 
   bool get isDark => state.themeMode == ThemeMode.dark;

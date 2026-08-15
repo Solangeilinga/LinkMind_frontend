@@ -271,6 +271,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ]),
 
+              // ── Sons ─────────────────────────────────────────────────────
+              const _SectionHeader('Sons'),
+              _SettingCard(children: [
+                SwitchListTile(
+                  value: settings.soundsEnabled,
+                  onChanged: (v) => notifier.setSoundsEnabled(v),
+                  activeThumbColor: AppColors.primary,
+                  secondary: Icon(
+                    settings.soundsEnabled
+                        ? Icons.volume_up_outlined
+                        : Icons.volume_off_outlined,
+                    size: 20,
+                    color: AppColors.onSurfaceMuted,
+                  ),
+                  title: const Text('Sons de l\'application', style: AppTextStyles.body),
+                  subtitle: Text(
+                    'Sons doux pour les exercices de respiration et confirmations',
+                    style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted),
+                  ),
+                ),
+              ]),
+
               // ── Notifications ─────────────────────────────────────────────
               const _SectionHeader('Notifications'),
               _SettingCard(children: [
@@ -392,7 +414,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 _SettingRow(
                   icon: Icons.privacy_tip_outlined,
                   title: 'Politique de confidentialité',
-                  onTap: () => _launchUrl('https://basyamsite.netlify.app/legal/privacy'),
+                  onTap: () => _launchUrl('https://basyam.app/legal/privacy'),
                 ),
                 const Divider(height: 1),
                 _SettingRow(
@@ -407,7 +429,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   title: 'Support WhatsApp',
                   subtitle: 'Répond sous 24h',
                   onTap: () => _launchUrl(
-                      'https://wa.me/22661645069?text=Bonjour%2C%20j%27ai%20besoin%20d%27aide%20avec%20BASYAM.'),
+                      'https://wa.me/22600000000?text=Bonjour%2C%20j%27ai%20besoin%20d%27aide%20avec%20BASYAM.'),
                 ),
               ]),
 
