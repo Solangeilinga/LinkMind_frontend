@@ -12,7 +12,9 @@ enum AppSound {
   breathingHold('assets/sounds/breathing_hold.wav'),
   breathingExhale('assets/sounds/breathing_exhale.wav'),
   checkinConfirm('assets/sounds/checkin_confirm.wav'),
-  messageReceived('assets/sounds/message_received.wav');
+  messageReceived('assets/sounds/message_received.wav'),
+  challengeComplete('assets/sounds/challenge_complete.wav'),
+  badgeUnlocked('assets/sounds/badge_unlocked.wav');
 
   final String assetPath;
   const AppSound(this.assetPath);

@@ -7,6 +7,7 @@ import '../../providers/content_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/challenge.dart';
 import '../../services/api.service.dart';
+import '../../services/sound_service.dart';
 
 class ChallengeDetailScreen extends ConsumerStatefulWidget {
   final String challengeId;
@@ -187,6 +188,13 @@ class _ChallengeDetailScreenState extends ConsumerState<ChallengeDetailScreen>
         _isCompleted = true;
         _isCompleting = false;
       });
+
+      // Son distinct si un badge est débloqué en plus du défi, sinon le son
+      // standard de défi complété — jamais les deux, pour rester discret.
+      final newBadges = List<dynamic>.from(result['newBadges'] ?? []);
+      SoundService.instance.play(
+        newBadges.isNotEmpty ? AppSound.badgeUnlocked : AppSound.challengeComplete,
+      );
 
       _checkController.forward();
       await Future.delayed(const Duration(milliseconds: 400));
