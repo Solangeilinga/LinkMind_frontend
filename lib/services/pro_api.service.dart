@@ -98,6 +98,15 @@ class ProApiService {
     return _handle(res) as Map<String, dynamic>;
   }
 
+  Future<void> updateProfile(Map<String, dynamic> fields) async {
+    final res = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/professionals/me'),
+      headers: await _headers(),
+      body: jsonEncode(fields),
+    );
+    _handle(res);
+  }
+
   Future<List<dynamic>> getBookings({String? status}) async {
     final uri = Uri.parse('${AppConstants.baseUrl}/professionals/me/bookings')
         .replace(queryParameters: status != null ? {'status': status} : null);

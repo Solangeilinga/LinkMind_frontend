@@ -38,6 +38,7 @@ import 'screens/pro/pro_dashboard_screen.dart';
 import 'screens/pro/pro_slots_screen.dart';
 import 'screens/pro/pro_community_screen.dart';
 import 'screens/pro/pro_forgot_password_screen.dart';
+import 'screens/pro/pro_profile_screen.dart';
 import 'screens/detail/challenge_detail_screen.dart';
 import 'screens/detail/mood_history_screen.dart';
 import 'screens/premium/premium_screen.dart';
@@ -286,6 +287,10 @@ class _BASYAMAppState extends ConsumerState<BASYAMApp>
         GoRoute(
           path: '/pro/forgot-password',
           builder: (_, __) => const ProForgotPasswordScreen(),
+        ),
+        GoRoute(
+          path: '/pro/profile',
+          builder: (_, __) => const ProProfileScreen(),
         ),
 
         // Premium

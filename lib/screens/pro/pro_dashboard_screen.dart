@@ -142,6 +142,11 @@ class _ProDashboardScreenState extends State<ProDashboardScreen> {
                         ),
                       ),
                       IconButton(
+                        icon: const Icon(Icons.person_outline, color: AppColors.primary),
+                        onPressed: () => context.push('/pro/profile'),
+                        tooltip: 'Mon profil',
+                      ),
+                      IconButton(
                         icon: const Icon(Icons.forum_outlined, color: AppColors.primary),
                         onPressed: () => context.push('/pro/community'),
                         tooltip: 'Communauté',
@@ -155,6 +160,38 @@ class _ProDashboardScreenState extends State<ProDashboardScreen> {
                   ),
                 ),
               ),
+
+              // ── Incitation à compléter le profil ─────────────────────────
+              if (_me != null && _me!['isProfileComplete'] == false)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                    child: GestureDetector(
+                      onTap: () => context.push('/pro/profile'),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.accentOrange.withValues(alpha: 0.1),
+                          borderRadius: AppRadius.lg,
+                          border: Border.all(color: AppColors.accentOrange.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline, color: AppColors.accentOrange, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Complète ton profil pour être visible par les testeurs.',
+                                style: AppTextStyles.body.copyWith(color: AppColors.accentOrange, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right, color: AppColors.accentOrange, size: 20),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
 
               // ── Filtres de statut ──────────────────────────────────────
               SliverToBoxAdapter(
