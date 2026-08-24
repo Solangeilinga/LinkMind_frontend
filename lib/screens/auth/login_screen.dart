@@ -8,6 +8,7 @@ import '../../providers/auth_provider.dart';
 import '../../utils/validators.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api.service.dart';
+import '../../services/pro_api.service.dart';
 
 // ─── Error Banner ─────────────────────────────────────────────────────────────
 class _ErrorBanner extends StatelessWidget {
@@ -62,10 +63,55 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (email.isEmpty)    { setState(() => _localError = 'Saisis ton adresse email.'); return; }
     if (password.isEmpty) { setState(() => _localError = 'Saisis ton mot de passe.'); return; }
     setState(() => _localError = null);
-    final success = await ref.read(authProvider.notifier).login(
-      email: email, password: password,
+
+    // Même écran de connexion pour tout le monde (pas de formulaire séparé).
+    // Les deux connexions sont tentées EN PARALLÈLE (pas l'une après l'autre,
+    // pour ne pas ralentir les pros) avec les mêmes identifiants : une même
+    // personne peut avoir un compte testeur ET un compte professionnel avec
+    // le même email/mot de passe. Si les deux existent, on lui laisse le
+    // choix plutôt que de privilégier l'un par défaut.
+    final results = await Future.wait<bool>([
+      ref.read(authProvider.notifier).login(email: email, password: password),
+      ProApiService().login(email, password).then((_) => true).catchError((_) => false),
+    ]);
+
+    final userSuccess = results[0];
+    final proSuccess = results[1];
+    if (!mounted) return;
+
+    if (userSuccess && proSuccess) {
+      _showSpaceChoiceDialog();
+    } else if (userSuccess) {
+      context.go('/home');
+    } else if (proSuccess) {
+      context.go('/pro/dashboard');
+    }
+    // Sinon : ni l'un ni l'autre n'a fonctionné — l'erreur déjà affichée
+    // (state.error de authProvider) reste valable, rien de plus à faire.
+  }
+
+  void _showSpaceChoiceDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
+        title: const Text('Quel espace veux-tu ouvrir ?'),
+        content: const Text(
+          'Tu as à la fois un compte testeur et un compte professionnel avec ces identifiants.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () { Navigator.pop(ctx); context.go('/home'); },
+            child: const Text('Espace testeur'),
+          ),
+          TextButton(
+            onPressed: () { Navigator.pop(ctx); context.go('/pro/dashboard'); },
+            child: const Text('Espace professionnel'),
+          ),
+        ],
+      ),
     );
-    if (success && mounted) context.go('/home');
   }
 
   @override

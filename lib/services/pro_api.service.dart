@@ -1,0 +1,183 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
+import '../utils/theme.dart';
+
+/// Service API isolé pour l'espace professionnel (psychologues partenaires).
+///
+/// Volontairement séparé de `ApiService` (comptes utilisateurs classiques) :
+/// les deux systèmes d'authentification utilisent des JWT de nature
+/// différente (`type: 'professional'` vs utilisateur classique), stockés
+/// sous des clés distinctes, pour éviter tout risque d'écrasement mutuel si
+/// les deux sessions coexistaient sur le même appareil.
+class ProApiService {
+  static final ProApiService _instance = ProApiService._internal();
+  factory ProApiService() => _instance;
+  ProApiService._internal();
+
+  final _storage = const FlutterSecureStorage();
+  static const _tokenKey = 'pro_access_token';
+  String? _token;
+
+  Future<String?> _getToken() async {
+    _token ??= await _storage.read(key: _tokenKey);
+    return _token;
+  }
+
+  Future<void> _setToken(String token) async {
+    _token = token;
+    await _storage.write(key: _tokenKey, value: token);
+  }
+
+  Future<void> logout() async {
+    _token = null;
+    await _storage.delete(key: _tokenKey);
+  }
+
+  Future<bool> isLoggedIn() async => (await _getToken()) != null;
+
+  Future<Map<String, String>> _headers() async {
+    final token = await _getToken();
+    return {
+      'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  dynamic _handle(http.Response res) {
+    final body = res.body.isNotEmpty ? jsonDecode(res.body) : {};
+    if (res.statusCode >= 200 && res.statusCode < 300) return body;
+    if (res.statusCode == 401) {
+      // Session pro expirée/invalide — on efface le token pour forcer un
+      // nouveau login plutôt que de laisser l'app dans un état incohérent.
+      logout();
+    }
+    throw Exception(body['error'] ?? 'Erreur réseau (${res.statusCode})');
+  }
+
+  // ── Authentification ────────────────────────────────────────────────────
+
+  Future<void> login(String email, String password) async {
+    final res = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/professionals/auth/login'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'password': password}),
+    );
+    final data = _handle(res);
+    await _setToken(data['token'] as String);
+  }
+
+  Future<void> setupPassword(String setupToken, String newPassword) async {
+    final res = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/professionals/auth/setup-password'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'token': setupToken, 'newPassword': newPassword}),
+    );
+    final data = _handle(res);
+    await _setToken(data['token'] as String);
+  }
+
+  /// Ne lève jamais d'erreur côté UI : le backend renvoie volontairement le
+  /// même message que l'email existe ou non (anti-énumération de comptes).
+  Future<void> forgotPassword(String email) async {
+    await http.post(
+      Uri.parse('${AppConstants.baseUrl}/professionals/auth/forgot-password'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email}),
+    );
+  }
+
+  // ── Profil & rendez-vous ────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getMe() async {
+    final res = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/professionals/me'),
+      headers: await _headers(),
+    );
+    return _handle(res) as Map<String, dynamic>;
+  }
+
+  Future<List<dynamic>> getBookings({String? status}) async {
+    final uri = Uri.parse('${AppConstants.baseUrl}/professionals/me/bookings')
+        .replace(queryParameters: status != null ? {'status': status} : null);
+    final res = await http.get(uri, headers: await _headers());
+    final data = _handle(res);
+    return (data['bookings'] as List<dynamic>?) ?? [];
+  }
+
+  Future<void> cancelBooking(String bookingId, {String? reason}) async {
+    final res = await http.patch(
+      Uri.parse('${AppConstants.baseUrl}/professionals/me/bookings/$bookingId/cancel'),
+      headers: await _headers(),
+      body: jsonEncode({if (reason != null) 'reason': reason}),
+    );
+    _handle(res);
+  }
+
+  Future<void> completeBooking(String bookingId) async {
+    final res = await http.patch(
+      Uri.parse('${AppConstants.baseUrl}/professionals/me/bookings/$bookingId/complete'),
+      headers: await _headers(),
+    );
+    _handle(res);
+  }
+
+  Future<void> updateSlots(List<Map<String, dynamic>> slots) async {
+    final res = await http.put(
+      Uri.parse('${AppConstants.baseUrl}/professionals/me/slots'),
+      headers: await _headers(),
+      body: jsonEncode({'slots': slots}),
+    );
+    _handle(res);
+  }
+
+  Future<void> addSlot({required String date, required String startTime, required String endTime}) async {
+    final res = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/professionals/me/slots'),
+      headers: await _headers(),
+      body: jsonEncode({'date': date, 'startTime': startTime, 'endTime': endTime}),
+    );
+    _handle(res);
+  }
+
+  Future<void> deleteSlot(String slotId) async {
+    final res = await http.delete(
+      Uri.parse('${AppConstants.baseUrl}/professionals/me/slots/$slotId'),
+      headers: await _headers(),
+    );
+    _handle(res);
+  }
+
+  // ── Communauté (identifié, badge visible) ───────────────────────────────
+
+  Future<List<dynamic>> getCommunityFeed({int page = 1, String? postType}) async {
+    final uri = Uri.parse('${AppConstants.baseUrl}/professionals/me/community/feed')
+        .replace(queryParameters: {
+      'page': page.toString(),
+      if (postType != null) 'postType': postType,
+    });
+    final res = await http.get(uri, headers: await _headers());
+    final data = _handle(res);
+    return (data['posts'] as List<dynamic>?) ?? [];
+  }
+
+  Future<Map<String, dynamic>> createCommunityPost(String content, {String postType = 'tip'}) async {
+    final res = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/professionals/me/community/posts'),
+      headers: await _headers(),
+      body: jsonEncode({'content': content, 'postType': postType}),
+    );
+    final data = _handle(res);
+    return data['post'] as Map<String, dynamic>;
+  }
+
+  Future<void> addCommunityComment(String postId, String content) async {
+    final res = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/professionals/me/community/posts/$postId/comments'),
+      headers: await _headers(),
+      body: jsonEncode({'content': content}),
+    );
+    _handle(res);
+  }
+}

@@ -406,6 +406,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               const _SectionHeader('À propos'),
               _SettingCard(children: [
                 _SettingRow(
+                  icon: Icons.install_mobile_outlined,
+                  title: 'Installer l\'application',
+                  subtitle: 'Ajouter BASYAM à ton écran d\'accueil',
+                  onTap: () => context.push('/install-guide'),
+                ),
+                const Divider(height: 1),
+                _SettingRow(
                   icon: Icons.description_outlined,
                   title: 'Conditions d\'utilisation',
                   onTap: () => context.push('/legal-terms'),
@@ -414,14 +421,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 _SettingRow(
                   icon: Icons.privacy_tip_outlined,
                   title: 'Politique de confidentialité',
-                  onTap: () => _launchUrl('https://basyam.app/legal/privacy'),
+                  onTap: () => _launchUrl('https://basyam.com/legal/privacy'),
                 ),
                 const Divider(height: 1),
                 _SettingRow(
                   icon: Icons.support_outlined,
                   title: 'Nous contacter',
-                  subtitle: 'support@basyam.app',
-                  onTap: () => _launchUrl('mailto:support@basyam.app'),
+                  subtitle: 'support@basyam.com',
+                  onTap: () => _launchUrl('mailto:support@basyam.com'),
                 ),
                 const Divider(height: 1),
                 _SettingRow(

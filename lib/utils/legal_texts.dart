@@ -143,7 +143,7 @@ Tu as le droit de :
 • Supprimer ton compte et tes données
 • T'opposer à certains traitements
 
-Pour exercer ces droits : privacy@basyam.app
+Pour exercer ces droits : privacy@basyam.com
 
 9. COOKIES ET DONNÉES LOCALES
 
@@ -153,7 +153,7 @@ L'application stocke localement sur ton appareil tes préférences et un token d
 
 Toute modification importante de cette politique sera notifiée dans l'application. La date de mise à jour est indiquée en haut de ce document.
 
-Contact : privacy@basyam.app
+Contact : privacy@basyam.com
 Adresse : Ouagadougou, Burkina Faso
 ''';
 

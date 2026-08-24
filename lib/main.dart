@@ -31,6 +31,13 @@ import 'screens/main/professionals_screen.dart';
 import 'screens/main/profile_screen.dart' as profile;
 import 'screens/main/assistant_screen.dart';
 import 'screens/main/settings_screen.dart';
+import 'screens/main/install_guide_screen.dart';
+import 'screens/pro/pro_login_screen.dart';
+import 'screens/pro/pro_setup_password_screen.dart';
+import 'screens/pro/pro_dashboard_screen.dart';
+import 'screens/pro/pro_slots_screen.dart';
+import 'screens/pro/pro_community_screen.dart';
+import 'screens/pro/pro_forgot_password_screen.dart';
 import 'screens/detail/challenge_detail_screen.dart';
 import 'screens/detail/mood_history_screen.dart';
 import 'screens/premium/premium_screen.dart';
@@ -158,6 +165,11 @@ class _BASYAMAppState extends ConsumerState<BASYAMApp>
         final isOnboarding = location == '/onboarding';
         final isVerifyEmail = location == '/verify-email';
         final isLegalTerms = location == '/legal-terms';
+        // L'espace professionnel a sa propre authentification (ProApiService),
+        // totalement indépendante de authProvider — jamais concerné par ces
+        // redirections utilisateur classique, dans un sens comme dans l'autre.
+        final isProRoute = location.startsWith('/pro');
+        if (isProRoute) return null;
 
         // /init : point d'entrée — redirige immédiatement selon l'état
         if (isInit) {
@@ -247,6 +259,35 @@ class _BASYAMAppState extends ConsumerState<BASYAMApp>
           builder: (_, __) => const LegalTermsScreen(),
         ),
 
+        // Espace professionnel (psychologues partenaires) — routes
+        // indépendantes du flux utilisateur classique, authentification dédiée.
+        GoRoute(
+          path: '/pro/login',
+          builder: (_, __) => const ProLoginScreen(),
+        ),
+        GoRoute(
+          path: '/pro/setup-password',
+          builder: (_, state) => ProSetupPasswordScreen(
+            token: state.uri.queryParameters['token'],
+          ),
+        ),
+        GoRoute(
+          path: '/pro/dashboard',
+          builder: (_, __) => const ProDashboardScreen(),
+        ),
+        GoRoute(
+          path: '/pro/slots',
+          builder: (_, __) => const ProSlotsScreen(),
+        ),
+        GoRoute(
+          path: '/pro/community',
+          builder: (_, __) => const ProCommunityScreen(),
+        ),
+        GoRoute(
+          path: '/pro/forgot-password',
+          builder: (_, __) => const ProForgotPasswordScreen(),
+        ),
+
         // Premium
         GoRoute(
           path: '/premium',
@@ -299,6 +340,10 @@ class _BASYAMAppState extends ConsumerState<BASYAMApp>
         GoRoute(
           path: '/settings',
           builder: (_, __) => const SettingsScreen(),
+        ),
+        GoRoute(
+          path: '/install-guide',
+          builder: (_, __) => const InstallGuideScreen(),
         ),
       ],
     );
