@@ -10,6 +10,7 @@ import 'package:firebase_core/firebase_core.dart';
 // Utils & Theme
 import 'utils/theme.dart';
 import 'utils/app_localizations.dart';
+import 'utils/url_strategy.dart';
 
 // Services
 import 'services/local_notification_service.dart';
@@ -63,6 +64,11 @@ final sharedPrefsProvider = FutureProvider<SharedPreferences>((ref) async {
 void main() async {
   // ✅ 1. Initialisation Flutter (obligatoire avant tout)
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ✅ 1bis. URLs propres sur le web (sans "#") — indispensable pour que les
+  // liens envoyés par email (configuration mot de passe pro, confirmation
+  // de rendez-vous...) fonctionnent au premier clic. Sans effet sur mobile.
+  configurePathUrlStrategy();
 
   // ✅ 2. Configuration orientation (portrait uniquement) - rapide
   await SystemChrome.setPreferredOrientations([
