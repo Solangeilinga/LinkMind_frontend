@@ -64,19 +64,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (password.isEmpty) { setState(() => _localError = 'Saisis ton mot de passe.'); return; }
     setState(() => _localError = null);
 
+    // ⚠️ On capture une référence stable au routeur AVANT toute attente
+    // réseau. Preuve concrète par les logs : la connexion pro réussissait
+    // déjà (jeton stocké), mais l'écran restait bloqué — le widget avait été
+    // démonté/remplacé entre-temps (probablement suite au changement d'état
+    // déclenché par l'échec de la tentative testeur juste avant), rendant
+    // `context`/`mounted` de CE widget invalides pour la navigation finale.
+    // Un `GoRouter` capturé ainsi reste valide même si le widget d'origine
+    // a disparu — plus robuste qu'un `context.go(...)` tardif.
+    final router = GoRouter.of(context);
+
     // Même écran de connexion pour tout le monde (pas de formulaire séparé).
     // Approche SÉQUENTIELLE, volontairement simple : on tente d'abord le
     // compte testeur (le cas le plus fréquent), puis seulement en repli le
     // compte professionnel — jamais les deux en parallèle avec les mêmes
     // identifiants, car rien ne garantit que les deux mots de passe soient
     // identiques pour quelqu'un ayant les deux types de compte.
-    //
-    // ⚠️ Volontairement AUCUNE vérification `mounted` entre les étapes
-    // réseau elles-mêmes — seulement juste avant chaque navigation. Un
-    // `if (!mounted) return;` placé trop tôt (par ex. juste après l'échec de
-    // la connexion testeur) peut couper la fonction avant même d'avoir
-    // tenté la connexion pro, si le widget se démonte pour une raison
-    // annexe à ce moment précis (changement d'état déclenché ailleurs).
     final userSuccess = await ref.read(authProvider.notifier).login(
       email: email, password: password,
     );
@@ -88,9 +91,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       // email, pour le proposer — sans jamais supposer un mot de passe commun.
       final hasProAccount = await ApiService().checkProAccountExists(email);
       if (hasProAccount) {
-        if (mounted) _showSpaceChoiceDialog();
+        if (mounted) _showSpaceChoiceDialog(); // showDialog a besoin d'un vrai contexte
       } else {
-        if (mounted) context.go('/home');
+        router.go('/home');
       }
       return;
     }
@@ -102,7 +105,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       await ProApiService().login(email, password);
       debugPrint('🔎 [DualLogin] connexion pro RÉUSSIE');
-      if (mounted) context.go('/pro/dashboard');
+      router.go('/pro/dashboard');
     } catch (e) {
       debugPrint('🔎 [DualLogin] connexion pro ÉCHOUÉE : $e');
       // Ni l'un ni l'autre n'a fonctionné — l'erreur déjà affichée
