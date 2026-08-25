@@ -70,21 +70,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // compte professionnel — jamais les deux en parallèle avec les mêmes
     // identifiants, car rien ne garantit que les deux mots de passe soient
     // identiques pour quelqu'un ayant les deux types de compte.
+    //
+    // ⚠️ Volontairement AUCUNE vérification `mounted` entre les étapes
+    // réseau elles-mêmes — seulement juste avant chaque navigation. Un
+    // `if (!mounted) return;` placé trop tôt (par ex. juste après l'échec de
+    // la connexion testeur) peut couper la fonction avant même d'avoir
+    // tenté la connexion pro, si le widget se démonte pour une raison
+    // annexe à ce moment précis (changement d'état déclenché ailleurs).
     final userSuccess = await ref.read(authProvider.notifier).login(
       email: email, password: password,
     );
-    if (!mounted) return;
+    debugPrint('🔎 [DualLogin] userSuccess=$userSuccess');
 
     if (userSuccess) {
       // Connecté comme testeur : on vérifie séparément (sans mot de passe,
       // juste une existence) si un espace pro est aussi rattaché à cet
       // email, pour le proposer — sans jamais supposer un mot de passe commun.
       final hasProAccount = await ApiService().checkProAccountExists(email);
-      if (!mounted) return;
       if (hasProAccount) {
-        _showSpaceChoiceDialog();
+        if (mounted) _showSpaceChoiceDialog();
       } else {
-        context.go('/home');
+        if (mounted) context.go('/home');
       }
       return;
     }
@@ -92,10 +98,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // Pas de compte testeur avec ces identifiants : on tente en repli un
     // compte professionnel, avec les MÊMES identifiants tapés (cas le plus
     // courant : quelqu'un qui n'a qu'un compte pro, pas de compte testeur).
+    debugPrint('🔎 [DualLogin] tentative connexion pro...');
     try {
       await ProApiService().login(email, password);
+      debugPrint('🔎 [DualLogin] connexion pro RÉUSSIE');
       if (mounted) context.go('/pro/dashboard');
-    } catch (_) {
+    } catch (e) {
+      debugPrint('🔎 [DualLogin] connexion pro ÉCHOUÉE : $e');
       // Ni l'un ni l'autre n'a fonctionné — l'erreur déjà affichée
       // (state.error de authProvider) reste valable, rien de plus à faire.
     }
