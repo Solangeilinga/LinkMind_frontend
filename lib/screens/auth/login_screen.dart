@@ -65,29 +65,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _localError = null);
 
     // Même écran de connexion pour tout le monde (pas de formulaire séparé).
-    // Les deux connexions sont tentées EN PARALLÈLE (pas l'une après l'autre,
-    // pour ne pas ralentir les pros) avec les mêmes identifiants : une même
-    // personne peut avoir un compte testeur ET un compte professionnel avec
-    // le même email/mot de passe. Si les deux existent, on lui laisse le
-    // choix plutôt que de privilégier l'un par défaut.
-    final results = await Future.wait<bool>([
-      ref.read(authProvider.notifier).login(email: email, password: password),
-      ProApiService().login(email, password).then((_) => true).catchError((_) => false),
-    ]);
-
-    final userSuccess = results[0];
-    final proSuccess = results[1];
+    // Approche SÉQUENTIELLE, volontairement simple : on tente d'abord le
+    // compte testeur (le cas le plus fréquent), puis seulement en repli le
+    // compte professionnel — jamais les deux en parallèle avec les mêmes
+    // identifiants, car rien ne garantit que les deux mots de passe soient
+    // identiques pour quelqu'un ayant les deux types de compte.
+    final userSuccess = await ref.read(authProvider.notifier).login(
+      email: email, password: password,
+    );
     if (!mounted) return;
 
-    if (userSuccess && proSuccess) {
-      _showSpaceChoiceDialog();
-    } else if (userSuccess) {
-      context.go('/home');
-    } else if (proSuccess) {
-      context.go('/pro/dashboard');
+    if (userSuccess) {
+      // Connecté comme testeur : on vérifie séparément (sans mot de passe,
+      // juste une existence) si un espace pro est aussi rattaché à cet
+      // email, pour le proposer — sans jamais supposer un mot de passe commun.
+      final hasProAccount = await ApiService().checkProAccountExists(email);
+      if (!mounted) return;
+      if (hasProAccount) {
+        _showSpaceChoiceDialog();
+      } else {
+        context.go('/home');
+      }
+      return;
     }
-    // Sinon : ni l'un ni l'autre n'a fonctionné — l'erreur déjà affichée
-    // (state.error de authProvider) reste valable, rien de plus à faire.
+
+    // Pas de compte testeur avec ces identifiants : on tente en repli un
+    // compte professionnel, avec les MÊMES identifiants tapés (cas le plus
+    // courant : quelqu'un qui n'a qu'un compte pro, pas de compte testeur).
+    try {
+      await ProApiService().login(email, password);
+      if (mounted) context.go('/pro/dashboard');
+    } catch (_) {
+      // Ni l'un ni l'autre n'a fonctionné — l'erreur déjà affichée
+      // (state.error de authProvider) reste valable, rien de plus à faire.
+    }
   }
 
   void _showSpaceChoiceDialog() {
@@ -98,7 +109,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
         title: const Text('Quel espace veux-tu ouvrir ?'),
         content: const Text(
-          'Tu as à la fois un compte testeur et un compte professionnel avec ces identifiants.',
+          'Un espace professionnel est aussi rattaché à cet email. Tu es connecté(e) côté testeur — pour ouvrir ton espace professionnel, entre son mot de passe (il peut être différent).',
         ),
         actions: [
           TextButton(
@@ -106,7 +117,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: const Text('Espace testeur'),
           ),
           TextButton(
-            onPressed: () { Navigator.pop(ctx); context.go('/pro/dashboard'); },
+            onPressed: () { Navigator.pop(ctx); context.go('/pro/login'); },
             child: const Text('Espace professionnel'),
           ),
         ],

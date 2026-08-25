@@ -163,6 +163,28 @@ class ApiService {
     return http.Client();
   }
 
+  /// Vérifie si un espace professionnel actif et configuré existe pour cet
+  /// email — appelé seulement après une connexion utilisateur classique
+  /// réussie, jamais avant. Ne suppose jamais que les deux mots de passe
+  /// (testeur / professionnel) sont identiques.
+  Future<bool> checkProAccountExists(String email) async {
+    try {
+      final client = await _getClient();
+      final headers = await _getHeaders();
+      final uri = Uri.parse('${AppConstants.baseUrl}/professionals/auth/exists')
+          .replace(queryParameters: {'email': email});
+      final res = await client.get(uri, headers: headers);
+      if (res.statusCode != 200) return false;
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      return data['exists'] == true;
+    } catch (_) {
+      // Jamais bloquant : en cas d'échec, on suppose simplement qu'il n'y a
+      // pas de compte pro à proposer, l'utilisateur peut toujours y accéder
+      // via /pro/login directement.
+      return false;
+    }
+  }
+
   // ─── Data Extraction Helper ──────────────────────────────────────────────
   dynamic _extractData(dynamic response) {
     if (response is Map<String, dynamic>) {
