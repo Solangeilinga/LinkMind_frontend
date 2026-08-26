@@ -248,13 +248,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 20),
 
                   if (_localError != null) ...[
-                    _ErrorBanner(message: _localError!, isNetwork: false),
+                    _ErrorBanner(message: _localError ?? '', isNetwork: false),
                     const SizedBox(height: 12),
                   ],
                   if (state.error != null && !_attemptingProFallback) ...[
                     _ErrorBanner(
-                        message: state.error!,
-                        isNetwork: state.error!.contains('internet')),
+                        message: state.error ?? '',
+                        isNetwork: state.error?.contains('internet') ?? false),
                     const SizedBox(height: 12),
                   ],
 
@@ -597,7 +597,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 child: Row(children: [
                   const Icon(Icons.error_outline, color: AppColors.accent, size: 16),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(state.error!,
+                  Expanded(child: Text(state.error ?? '',
                       style: AppTextStyles.bodySmall.copyWith(color: AppColors.accent))),
                 ]),
               ),
