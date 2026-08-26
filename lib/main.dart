@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -62,7 +63,31 @@ final sharedPrefsProvider = FutureProvider<SharedPreferences>((ref) async {
   return await SharedPreferences.getInstance();
 });
 
-void main() async {
+void main() {
+  // ⚠️ runZonedGuarded + FlutterError.onError : filet de sécurité global.
+  // Sans ça, une erreur non rattrapée (même hors d'un `try/catch` classique,
+  // par ex. dans un microtask séparé ou une erreur de framework Flutter) ne
+  // laisse dans la console qu'une trace minifiée illisible ("Uncaught Error
+  // at R5.B (main.dart.js:114044:8)") sans indication de la cause réelle ni
+  // de l'endroit dans NOTRE code où ça s'est déclenché.
+  runZonedGuarded(() async {
+    FlutterError.onError = (FlutterErrorDetails details) {
+      debugPrint('🔴 [FlutterError] ${details.exceptionAsString()}');
+      debugPrint('🔴 [FlutterError] library: ${details.library}');
+      debugPrint('🔴 [FlutterError] context: ${details.context}');
+      debugPrint('🔴 [FlutterError] stack:\n${details.stack}');
+      FlutterError.presentError(details);
+    };
+
+    await _runApp();
+  }, (error, stack) {
+    debugPrint('🔴 [UncaughtZoneError] type: ${error.runtimeType}');
+    debugPrint('🔴 [UncaughtZoneError] message: $error');
+    debugPrint('🔴 [UncaughtZoneError] stack:\n$stack');
+  });
+}
+
+Future<void> _runApp() async {
   // ✅ 1. Initialisation Flutter (obligatoire avant tout)
   WidgetsFlutterBinding.ensureInitialized();
 

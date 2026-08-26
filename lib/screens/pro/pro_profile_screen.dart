@@ -31,11 +31,10 @@ class _ProProfileScreenState extends State<ProProfileScreen> {
   bool _isOnline = true;
   bool _isInPerson = true;
 
-  static const _types = {
-    'psychologist': 'Psychologue',
-    'coach': 'Coach de vie',
-    'doctor': 'Médecin',
-  };
+  // ⚠️ Anciennement une carte figée en dur ('psychologist'/'coach'/'doctor'
+  // uniquement) — déconnectée des types réellement configurés en base.
+  // Chargée maintenant depuis /professionals/me/types.
+  List<Map<String, dynamic>> _types = [];
 
   @override
   void initState() {
@@ -63,8 +62,13 @@ class _ProProfileScreenState extends State<ProProfileScreen> {
     }
     setState(() { _isLoading = true; _error = null; });
     try {
-      final me = await ProApiService().getMe();
+      final results = await Future.wait([
+        ProApiService().getMe(),
+        ProApiService().getProfessionalTypes(),
+      ]);
+      final me = results[0] as Map<String, dynamic>;
       final pro = me['professional'] as Map<String, dynamic>;
+      _types = (results[1] as List<dynamic>).cast<Map<String, dynamic>>();
       _firstNameCtrl.text = pro['firstName'] ?? '';
       _lastNameCtrl.text = pro['lastName'] ?? '';
       _phoneCtrl.text = pro['phone'] ?? '';
@@ -170,10 +174,10 @@ class _ProProfileScreenState extends State<ProProfileScreen> {
                       const SizedBox(height: 16),
 
                       DropdownButtonFormField<String>(
-                        initialValue: _type,
+                        initialValue: _types.any((t) => t['id'] == _type) ? _type : null,
                         decoration: _dec('Profession'),
-                        items: _types.entries
-                            .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                        items: _types
+                            .map((t) => DropdownMenuItem(value: t['id'] as String, child: Text('${t['emoji'] ?? ''} ${t['label']}'.trim())))
                             .toList(),
                         onChanged: (v) => setState(() => _type = v ?? _type),
                       ),

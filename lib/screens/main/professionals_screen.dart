@@ -4,16 +4,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../utils/theme.dart';
 import '../../services/api.service.dart';
 import '../../providers/professionals_provider.dart';
+import '../../providers/content_provider.dart';
 import '../../widgets/skeleton_widget.dart'; // ✅ Ton nouveau provider
 import '../../widgets/report_button.dart';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-const _typeConfigDefault = {
-  'all':          (label: 'Tous',         labelPlural: 'Tous',          emoji: '👥', color: AppColors.primary),
-  'psychologist': (label: 'Psychologue',  labelPlural: 'Psychologues',  emoji: '🧠', color: AppColors.primary),
-  'coach':        (label: 'Coach',        labelPlural: 'Coachs',        emoji: '🌱', color: AppColors.accentOrange),
-  'doctor':       (label: 'Médecin',      labelPlural: 'Médecins',      emoji: '🩺', color: AppColors.accent),
-};
+// ⚠️ Anciennement une carte figée en dur ('psychologist'/'coach'/'doctor'
+// uniquement) — complètement déconnectée des types réellement configurés en
+// base (via /content/professional-types, déjà chargés par contentProvider
+// ailleurs dans l'app). Un professionnel de type "psychiatrist" ou
+// "counselor" retombait silencieusement sur l'affichage "Psychologue".
+// Les infos d'affichage viennent maintenant systématiquement de la vraie
+// liste — cette fonction ne fait plus que fournir un filet de sécurité si
+// jamais le contenu n'est pas encore chargé ou qu'un type est inconnu.
+({String label, String labelPlural, String emoji, Color color}) _typeConf(
+    String? type, List<ProTypeDef> types) {
+  final match = types.where((t) => t.id == type).toList();
+  if (match.isNotEmpty) {
+    final t = match.first;
+    return (label: t.label, labelPlural: t.labelPlural, emoji: t.emoji, color: t.color);
+  }
+  return (label: 'Professionnel', labelPlural: 'Professionnels', emoji: '🧑‍⚕️', color: AppColors.primary);
+}
 
 const _statusConfig = {
   'pending':   (label: 'En attente',  color: AppColors.secondary),
@@ -300,6 +312,7 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
         onUpdate: (consultationType, preferredDate, message, slotId) {
           _updateBooking(booking, consultationType: consultationType, preferredDate: preferredDate, message: message, slotId: slotId);
         },
+        professionalTypes: ref.read(contentProvider).professionalTypes,
       ),
     );
   }
@@ -315,6 +328,7 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
           ref.read(professionalsProvider.notifier).loadBookings(forceRefresh: true);
           _tabCtrl.animateTo(1);
         },
+        professionalTypes: ref.read(contentProvider).professionalTypes,
       ),
     );
   }
@@ -329,6 +343,12 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(professionalsProvider);
+    final professionalTypes = ref.watch(contentProvider).professionalTypes;
+    // Filtre "Tous" + les vrais types configurés en base (jamais figés en dur).
+    final typeFilterEntries = <MapEntry<String, ({String label, String labelPlural, String emoji, Color color})>>[
+      const MapEntry('all', (label: 'Tous', labelPlural: 'Tous', emoji: '👥', color: AppColors.primary)),
+      ...professionalTypes.map((t) => MapEntry(t.id, (label: t.label, labelPlural: t.labelPlural, emoji: t.emoji, color: t.color))),
+    ];
 
     return Scaffold(
       body: SafeArea(child: Column(children: [
@@ -336,7 +356,7 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('Professionnels 🩺', style: AppTextStyles.h2),
-            Text('Psychologues, coachs et médecins partenaires',
+            Text('Des professionnels partenaires à ta portée',
                 style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
             const SizedBox(height: 14),
 
@@ -389,7 +409,7 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
                 padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  child: Row(children: _typeConfigDefault.entries.map((e) {
+                  child: Row(children: typeFilterEntries.map((e) {
                     final sel = _activeType == e.key;
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
@@ -443,6 +463,7 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
                               child: _ProfessionalCard(
                                 pro: state.professionals[i],
                                 onBook: () => _showBookingSheet(state.professionals[i]),
+                                professionalTypes: professionalTypes,
                               ),
                             );
                           },
@@ -481,6 +502,7 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
                               onCancel: () => _cancelBooking(state.bookings[i]),
                               onFeedback: () => _showFeedbackDialog(state.bookings[i]),
                               onHide: () => _hideBooking(state.bookings[i]),
+                              professionalTypes: professionalTypes,
                             ),
                           ),
                         ),
@@ -497,11 +519,12 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
 class _ProfessionalCard extends StatelessWidget {
   final Map<String, dynamic> pro;
   final VoidCallback onBook;
-  const _ProfessionalCard({required this.pro, required this.onBook});
+  final List<ProTypeDef> professionalTypes;
+  const _ProfessionalCard({required this.pro, required this.onBook, required this.professionalTypes});
 
   @override
   Widget build(BuildContext context) {
-    final typeConf = _typeConfigDefault[pro['type']] ?? _typeConfigDefault['psychologist']!;
+    final typeConf = _typeConf(pro['type'], professionalTypes);
     final specs = (pro['specialties'] as List?) ?? [];
 
     return Container(
@@ -609,8 +632,9 @@ class _BookingCard extends StatelessWidget {
   final VoidCallback onCancel;
   final VoidCallback onFeedback;
   final VoidCallback onHide;
+  final List<ProTypeDef> professionalTypes;
   
-  const _BookingCard({required this.booking, required this.onEdit, required this.onCancel, required this.onFeedback, required this.onHide});
+  const _BookingCard({required this.booking, required this.onEdit, required this.onCancel, required this.onFeedback, required this.onHide, required this.professionalTypes});
 
   String _fmtDateTime(String iso) {
     try {
@@ -628,7 +652,7 @@ class _BookingCard extends StatelessWidget {
     final status = booking['status']?.toString() ?? 'pending';
     final statusConf = _statusConfig[status] ?? _statusConfig['pending']!;
     final pro = booking['professional'] as Map<String, dynamic>?;
-    final typeConf = _typeConfigDefault[pro?['type']] ?? _typeConfigDefault['psychologist']!;
+    final typeConf = _typeConf(pro?['type'], professionalTypes);
     final isPending = status == 'pending';
     
     // 🔍 DEBUG — à retirer après validation
@@ -830,7 +854,8 @@ class _BookingCard extends StatelessWidget {
 class _BookingSheet extends StatefulWidget {
   final Map<String, dynamic> professional;
   final VoidCallback onBooked;
-  const _BookingSheet({required this.professional, required this.onBooked});
+  final List<ProTypeDef> professionalTypes;
+  const _BookingSheet({required this.professional, required this.onBooked, required this.professionalTypes});
   @override
   State<_BookingSheet> createState() => _BookingSheetState();
 }
@@ -991,7 +1016,7 @@ class _BookingSheetState extends State<_BookingSheet> {
   @override
   Widget build(BuildContext context) {
     final pro      = widget.professional;
-    final typeConf = _typeConfigDefault[pro['type']] ?? _typeConfigDefault['psychologist']!;
+    final typeConf = _typeConf(pro['type'], widget.professionalTypes);
     final hasOnline = pro['isOnline'] == true;
     final hasInPerson = pro['isInPerson'] == true;
 
@@ -1210,7 +1235,8 @@ class _BookingSheetState extends State<_BookingSheet> {
 class _EditBookingSheet extends StatefulWidget {
   final Map<String, dynamic> booking;
   final Function(String?, String?, String?, String?) onUpdate; // consultationType, preferredDate, message, slotId
-  const _EditBookingSheet({required this.booking, required this.onUpdate});
+  final List<ProTypeDef> professionalTypes;
+  const _EditBookingSheet({required this.booking, required this.onUpdate, required this.professionalTypes});
   @override
   State<_EditBookingSheet> createState() => _EditBookingSheetState();
 }
@@ -1300,7 +1326,7 @@ class _EditBookingSheetState extends State<_EditBookingSheet> {
   @override
   Widget build(BuildContext context) {
     final pro      = widget.booking['professional'] as Map<String, dynamic>?;
-    final typeConf = _typeConfigDefault[pro?['type']] ?? _typeConfigDefault['psychologist']!;
+    final typeConf = _typeConf(pro?['type'], widget.professionalTypes);
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),

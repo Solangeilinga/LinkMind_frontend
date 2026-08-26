@@ -21,13 +21,28 @@ class ProApiService {
   String? _token;
 
   Future<String?> _getToken() async {
-    _token ??= await _storage.read(key: _tokenKey);
+    if (_token != null) return _token;
+    try {
+      _token = await _storage.read(key: _tokenKey);
+    } catch (e, stack) {
+      debugPrint('🔴 [ProApi] _getToken: ÉCHEC lecture stockage sécurisé : $e');
+      debugPrint('🔴 [ProApi] _getToken: stack:\n$stack');
+      return null; // ne bloque jamais l'app pour une lecture ratée
+    }
     return _token;
   }
 
   Future<void> _setToken(String token) async {
     _token = token;
-    await _storage.write(key: _tokenKey, value: token);
+    try {
+      debugPrint('🔎 [ProApi] _setToken: écriture dans le stockage sécurisé...');
+      await _storage.write(key: _tokenKey, value: token);
+      debugPrint('🔎 [ProApi] _setToken: écriture réussie');
+    } catch (e, stack) {
+      debugPrint('🔴 [ProApi] _setToken: ÉCHEC écriture stockage sécurisé : $e');
+      debugPrint('🔴 [ProApi] _setToken: stack:\n$stack');
+      rethrow;
+    }
   }
 
   Future<void> logout() async {
@@ -59,13 +74,17 @@ class ProApiService {
   // ── Authentification ────────────────────────────────────────────────────
 
   Future<void> login(String email, String password) async {
+    debugPrint('🔎 [ProApi] login: envoi de la requête HTTP...');
     final res = await http.post(
       Uri.parse('${AppConstants.baseUrl}/professionals/auth/login'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email, 'password': password}),
     );
+    debugPrint('🔎 [ProApi] login: réponse reçue, code ${res.statusCode}');
     final data = _handle(res);
+    debugPrint('🔎 [ProApi] login: _handle OK, token présent = ${data['token'] != null}');
     await _setToken(data['token'] as String);
+    debugPrint('🔎 [ProApi] login: token enregistré avec succès');
   }
 
   Future<void> setupPassword(String setupToken, String newPassword) async {
