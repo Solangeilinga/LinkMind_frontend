@@ -323,16 +323,26 @@ class _MoodScreenState extends ConsumerState<MoodScreen>
                               const Text('Comment te sens-tu ?',
                                   style: AppTextStyles.h2),
                             ])),
-                        Flexible(
-                            child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
+                        Row(
+                          children: [
+                            IconButton(
+                              onPressed: () => context.push('/crisis-help'),
+                              icon: const Icon(Icons.support_outlined, color: AppColors.primary),
+                              tooltip: 'Besoin d\'aide',
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                                child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
                               _PointsBadge(points: user?.totalPoints ?? 0),
                               if ((user?.streakDays ?? 0) > 0) ...[
                                 const SizedBox(height: 4),
                                 _StreakBadge(days: user!.streakDays),
                               ],
                             ])),
+                          ],
+                        ),
                       ]),
                 )),
 

@@ -49,6 +49,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passCtrl  = TextEditingController();
   bool _obscurePass = true;
   String? _localError;
+  // Masque l'erreur "identifiants invalides" de la tentative testeur pendant
+  // qu'on essaie encore le repli professionnel — évite un clignotement
+  // trompeur si le compte pro finit par réussir juste après.
+  bool _attemptingProFallback = false;
 
   @override
   void dispose() {
@@ -102,14 +106,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // compte professionnel, avec les MÊMES identifiants tapés (cas le plus
     // courant : quelqu'un qui n'a qu'un compte pro, pas de compte testeur).
     debugPrint('🔎 [DualLogin] tentative connexion pro...');
+    setState(() => _attemptingProFallback = true);
     try {
       await ProApiService().login(email, password);
       debugPrint('🔎 [DualLogin] connexion pro RÉUSSIE');
       router.go('/pro/dashboard');
     } catch (e) {
       debugPrint('🔎 [DualLogin] connexion pro ÉCHOUÉE : $e');
-      // Ni l'un ni l'autre n'a fonctionné — l'erreur déjà affichée
-      // (state.error de authProvider) reste valable, rien de plus à faire.
+      // Ni l'un ni l'autre n'a fonctionné — on réaffiche enfin l'erreur,
+      // maintenant qu'on est sûr qu'aucun des deux comptes ne correspond.
+      if (mounted) setState(() => _attemptingProFallback = false);
     }
   }
 
@@ -245,7 +251,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     _ErrorBanner(message: _localError!, isNetwork: false),
                     const SizedBox(height: 12),
                   ],
-                  if (state.error != null) ...[
+                  if (state.error != null && !_attemptingProFallback) ...[
                     _ErrorBanner(
                         message: state.error!,
                         isNetwork: state.error!.contains('internet')),

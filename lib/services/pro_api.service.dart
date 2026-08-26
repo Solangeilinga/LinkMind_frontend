@@ -115,6 +115,14 @@ class ProApiService {
     return (data['bookings'] as List<dynamic>?) ?? [];
   }
 
+  Future<void> confirmBooking(String bookingId) async {
+    final res = await http.patch(
+      Uri.parse('${AppConstants.baseUrl}/professionals/me/bookings/$bookingId/confirm'),
+      headers: await _headers(),
+    );
+    _handle(res);
+  }
+
   Future<void> cancelBooking(String bookingId, {String? reason}) async {
     final res = await http.patch(
       Uri.parse('${AppConstants.baseUrl}/professionals/me/bookings/$bookingId/cancel'),
@@ -181,11 +189,62 @@ class ProApiService {
     return data['post'] as Map<String, dynamic>;
   }
 
-  Future<void> addCommunityComment(String postId, String content) async {
+  Future<void> addCommunityComment(String postId, String content, {String? parentCommentId}) async {
     final res = await http.post(
       Uri.parse('${AppConstants.baseUrl}/professionals/me/community/posts/$postId/comments'),
       headers: await _headers(),
-      body: jsonEncode({'content': content}),
+      body: jsonEncode({'content': content, if (parentCommentId != null) 'parentCommentId': parentCommentId}),
+    );
+    _handle(res);
+  }
+
+  Future<Map<String, dynamic>> toggleReaction(String postId, String type) async {
+    final res = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/professionals/me/community/posts/$postId/react'),
+      headers: await _headers(),
+      body: jsonEncode({'type': type}),
+    );
+    return _handle(res) as Map<String, dynamic>;
+  }
+
+  Future<bool> toggleSameFeeling(String postId) async {
+    final res = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/professionals/me/community/posts/$postId/same-feeling'),
+      headers: await _headers(),
+    );
+    final data = _handle(res) as Map<String, dynamic>;
+    return data['sameFeeling'] == true;
+  }
+
+  Future<List<dynamic>> getComments(String postId) async {
+    final res = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/professionals/me/community/posts/$postId/comments'),
+      headers: await _headers(),
+    );
+    final data = _handle(res) as Map<String, dynamic>;
+    return data['comments'] as List<dynamic>? ?? [];
+  }
+
+  Future<void> toggleCommentLike(String postId, String commentId) async {
+    final res = await http.post(
+      Uri.parse('${AppConstants.baseUrl}/professionals/me/community/posts/$postId/comments/$commentId/like'),
+      headers: await _headers(),
+    );
+    _handle(res);
+  }
+
+  Future<void> deleteCommunityPost(String postId) async {
+    final res = await http.delete(
+      Uri.parse('${AppConstants.baseUrl}/professionals/me/community/posts/$postId'),
+      headers: await _headers(),
+    );
+    _handle(res);
+  }
+
+  Future<void> deleteCommunityComment(String commentId) async {
+    final res = await http.delete(
+      Uri.parse('${AppConstants.baseUrl}/professionals/me/community/comments/$commentId'),
+      headers: await _headers(),
     );
     _handle(res);
   }

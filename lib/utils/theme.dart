@@ -423,5 +423,5 @@ class AppConstants {
   // Paramètres du projet > Cloud Messaging > Configuration Web Push >
   // "Générer une paire de clés"). OBLIGATOIRE pour que getToken() fonctionne
   // sur navigateur — actuellement un placeholder, à remplacer avant le test web.
-  static const String fcmVapidKey = 'REMPLACER_PAR_LA_VRAIE_CLE_VAPID';
+  static const String fcmVapidKey = 'BPLWbplsU7w-jXoWyUFhzPnxJUrABfxgjs2Dr-MfAYp7K0VpByvVACKjyyyjQSPmcwnVS1w0k3Be6HUaZwsEGuI';
 }

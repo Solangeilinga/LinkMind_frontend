@@ -569,6 +569,19 @@ class ApiService {
   // ─── Legal ─────────────────────────────────────────────────────────────────
   Future<void> acceptLegal() async => await post('/users/accept-legal', {});
 
+  /// Bouton "Besoin d'aide maintenant" — indépendant de Mindo (pas encore
+  /// disponible dans l'app). Ne lève jamais d'exception côté UI : même en
+  /// cas d'échec réseau, on ne veut jamais bloquer quelqu'un en détresse
+  /// sur un message d'erreur technique.
+  Future<bool> sendCrisisSelfReport({String? message}) async {
+    try {
+      await post('/crisis-alerts/self-report', {if (message != null && message.trim().isNotEmpty) 'message': message.trim()});
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   // ─── Account ───────────────────────────────────────────────────────────────
   Future<void> deleteAccount() async => await delete('/users/me');
   Future<dynamic> exportMyData() async => await get('/users/me/export');

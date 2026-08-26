@@ -32,6 +32,7 @@ import 'screens/main/professionals_screen.dart';
 import 'screens/main/profile_screen.dart' as profile;
 import 'screens/main/assistant_screen.dart';
 import 'screens/main/settings_screen.dart';
+import 'screens/main/crisis_help_screen.dart';
 import 'screens/main/install_guide_screen.dart';
 import 'screens/pro/pro_login_screen.dart';
 import 'screens/pro/pro_setup_password_screen.dart';
@@ -351,6 +352,10 @@ class _BASYAMAppState extends ConsumerState<BASYAMApp>
         GoRoute(
           path: '/settings',
           builder: (_, __) => const SettingsScreen(),
+        ),
+        GoRoute(
+          path: '/crisis-help',
+          builder: (_, __) => const CrisisHelpScreen(),
         ),
         GoRoute(
           path: '/install-guide',

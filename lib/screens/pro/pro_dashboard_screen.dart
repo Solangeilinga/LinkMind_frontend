@@ -100,6 +100,19 @@ class _ProDashboardScreenState extends State<ProDashboardScreen> {
     }
   }
 
+  Future<void> _confirmBooking(String id) async {
+    try {
+      await ProApiService().confirmBooking(id);
+      _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+        );
+      }
+    }
+  }
+
   Future<void> _completeBooking(String id) async {
     try {
       await ProApiService().completeBooking(id);
@@ -244,7 +257,7 @@ class _ProDashboardScreenState extends State<ProDashboardScreen> {
                 )
               else
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 100), // espace pour le bouton flottant
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) => _BookingCard(
@@ -253,6 +266,7 @@ class _ProDashboardScreenState extends State<ProDashboardScreen> {
                         statusColors: _statusColors,
                         onCancel: () => _cancelBooking(_bookings[index]['id'] ?? _bookings[index]['_id']),
                         onComplete: () => _completeBooking(_bookings[index]['id'] ?? _bookings[index]['_id']),
+                        onConfirm: () => _confirmBooking(_bookings[index]['id'] ?? _bookings[index]['_id']),
                       ),
                       childCount: _bookings.length,
                     ),
@@ -308,6 +322,7 @@ class _BookingCard extends StatelessWidget {
   final Map<String, Color> statusColors;
   final VoidCallback onCancel;
   final VoidCallback onComplete;
+  final VoidCallback onConfirm;
 
   const _BookingCard({
     required this.booking,
@@ -315,6 +330,7 @@ class _BookingCard extends StatelessWidget {
     required this.statusColors,
     required this.onCancel,
     required this.onComplete,
+    required this.onConfirm,
   });
 
   @override
@@ -369,6 +385,17 @@ class _BookingCard extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
+                if (status == 'pending')
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: onConfirm,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Accepter'),
+                    ),
+                  ),
                 if (status == 'confirmed')
                   Expanded(
                     child: OutlinedButton(
@@ -377,12 +404,12 @@ class _BookingCard extends StatelessWidget {
                       child: const Text('Marquer terminé'),
                     ),
                   ),
-                if (status == 'confirmed') const SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Expanded(
                   child: TextButton(
                     onPressed: onCancel,
                     style: TextButton.styleFrom(foregroundColor: AppColors.accent),
-                    child: const Text('Annuler'),
+                    child: Text(status == 'pending' ? 'Refuser' : 'Annuler'),
                   ),
                 ),
               ],

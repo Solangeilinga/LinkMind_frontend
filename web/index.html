@@ -47,7 +47,21 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <!-- Enregistrement du service worker Firebase Messaging — indispensable
+       pour recevoir des notifications quand l'onglet est en arrière-plan ou
+       fermé. Sans cet enregistrement explicite, le fichier
+       firebase-messaging-sw.js existe bien sur le serveur mais n'est jamais
+       chargé par le navigateur, et FirebaseMessaging.getToken() échoue
+       silencieusement côté Dart. -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/firebase-messaging-sw.js')
+          .then((reg) => console.log('✅ Service worker Firebase enregistré :', reg.scope))
+          .catch((err) => console.error('❌ Échec enregistrement service worker Firebase :', err));
+      });
+    }
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
-
