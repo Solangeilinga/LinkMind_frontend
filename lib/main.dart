@@ -130,6 +130,81 @@ Future<void> _runApp() async {
   });
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Logique de redirection extraite en fonction séparée pour pouvoir
+// l'envelopper proprement dans un try/catch (voir _buildRouter ci-dessous) —
+// sans ça, une erreur ici remonte comme une trace JS minifiée illisible.
+// ─────────────────────────────────────────────────────────────────────────
+Future<String?> _computeRedirect(BuildContext context, GoRouterState state, WidgetRef ref) async {
+  final location = state.matchedLocation;
+  final authState = ref.read(authProvider);
+  final isLoggedIn = authState.isAuthenticated;
+
+  // Routes spéciales
+  final isInit = location == '/init';
+  final isAuthRoute = location.startsWith('/auth');
+  final isForgotPassword = location == '/auth/forgot-password';
+  final isOnboarding = location == '/onboarding';
+  final isVerifyEmail = location == '/verify-email';
+  final isLegalTerms = location == '/legal-terms';
+  // L'espace professionnel a sa propre authentification (ProApiService),
+  // totalement indépendante de authProvider — jamais concerné par ces
+  // redirections utilisateur classique, dans un sens comme dans l'autre.
+  final isProRoute = location.startsWith('/pro');
+  if (isProRoute) return null;
+
+  // /init : point d'entrée — redirige immédiatement selon l'état
+  if (isInit) {
+    final prefs = await ref.read(sharedPrefsProvider.future);
+    final onboardingDone = prefs.getBool('onboarding_done') ?? false;
+    if (!isLoggedIn) {
+      return onboardingDone ? '/auth/login' : '/onboarding';
+    }
+    // Connecté : aller au home
+    return '/home';
+  }
+
+  // 2. Utilisateur NON connecté
+  if (!isLoggedIn) {
+    // Routes autorisées sans connexion
+    if (isAuthRoute || isOnboarding || isVerifyEmail || isLegalTerms) {
+      return null;
+    }
+
+    final prefs = await ref.read(sharedPrefsProvider.future);
+    final onboardingDone = prefs.getBool('onboarding_done') ?? false;
+
+    if (!onboardingDone) return '/onboarding';
+    return '/auth/login';
+  }
+
+  // 3. Utilisateur connecté
+  if (isLoggedIn) {
+    // Ne pas rediriger sur ces écrans — jamais
+    if (isVerifyEmail) return null;
+
+    // Forcer la vérification email si pas encore vérifiée
+    final user = ref.read(authProvider).user;
+    final emailNotVerified = user?.email != null && user?.isEmailVerified != true;
+    if (emailNotVerified && !isVerifyEmail && !isAuthRoute) {
+      return '/verify-email';
+    }
+
+    // Autoriser l'onboarding si c'est un nouvel inscrit (flag SharedPrefs)
+    if (isOnboarding) {
+      final prefs = await ref.read(sharedPrefsProvider.future);
+      final needsOnboarding = prefs.getBool('needs_onboarding') ?? false;
+      if (needsOnboarding) return null;
+      return '/home';
+    }
+
+    // Rediriger les routes d'auth (sauf forgot-password)
+    if (isAuthRoute && !isForgotPassword) return '/home';
+  }
+
+  return null;
+}
+
 class BASYAMApp extends ConsumerStatefulWidget {
   const BASYAMApp({super.key});
 
@@ -187,73 +262,15 @@ class _BASYAMAppState extends ConsumerState<BASYAMApp>
       initialLocation: '/init',
       debugLogDiagnostics: false,
       redirect: (context, state) async {
-        final location = state.matchedLocation;
-        final authState = ref.read(authProvider);
-        final isLoggedIn = authState.isAuthenticated;
-
-        // Routes spéciales
-        final isInit = location == '/init';
-        final isAuthRoute = location.startsWith('/auth');
-        final isForgotPassword = location == '/auth/forgot-password';
-        final isOnboarding = location == '/onboarding';
-        final isVerifyEmail = location == '/verify-email';
-        final isLegalTerms = location == '/legal-terms';
-        // L'espace professionnel a sa propre authentification (ProApiService),
-        // totalement indépendante de authProvider — jamais concerné par ces
-        // redirections utilisateur classique, dans un sens comme dans l'autre.
-        final isProRoute = location.startsWith('/pro');
-        if (isProRoute) return null;
-
-        // /init : point d'entrée — redirige immédiatement selon l'état
-        if (isInit) {
-          final prefs = await ref.read(sharedPrefsProvider.future);
-          final onboardingDone = prefs.getBool('onboarding_done') ?? false;
-          if (!isLoggedIn) {
-            return onboardingDone ? '/auth/login' : '/onboarding';
-          }
-          // Connecté : aller au home
-          return '/home';
+        try {
+          return await _computeRedirect(context, state, ref);
+        } catch (e, stack) {
+          debugPrint('🔴 [Redirect] ERREUR pendant le calcul de redirection : $e');
+          debugPrint('🔴 [Redirect] type: ${e.runtimeType}');
+          debugPrint('🔴 [Redirect] location: ${state.matchedLocation}');
+          debugPrint('🔴 [Redirect] stack:\n$stack');
+          return null; // ne bloque jamais la navigation pour une erreur ici
         }
-
-        // 2. Utilisateur NON connecté
-        if (!isLoggedIn) {
-          // Routes autorisées sans connexion
-          if (isAuthRoute || isOnboarding || isVerifyEmail || isLegalTerms) {
-            return null;
-          }
-
-          final prefs = await ref.read(sharedPrefsProvider.future);
-          final onboardingDone = prefs.getBool('onboarding_done') ?? false;
-
-          if (!onboardingDone) return '/onboarding';
-          return '/auth/login';
-        }
-
-        // 3. Utilisateur connecté
-        if (isLoggedIn) {
-          // Ne pas rediriger sur ces écrans — jamais
-          if (isVerifyEmail) return null;
-
-          // Forcer la vérification email si pas encore vérifiée
-          final user = ref.read(authProvider).user;
-          final emailNotVerified = user?.email != null && user?.isEmailVerified != true;
-          if (emailNotVerified && !isVerifyEmail && !isAuthRoute) {
-            return '/verify-email';
-          }
-
-          // Autoriser l'onboarding si c'est un nouvel inscrit (flag SharedPrefs)
-          if (isOnboarding) {
-            final prefs = await ref.read(sharedPrefsProvider.future);
-            final needsOnboarding = prefs.getBool('needs_onboarding') ?? false;
-            if (needsOnboarding) return null;
-            return '/home';
-          }
-
-          // Rediriger les routes d'auth (sauf forgot-password)
-          if (isAuthRoute && !isForgotPassword) return '/home';
-        }
-
-        return null;
       },
       routes: [
         // Écran de démarrage
