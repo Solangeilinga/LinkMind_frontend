@@ -117,6 +117,17 @@ class ProApiService {
     return _handle(res) as Map<String, dynamic>;
   }
 
+  /// Types de professionnels réellement configurés en base — jamais figés en
+  /// dur, pour qu'un nouveau type ajouté côté admin apparaisse automatiquement.
+  Future<List<dynamic>> getProfessionalTypes() async {
+    final res = await http.get(
+      Uri.parse('${AppConstants.baseUrl}/professionals/me/types'),
+      headers: await _headers(),
+    );
+    final data = _handle(res);
+    return (data['types'] as List<dynamic>?) ?? [];
+  }
+
   Future<void> updateProfile(Map<String, dynamic> fields) async {
     final res = await http.put(
       Uri.parse('${AppConstants.baseUrl}/professionals/me'),
@@ -192,6 +203,25 @@ class ProApiService {
         .replace(queryParameters: {
       'page': page.toString(),
       if (postType != null) 'postType': postType,
+    });
+    final res = await http.get(uri, headers: await _headers());
+    final data = _handle(res);
+    return (data['posts'] as List<dynamic>?) ?? [];
+  }
+
+  Future<List<dynamic>> getMyCommunityPosts({int page = 1}) async {
+    final uri = Uri.parse('${AppConstants.baseUrl}/professionals/me/community/my-posts')
+        .replace(queryParameters: {'page': page.toString()});
+    final res = await http.get(uri, headers: await _headers());
+    final data = _handle(res);
+    return (data['posts'] as List<dynamic>?) ?? [];
+  }
+
+  Future<List<dynamic>> searchCommunityPosts(String query, {String? postType}) async {
+    final uri = Uri.parse('${AppConstants.baseUrl}/professionals/me/community/search')
+        .replace(queryParameters: {
+      'q': query,
+      if (postType != null) 'type': postType,
     });
     final res = await http.get(uri, headers: await _headers());
     final data = _handle(res);
