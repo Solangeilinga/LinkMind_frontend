@@ -546,7 +546,7 @@ class ChallengesNotifier extends StateNotifier<ChallengesState> {
     loadDaily();
   }
 
-  Future<void> loadDaily({String? moodLabel}) async {
+  Future<void> loadDaily({String? moodLabel, bool forceRefresh = false}) async {
     state = state.copyWith(isLoading: true);
     try {
       // Auto-détection de l'humeur
@@ -565,7 +565,7 @@ class ChallengesNotifier extends StateNotifier<ChallengesState> {
         }
       }
       
-      final data = await _api.getDailyChallenges(moodLabel: finalMoodLabel);
+      final data = await _api.getDailyChallenges(moodLabel: finalMoodLabel, forceRefresh: forceRefresh);
       
       // 🔥 CORRECTION : Extraction sécurisée des challenges
       final challengesList = _extractChallenges(data);

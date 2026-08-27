@@ -43,10 +43,10 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen>
     super.dispose();
   }
 
-  Future<void> _refreshData() async {
+  Future<void> _refreshData({bool forceRefresh = false}) async {
     if (_isRefreshing) return;
     setState(() => _isRefreshing = true);
-    await ref.read(challengesProvider.notifier).loadDaily();
+    await ref.read(challengesProvider.notifier).loadDaily(forceRefresh: forceRefresh);
     if (mounted) {
       setState(() => _isRefreshing = false);
       SecurityService.recordActivity(type: 'refresh_challenges');
@@ -120,7 +120,7 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen>
       body: Stack(children: [
         RefreshIndicator(
           color: AppColors.primary,
-          onRefresh: _refreshData,
+          onRefresh: () => _refreshData(forceRefresh: true),
           child: CustomScrollView(slivers: [
 
             // ── Header ──────────────────────────────────────────────────────
@@ -199,7 +199,7 @@ class _ChallengesScreenState extends ConsumerState<ChallengesScreen>
             else if (challenges.isEmpty)
               SliverToBoxAdapter(
                 child: _EmptyState(
-                  onRefresh: _refreshData,
+                  onRefresh: () => _refreshData(forceRefresh: true),
                   hasMood: moodState.todayMood != null,
                 ),
               )

@@ -405,7 +405,13 @@ class ApiService {
       return Duration.zero;
     }
 
-    if (path.startsWith('/professionals')) return const Duration(minutes: 2);
+    // Créneaux disponibles = donnée critique pour la réservation (un
+    // créneau ajouté par un pro doit apparaître rapidement côté testeur,
+    // sans qu'il ait besoin de se déconnecter/reconnecter). Réduit de 2
+    // minutes à 30 secondes — complète le rafraîchissement forcé déjà en
+    // place au changement d'onglet (voir home_shell.dart) et la correction
+    // du "tirer pour actualiser" (voir professionals_screen.dart).
+    if (path.startsWith('/professionals')) return const Duration(seconds: 30);
     if (path.startsWith('/community/')) return const Duration(minutes: 1);
     if (path.startsWith('/mood/history')) return const Duration(minutes: 2);
     if (path.startsWith('/mood/today')) return Duration.zero;
@@ -625,9 +631,10 @@ class ApiService {
       await get('/mood/insights');
 
   // ─── Challenges ────────────────────────────────────────────────────────────
-  Future<List<dynamic>> getDailyChallenges({String? moodLabel}) async {
+  Future<List<dynamic>> getDailyChallenges({String? moodLabel, bool forceRefresh = false}) async {
     final result = await get('/challenges/daily',
-        queryParams: moodLabel != null ? {'moodLabel': moodLabel} : null);
+        queryParams: moodLabel != null ? {'moodLabel': moodLabel} : null,
+        forceRefresh: forceRefresh);
     
     // Si le résultat est déjà une liste, le retourner
     if (result is List) {

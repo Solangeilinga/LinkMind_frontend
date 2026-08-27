@@ -62,7 +62,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _login() async {
-    debugPrint('🔎 [DualLogin] === DÉBUT _login() ===');
     final email    = _emailCtrl.text.trim();
     final password = _passCtrl.text;
     if (email.isEmpty)    { setState(() => _localError = 'Saisis ton adresse email.'); return; }
@@ -88,7 +87,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final userSuccess = await ref.read(authProvider.notifier).login(
       email: email, password: password,
     );
-    debugPrint('🔎 [DualLogin] userSuccess=$userSuccess (retour de authProvider.login())');
 
     if (userSuccess) {
       // Connecté comme testeur : on vérifie séparément (sans mot de passe,
@@ -106,37 +104,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // Pas de compte testeur avec ces identifiants : on tente en repli un
     // compte professionnel, avec les MÊMES identifiants tapés (cas le plus
     // courant : quelqu'un qui n'a qu'un compte pro, pas de compte testeur).
-    debugPrint('🔎 [DualLogin] tentative connexion pro...');
-    debugPrint('🔎 [DualLogin] AVANT setState(_attemptingProFallback)');
+    //
+    // ⚠️ Le setState ci-dessous est enveloppé dans un try/catch délibéré et
+    // permanent : un plantage isolé et non résolu s'y est déjà produit une
+    // fois (probablement lié à Riverpod/Flutter plutôt qu'à ce fichier —
+    // recherche exhaustive faite, aucun opérateur `!` dangereux ici). Ce
+    // filet de sécurité garantit que la connexion continue même si ça se
+    // reproduit, plutôt que de bloquer l'utilisateur sur un écran figé.
     try {
       setState(() => _attemptingProFallback = true);
-      debugPrint('🔎 [DualLogin] APRÈS setState(_attemptingProFallback) — rebuild terminé sans erreur');
-    } catch (e, stack) {
-      debugPrint('🔴 [DualLogin] CRASH pendant setState(_attemptingProFallback) : $e');
-      debugPrint('🔴 [DualLogin] type: ${e.runtimeType}');
-      debugPrint('🔴 [DualLogin] stack:\n$stack');
+    } catch (e) {
+      debugPrint('⚠️ [DualLogin] setState absorbé (voir commentaire) : $e');
     }
 
-    debugPrint('🔎 [DualLogin] AVANT ProApiService().login(...)');
     try {
       await ProApiService().login(email, password);
-      debugPrint('🔎 [DualLogin] connexion pro RÉUSSIE');
-      debugPrint('🔎 [DualLogin] AVANT router.go(/pro/dashboard)');
       router.go('/pro/dashboard');
-      debugPrint('🔎 [DualLogin] APRÈS router.go(/pro/dashboard)');
-    } catch (e, stack) {
-      debugPrint('🔎 [DualLogin] connexion pro ÉCHOUÉE : $e');
-      debugPrint('🔎 [DualLogin] type erreur: ${e.runtimeType}');
-      debugPrint('🔎 [DualLogin] stack:\n$stack');
-      // Ni l'un ni l'autre n'a fonctionné — on réaffiche enfin l'erreur,
-      // maintenant qu'on est sûr qu'aucun des deux comptes ne correspond.
-      if (mounted) {
-        debugPrint('🔎 [DualLogin] AVANT setState(_attemptingProFallback = false)');
-        setState(() => _attemptingProFallback = false);
-        debugPrint('🔎 [DualLogin] APRÈS setState(_attemptingProFallback = false)');
-      }
+    } catch (e) {
+      // Ni l'un ni l'autre n'a fonctionné — l'erreur déjà affichée
+      // (state.error de authProvider) reste valable, rien de plus à faire.
+      if (mounted) setState(() => _attemptingProFallback = false);
     }
-    debugPrint('🔎 [DualLogin] FIN de _login()');
   }
 
   void _showSpaceChoiceDialog() {

@@ -446,7 +446,7 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
                       ]))
                     : RefreshIndicator(
                         color: AppColors.primary,
-                        onRefresh: () => ref.read(professionalsProvider.notifier).loadProfessionals(),
+                        onRefresh: () => ref.read(professionalsProvider.notifier).loadProfessionals(forceRefresh: true),
                         child: ListView.builder(
                           controller: _scrollCtrl, // ✅ Pagination attachée
                           padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
