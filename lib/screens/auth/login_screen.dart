@@ -62,6 +62,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _login() async {
+    debugPrint('🔎 [DualLogin] === DÉBUT _login() ===');
     final email    = _emailCtrl.text.trim();
     final password = _passCtrl.text;
     if (email.isEmpty)    { setState(() => _localError = 'Saisis ton adresse email.'); return; }
@@ -87,7 +88,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final userSuccess = await ref.read(authProvider.notifier).login(
       email: email, password: password,
     );
-    debugPrint('🔎 [DualLogin] userSuccess=$userSuccess');
+    debugPrint('🔎 [DualLogin] userSuccess=$userSuccess (retour de authProvider.login())');
 
     if (userSuccess) {
       // Connecté comme testeur : on vérifie séparément (sans mot de passe,
@@ -106,17 +107,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // compte professionnel, avec les MÊMES identifiants tapés (cas le plus
     // courant : quelqu'un qui n'a qu'un compte pro, pas de compte testeur).
     debugPrint('🔎 [DualLogin] tentative connexion pro...');
-    setState(() => _attemptingProFallback = true);
+    debugPrint('🔎 [DualLogin] AVANT setState(_attemptingProFallback)');
+    try {
+      setState(() => _attemptingProFallback = true);
+      debugPrint('🔎 [DualLogin] APRÈS setState(_attemptingProFallback) — rebuild terminé sans erreur');
+    } catch (e, stack) {
+      debugPrint('🔴 [DualLogin] CRASH pendant setState(_attemptingProFallback) : $e');
+      debugPrint('🔴 [DualLogin] type: ${e.runtimeType}');
+      debugPrint('🔴 [DualLogin] stack:\n$stack');
+    }
+
+    debugPrint('🔎 [DualLogin] AVANT ProApiService().login(...)');
     try {
       await ProApiService().login(email, password);
       debugPrint('🔎 [DualLogin] connexion pro RÉUSSIE');
+      debugPrint('🔎 [DualLogin] AVANT router.go(/pro/dashboard)');
       router.go('/pro/dashboard');
-    } catch (e) {
+      debugPrint('🔎 [DualLogin] APRÈS router.go(/pro/dashboard)');
+    } catch (e, stack) {
       debugPrint('🔎 [DualLogin] connexion pro ÉCHOUÉE : $e');
+      debugPrint('🔎 [DualLogin] type erreur: ${e.runtimeType}');
+      debugPrint('🔎 [DualLogin] stack:\n$stack');
       // Ni l'un ni l'autre n'a fonctionné — on réaffiche enfin l'erreur,
       // maintenant qu'on est sûr qu'aucun des deux comptes ne correspond.
-      if (mounted) setState(() => _attemptingProFallback = false);
+      if (mounted) {
+        debugPrint('🔎 [DualLogin] AVANT setState(_attemptingProFallback = false)');
+        setState(() => _attemptingProFallback = false);
+        debugPrint('🔎 [DualLogin] APRÈS setState(_attemptingProFallback = false)');
+      }
     }
+    debugPrint('🔎 [DualLogin] FIN de _login()');
   }
 
   void _showSpaceChoiceDialog() {
