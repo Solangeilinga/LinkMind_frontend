@@ -589,7 +589,9 @@ class _ProfessionalCard extends StatelessWidget {
           const SizedBox(height: 12),
           Row(children: [
             Expanded(child: Wrap(spacing: 6, runSpacing: 4, children: [
-              if (pro['sessionPrice'] != null)
+              // ⚠️ Tarif masqué pendant la phase pilote bénévole (gratuite).
+              // Remettre `pro['sessionPrice'] != null` pour réactiver après le pilote.
+              if (false && pro['sessionPrice'] != null)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(color: AppColors.secondary.withValues(alpha: 0.1), borderRadius: AppRadius.full),

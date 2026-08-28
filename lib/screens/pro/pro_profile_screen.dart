@@ -199,12 +199,9 @@ class _ProProfileScreenState extends State<ProProfileScreen> {
                       ]),
                       const SizedBox(height: 16),
 
-                      TextField(
-                        controller: _priceCtrl,
-                        decoration: _dec('Tarif par séance (FCFA)'),
-                        keyboardType: TextInputType.number,
-                      ),
-                      const SizedBox(height: 16),
+                      // ⚠️ Tarif masqué pendant la phase pilote bénévole (gratuite) —
+                      // la donnée reste soumise telle quelle (_priceCtrl), champ juste
+                      // retiré de l'affichage. Facile à réactiver après le pilote.
 
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,

@@ -49,10 +49,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passCtrl  = TextEditingController();
   bool _obscurePass = true;
   String? _localError;
-  // Masque l'erreur "identifiants invalides" de la tentative testeur pendant
-  // qu'on essaie encore le repli professionnel — évite un clignotement
-  // trompeur si le compte pro finit par réussir juste après.
-  bool _attemptingProFallback = false;
 
   @override
   void dispose() {
@@ -68,63 +64,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (password.isEmpty) { setState(() => _localError = 'Saisis ton mot de passe.'); return; }
     setState(() => _localError = null);
 
-    // ⚠️ On capture une référence stable au routeur AVANT toute attente
-    // réseau. Preuve concrète par les logs : la connexion pro réussissait
-    // déjà (jeton stocké), mais l'écran restait bloqué — le widget avait été
-    // démonté/remplacé entre-temps (probablement suite au changement d'état
-    // déclenché par l'échec de la tentative testeur juste avant), rendant
-    // `context`/`mounted` de CE widget invalides pour la navigation finale.
-    // Un `GoRouter` capturé ainsi reste valide même si le widget d'origine
-    // a disparu — plus robuste qu'un `context.go(...)` tardif.
+    // Référence stable au routeur, valide même si ce widget est remplacé
+    // pendant l'attente réseau qui suit.
     final router = GoRouter.of(context);
 
-    // Même écran de connexion pour tout le monde (pas de formulaire séparé).
-    // Approche SÉQUENTIELLE, volontairement simple : on tente d'abord le
-    // compte testeur (le cas le plus fréquent), puis seulement en repli le
-    // compte professionnel — jamais les deux en parallèle avec les mêmes
-    // identifiants, car rien ne garantit que les deux mots de passe soient
-    // identiques pour quelqu'un ayant les deux types de compte.
-    final userSuccess = await ref.read(authProvider.notifier).login(
-      email: email, password: password,
-    );
+    // ── Connexion simplifiée : une seule interface pour tout le monde ──────
+    // On tente le compte testeur ET le compte professionnel EN PARALLÈLE,
+    // avec le même mot de passe saisi. Si quelqu'un a les deux comptes avec
+    // le même mot de passe, les deux réussissent — on lui laisse alors
+    // choisir quel espace ouvrir. Si un seul correspond, on y va directement.
+    // Si aucun des deux comptes n'utilise ce mot de passe, l'échec normal
+    // s'affiche (rien de spécial à faire ici).
+    final results = await Future.wait<bool>([
+      ref.read(authProvider.notifier).login(email: email, password: password),
+      ProApiService().login(email, password).then((_) => true).catchError((_) => false),
+    ]);
 
-    if (userSuccess) {
-      // Connecté comme testeur : on vérifie séparément (sans mot de passe,
-      // juste une existence) si un espace pro est aussi rattaché à cet
-      // email, pour le proposer — sans jamais supposer un mot de passe commun.
-      final hasProAccount = await ApiService().checkProAccountExists(email);
-      if (hasProAccount) {
-        if (mounted) _showSpaceChoiceDialog(); // showDialog a besoin d'un vrai contexte
-      } else {
-        router.go('/home');
-      }
-      return;
-    }
+    final userSuccess = results[0];
+    final proSuccess = results[1];
 
-    // Pas de compte testeur avec ces identifiants : on tente en repli un
-    // compte professionnel, avec les MÊMES identifiants tapés (cas le plus
-    // courant : quelqu'un qui n'a qu'un compte pro, pas de compte testeur).
-    //
-    // ⚠️ Le setState ci-dessous est enveloppé dans un try/catch délibéré et
-    // permanent : un plantage isolé et non résolu s'y est déjà produit une
-    // fois (probablement lié à Riverpod/Flutter plutôt qu'à ce fichier —
-    // recherche exhaustive faite, aucun opérateur `!` dangereux ici). Ce
-    // filet de sécurité garantit que la connexion continue même si ça se
-    // reproduit, plutôt que de bloquer l'utilisateur sur un écran figé.
-    try {
-      setState(() => _attemptingProFallback = true);
-    } catch (e) {
-      debugPrint('⚠️ [DualLogin] setState absorbé (voir commentaire) : $e');
-    }
-
-    try {
-      await ProApiService().login(email, password);
+    if (userSuccess && proSuccess) {
+      if (mounted) _showSpaceChoiceDialog();
+    } else if (userSuccess) {
+      router.go('/home');
+    } else if (proSuccess) {
       router.go('/pro/dashboard');
-    } catch (e) {
-      // Ni l'un ni l'autre n'a fonctionné — l'erreur déjà affichée
-      // (state.error de authProvider) reste valable, rien de plus à faire.
-      if (mounted) setState(() => _attemptingProFallback = false);
     }
+    // Sinon : ni l'un ni l'autre — l'erreur (state.error de authProvider)
+    // s'affiche normalement, rien de plus à faire ici.
   }
 
   void _showSpaceChoiceDialog() {
@@ -135,7 +102,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
         title: const Text('Quel espace veux-tu ouvrir ?'),
         content: const Text(
-          'Un espace professionnel est aussi rattaché à cet email. Tu es connecté(e) côté testeur — pour ouvrir ton espace professionnel, entre son mot de passe (il peut être différent).',
+          'Un espace professionnel est aussi rattaché à cet email, avec le même mot de passe. Lequel veux-tu ouvrir ?',
         ),
         actions: [
           TextButton(
@@ -143,7 +110,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: const Text('Espace testeur'),
           ),
           TextButton(
-            onPressed: () { Navigator.pop(ctx); context.go('/pro/login'); },
+            onPressed: () { Navigator.pop(ctx); context.go('/pro/dashboard'); },
             child: const Text('Espace professionnel'),
           ),
         ],
@@ -259,7 +226,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     _ErrorBanner(message: _localError ?? '', isNetwork: false),
                     const SizedBox(height: 12),
                   ],
-                  if (state.error != null && !_attemptingProFallback) ...[
+                  if (state.error != null) ...[
                     _ErrorBanner(
                         message: state.error ?? '',
                         isNetwork: state.error?.contains('internet') ?? false),
