@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'dart:io';
+import 'secure_storage_queue.dart';
 import '../utils/theme.dart';
 import 'cache_manager.dart';
 
@@ -69,11 +70,11 @@ class ApiService {
   // ─── Token Management ──────────────────────────────────────────────────────
   Future<void> saveTokens(String access, [String? refresh]) async {
     _accessToken = access;
-    await _storage.write(key: 'access_token', value: access);
+    await SecureStorageQueue.run(() => _storage.write(key: 'access_token', value: access));
     if (refresh != null) {
-      await _storage.write(key: 'refresh_token', value: refresh);
+      await SecureStorageQueue.run(() => _storage.write(key: 'refresh_token', value: refresh));
     } else {
-      await _storage.write(key: 'refresh_token', value: access);
+      await SecureStorageQueue.run(() => _storage.write(key: 'refresh_token', value: access));
     }
     if (kDebugMode) {
       debugPrint('✅ TOKEN SAUVEGARDÉ : ${access.substring(0, 10)}...');
@@ -88,13 +89,13 @@ class ApiService {
       return _accessToken;
     }
     try {
-      _accessToken = await _storage.read(key: 'access_token');
+      _accessToken = await SecureStorageQueue.run(() => _storage.read(key: 'access_token'));
       if (kDebugMode) {
         debugPrint('🔑 Token lu depuis storage : ${_accessToken?.substring(0, 10) ?? 'null'}...');
       }
     } catch (e) {
       debugPrint('❌ Erreur lecture token : $e');
-      try { await _storage.deleteAll(); } catch (_) {}
+      try { await SecureStorageQueue.run(() => _storage.deleteAll()); } catch (_) {}
       _accessToken = null;
     }
     return _accessToken;
@@ -104,9 +105,9 @@ class ApiService {
     try {
       String? refresh;
       try {
-        refresh = await _storage.read(key: 'refresh_token');
+        refresh = await SecureStorageQueue.run(() => _storage.read(key: 'refresh_token'));
       } catch (_) {
-        try { await _storage.deleteAll(); } catch (_) {}
+        try { await SecureStorageQueue.run(() => _storage.deleteAll()); } catch (_) {}
         return false;
       }
       if (refresh == null) return false;
@@ -134,7 +135,7 @@ class ApiService {
 
   Future<void> clearTokens() async {
     _accessToken = null;
-    await _storage.deleteAll();
+    await SecureStorageQueue.run(() => _storage.deleteAll());
     if (kDebugMode) {
       debugPrint('🗑️ Tous les tokens supprimés');
     }

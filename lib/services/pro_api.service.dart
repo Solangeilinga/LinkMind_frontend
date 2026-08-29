@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import '../utils/theme.dart';
+import 'secure_storage_queue.dart';
 
 /// Service API isolé pour l'espace professionnel (psychologues partenaires).
 ///
@@ -23,7 +24,7 @@ class ProApiService {
   Future<String?> _getToken() async {
     if (_token != null) return _token;
     try {
-      _token = await _storage.read(key: _tokenKey);
+      _token = await SecureStorageQueue.run(() => _storage.read(key: _tokenKey));
     } catch (e) {
       // Ne bloque jamais l'app pour une lecture de stockage ratée.
       return null;
@@ -33,12 +34,12 @@ class ProApiService {
 
   Future<void> _setToken(String token) async {
     _token = token;
-    await _storage.write(key: _tokenKey, value: token);
+    await SecureStorageQueue.run(() => _storage.write(key: _tokenKey, value: token));
   }
 
   Future<void> logout() async {
     _token = null;
-    await _storage.delete(key: _tokenKey);
+    await SecureStorageQueue.run(() => _storage.delete(key: _tokenKey));
   }
 
   Future<bool> isLoggedIn() async => (await _getToken()) != null;
