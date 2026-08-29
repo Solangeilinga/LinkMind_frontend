@@ -68,20 +68,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // pendant l'attente réseau qui suit.
     final router = GoRouter.of(context);
 
-    // ── Connexion simplifiée : une seule interface pour tout le monde ──────
-    // On tente le compte testeur ET le compte professionnel EN PARALLÈLE,
-    // avec le même mot de passe saisi. Si quelqu'un a les deux comptes avec
-    // le même mot de passe, les deux réussissent — on lui laisse alors
-    // choisir quel espace ouvrir. Si un seul correspond, on y va directement.
-    // Si aucun des deux comptes n'utilise ce mot de passe, l'échec normal
-    // s'affiche (rien de spécial à faire ici).
-    final results = await Future.wait<bool>([
-      ref.read(authProvider.notifier).login(email: email, password: password),
-      ProApiService().login(email, password).then((_) => true).catchError((_) => false),
-    ]);
-
-    final userSuccess = results[0];
-    final proSuccess = results[1];
+    // ── Connexion unifiée, une seule requête réseau ─────────────────────────
+    // Le backend vérifie désormais LUI-MÊME le compte testeur ET le compte
+    // professionnel (même email, même mot de passe) dans une seule requête,
+    // et renvoie les deux jetons si les deux correspondent. Fini les deux
+    // appels réseau séparés lancés en parallèle depuis l'app, qui pouvaient
+    // écrire deux jetons en même temps dans le stockage sécurisé du
+    // navigateur et se percuter — la vraie cause des connexions pro qui
+    // semblaient échouer alors que le mot de passe était pourtant correct.
+    final userSuccess = await ref.read(authProvider.notifier).login(email: email, password: password);
+    // Vérification purement locale (aucun appel réseau) : le jeton pro,
+    // s'il existait dans la réponse, vient d'être stocké par le provider
+    // ci-dessus ; sinon, toute session pro précédente a été effacée.
+    final proSuccess = await ProApiService().isLoggedIn();
 
     if (userSuccess && proSuccess) {
       if (mounted) _showSpaceChoiceDialog();

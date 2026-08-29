@@ -75,6 +75,11 @@ class ProApiService {
     await _setToken(data['token'] as String);
   }
 
+  /// Enregistre un jeton pro déjà obtenu ailleurs (typiquement : renvoyé par
+  /// l'écran de connexion unifié, qui vérifie les deux comptes en UNE seule
+  /// requête côté serveur). Pas d'appel réseau ici — juste le stockage.
+  Future<void> setTokenDirectly(String token) => _setToken(token);
+
   Future<void> setupPassword(String setupToken, String newPassword) async {
     final res = await http.post(
       Uri.parse('${AppConstants.baseUrl}/professionals/auth/setup-password'),

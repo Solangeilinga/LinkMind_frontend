@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../services/api.service.dart';
+import '../services/pro_api.service.dart';
 import 'package:flutter/foundation.dart';
 
 // ─── Auth State ───────────────────────────────────────────────────────────────
@@ -252,6 +253,29 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final data = await _api.login(email: email, password: password);
+
+      // ── Connexion unifiée ────────────────────────────────────────────────
+      // Le backend vérifie désormais le compte testeur ET le compte
+      // professionnel (même email, même mot de passe) dans CETTE seule
+      // requête. On traite le jeton pro d'abord, systématiquement — présent
+      // ou non — pour que l'état local reste toujours cohérent avec CETTE
+      // réponse précise, jamais avec une session pro précédente restée en
+      // mémoire par erreur.
+      if (data['professionalToken'] != null) {
+        await ProApiService().setTokenDirectly(data['professionalToken'] as String);
+      } else {
+        await ProApiService().logout();
+      }
+
+      if (data['accessToken'] == null) {
+        // Le compte testeur ne correspond pas à ces identifiants — mais le
+        // compte pro, lui, a peut-être réussi (déjà traité ci-dessus).
+        // Ce n'est pas une erreur au sens propre : on laisse l'écran de
+        // connexion décider quoi faire selon l'état du compte pro.
+        state = state.copyWith(isLoading: false, error: null);
+        return false;
+      }
+
       await _api.saveTokens(data['accessToken'], data['refreshToken']);
 
       // ⚠️ CORRECTION : `data` est désormais l'enveloppe complète renvoyée par
