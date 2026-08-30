@@ -57,6 +57,7 @@ import 'firebase_options.dart';
 // Services
 import 'services/lazy_init_service.dart';
 import 'services/cache_manager.dart';
+import 'services/pro_api.service.dart';
 
 // ✅ Provider pour SharedPreferences (préchargé une fois)
 final sharedPrefsProvider = FutureProvider<SharedPreferences>((ref) async {
@@ -198,8 +199,17 @@ Future<String?> _computeRedirect(BuildContext context, GoRouterState state, Widg
       return '/home';
     }
 
-    // Rediriger les routes d'auth (sauf forgot-password)
-    if (isAuthRoute && !isForgotPassword) return '/home';
+    // Rediriger les routes d'auth (sauf forgot-password) — SAUF si un compte
+    // professionnel est AUSSI connecté en ce moment : ça signale un scénario
+    // double-compte en cours de traitement par l'écran de connexion
+    // lui-même (dialogue de choix d'espace), qui doit garder la main. Sans
+    // cette exception, cette redirection générale prenait systématiquement
+    // de vitesse le dialogue, qui n'avait alors plus jamais la moindre
+    // chance de s'afficher.
+    if (isAuthRoute && !isForgotPassword) {
+      final hasProSession = await ProApiService().isLoggedIn();
+      if (!hasProSession) return '/home';
+    }
   }
 
   return null;
