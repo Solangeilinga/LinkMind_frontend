@@ -23,6 +23,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   void _navigate(bool isAuthenticated) {
     if (!mounted) return;
+    // ⚠️ Garde essentielle : cet écran de démarrage ne doit agir que tant
+    // qu'il est RÉELLEMENT affiché. Sans ce contrôle, son `ref.listen` (voir
+    // build()) restait actif même après en être parti, et redirigeait
+    // automatiquement vers /home dès qu'une connexion réussissait ailleurs
+    // dans l'app (par ex. depuis l'écran de connexion unifié) — prenant de
+    // vitesse le dialogue de choix d'espace, qui n'avait alors plus jamais
+    // la moindre chance de s'afficher.
+    if (ModalRoute.of(context)?.isCurrent != true) return;
     context.go(isAuthenticated ? '/home' : '/auth/login');
   }
 
