@@ -261,8 +261,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // ou non — pour que l'état local reste toujours cohérent avec CETTE
       // réponse précise, jamais avec une session pro précédente restée en
       // mémoire par erreur.
+      debugPrint('🔎 [AuthProvider] data.keys=${data.keys.toList()}');
+      debugPrint('🔎 [AuthProvider] professionalToken présent = ${data['professionalToken'] != null}');
       if (data['professionalToken'] != null) {
         await ProApiService().setTokenDirectly(data['professionalToken'] as String);
+        debugPrint('🔎 [AuthProvider] setTokenDirectly() terminé, isLoggedIn maintenant = ${await ProApiService().isLoggedIn()}');
       } else {
         await ProApiService().logout();
       }

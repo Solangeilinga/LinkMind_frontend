@@ -81,6 +81,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // s'il existait dans la réponse, vient d'être stocké par le provider
     // ci-dessus ; sinon, toute session pro précédente a été effacée.
     final proSuccess = await ProApiService().isLoggedIn();
+    debugPrint('🔎 [DualLogin] userSuccess=$userSuccess proSuccess=$proSuccess');
 
     if (userSuccess && proSuccess) {
       if (mounted) _showSpaceChoiceDialog();
