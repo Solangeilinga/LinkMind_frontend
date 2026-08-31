@@ -59,6 +59,14 @@ import 'services/lazy_init_service.dart';
 import 'services/cache_manager.dart';
 import 'services/pro_api.service.dart';
 
+// ⚠️ Clé de navigation globale et stable, indépendante du cycle de vie de
+// n'importe quel écran particulier. Nécessaire pour des actions (comme
+// afficher un dialogue) qui doivent survivre même si le widget d'origine
+// est reconstruit ou démonté entre-temps — ce qui arrive avec GoRouter dès
+// qu'une réévaluation de `redirect` a lieu, même quand elle ne redirige
+// finalement nulle part.
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+
 // ✅ Provider pour SharedPreferences (préchargé une fois)
 final sharedPrefsProvider = FutureProvider<SharedPreferences>((ref) async {
   return await SharedPreferences.getInstance();
@@ -269,6 +277,7 @@ class _BASYAMAppState extends ConsumerState<BASYAMApp>
 
   GoRouter _buildRouter() {
     return GoRouter(
+      navigatorKey: rootNavigatorKey,
       initialLocation: '/init',
       debugLogDiagnostics: false,
       redirect: (context, state) async {

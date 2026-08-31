@@ -9,6 +9,7 @@ import '../../utils/validators.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api.service.dart';
 import '../../services/pro_api.service.dart';
+import '../../main.dart' show rootNavigatorKey;
 
 // ─── Error Banner ─────────────────────────────────────────────────────────────
 class _ErrorBanner extends StatelessWidget {
@@ -84,7 +85,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     debugPrint('🔎 [DualLogin] userSuccess=$userSuccess proSuccess=$proSuccess');
 
     if (userSuccess && proSuccess) {
-      if (mounted) _showSpaceChoiceDialog();
+      // ⚠️ On n'utilise plus `mounted`/`context` de CE widget ici : une
+      // réévaluation de `redirect` (même sans redirection effective) peut
+      // reconstruire l'écran de connexion pendant cette attente réseau,
+      // rendant ce widget démonté avant d'arriver ici — le dialogue ne
+      // s'affichait alors jamais, sans la moindre erreur visible. La clé de
+      // navigation globale (`rootNavigatorKey`), elle, reste toujours valide.
+      _showSpaceChoiceDialog();
     } else if (userSuccess) {
       router.go('/home');
     } else if (proSuccess) {
@@ -95,8 +102,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   void _showSpaceChoiceDialog() {
+    // ⚠️ `rootNavigatorKey.currentContext!` plutôt que `context` : reste
+    // valide même si CE widget (l'écran de connexion) a été démonté entre
+    // temps — voir le commentaire dans _login() pour le pourquoi exact.
+    final dialogContext = rootNavigatorKey.currentContext;
+    if (dialogContext == null) return; // improbable, mais ne jamais planter
+    final router = GoRouter.of(dialogContext);
     showDialog(
-      context: context,
+      context: dialogContext,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
@@ -106,11 +119,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () { Navigator.pop(ctx); context.go('/home'); },
+            onPressed: () { Navigator.pop(ctx); router.go('/home'); },
             child: const Text('Espace testeur'),
           ),
           TextButton(
-            onPressed: () { Navigator.pop(ctx); context.go('/pro/dashboard'); },
+            onPressed: () { Navigator.pop(ctx); router.go('/pro/dashboard'); },
             child: const Text('Espace professionnel'),
           ),
         ],
