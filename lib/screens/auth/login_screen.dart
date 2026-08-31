@@ -102,33 +102,50 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   void _showSpaceChoiceDialog() {
-    // ⚠️ `rootNavigatorKey.currentContext!` plutôt que `context` : reste
-    // valide même si CE widget (l'écran de connexion) a été démonté entre
-    // temps — voir le commentaire dans _login() pour le pourquoi exact.
-    final dialogContext = rootNavigatorKey.currentContext;
-    if (dialogContext == null) return; // improbable, mais ne jamais planter
-    final router = GoRouter.of(dialogContext);
-    showDialog(
-      context: dialogContext,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
-        title: const Text('Quel espace veux-tu ouvrir ?'),
-        content: const Text(
-          'Un espace professionnel est aussi rattaché à cet email, avec le même mot de passe. Lequel veux-tu ouvrir ?',
+    debugPrint('🔎 [Dialog] _showSpaceChoiceDialog() appelée');
+    // ⚠️ CORRECTIF CLÉ : bug connu de GoRouter (issue flutter/flutter#146578)
+    // — son API n'est pas aussi synchrone qu'elle en a l'air. Un dialogue
+    // appelé juste après une navigation, ou même une simple réévaluation de
+    // `redirect` (notre cas ici, juste après le login), peut entrer en
+    // collision avec cette navigation en arrière-plan et être avalé
+    // silencieusement, sans la moindre erreur. La solution établie par la
+    // communauté Flutter : reporter l'affichage à la frame suivante, une
+    // fois que toute navigation en cours s'est bien stabilisée.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // ⚠️ `rootNavigatorKey.currentContext!` plutôt que `context` : reste
+      // valide même si CE widget (l'écran de connexion) a été démonté entre
+      // temps — voir le commentaire dans _login() pour le pourquoi exact.
+      final dialogContext = rootNavigatorKey.currentContext;
+      debugPrint('🔎 [Dialog] rootNavigatorKey.currentContext == null ? ${dialogContext == null}');
+      if (dialogContext == null) {
+        debugPrint('🔴 [Dialog] ARRÊT : aucun contexte disponible, dialogue jamais affiché');
+        return;
+      }
+      final router = GoRouter.of(dialogContext);
+      debugPrint('🔎 [Dialog] AVANT showDialog(...)');
+      showDialog(
+        context: dialogContext,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
+          title: const Text('Quel espace veux-tu ouvrir ?'),
+          content: const Text(
+            'Un espace professionnel est aussi rattaché à cet email, avec le même mot de passe. Lequel veux-tu ouvrir ?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () { Navigator.pop(ctx); router.go('/home'); },
+              child: const Text('Espace testeur'),
+            ),
+            TextButton(
+              onPressed: () { Navigator.pop(ctx); router.go('/pro/dashboard'); },
+              child: const Text('Espace professionnel'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () { Navigator.pop(ctx); router.go('/home'); },
-            child: const Text('Espace testeur'),
-          ),
-          TextButton(
-            onPressed: () { Navigator.pop(ctx); router.go('/pro/dashboard'); },
-            child: const Text('Espace professionnel'),
-          ),
-        ],
-      ),
-    );
+      ).then((_) => debugPrint('🔎 [Dialog] showDialog() résolu (fermé)'));
+      debugPrint('🔎 [Dialog] APRÈS showDialog(...) — appel lancé');
+    });
   }
 
   @override
