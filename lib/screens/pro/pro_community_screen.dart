@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../utils/theme.dart';
 import '../../services/pro_api.service.dart';
 import '../main/community/models/post_type_config.dart';
+import 'pro_compose_page.dart';
 
 const _reactionEmojis = {
   'heart':  '❤️',
@@ -11,11 +12,6 @@ const _reactionEmojis = {
   'strong': '💪',
   'fire':   '🔥',
 };
-
-// Types que le pro peut choisir en publiant — cohérent avec la restriction
-// déjà en place côté serveur (PRO_ALLOWED_POST_TYPES). Les types liés à la
-// gamification testeur (humeur, défi, badge) n'ont pas de sens ici.
-const _proComposableTypes = ['tip', 'support', 'general'];
 
 class ProCommunityScreen extends StatefulWidget {
   const ProCommunityScreen({super.key});
@@ -40,10 +36,6 @@ class _ProCommunityScreenState extends State<ProCommunityScreen> with SingleTick
   bool _isSearching = false;
   List<dynamic> _searchResults = [];
 
-  final _composeController = TextEditingController();
-  String _composeType = 'tip';
-  bool _isPosting = false;
-
   @override
   void initState() {
     super.initState();
@@ -58,7 +50,6 @@ class _ProCommunityScreenState extends State<ProCommunityScreen> with SingleTick
   @override
   void dispose() {
     _tabController.dispose();
-    _composeController.dispose();
     _searchController.dispose();
     _searchDebounce?.cancel();
     super.dispose();
@@ -123,25 +114,16 @@ class _ProCommunityScreenState extends State<ProCommunityScreen> with SingleTick
     if (_searchQuery.isNotEmpty) _performSearch(_searchQuery);
   }
 
-  Future<void> _publish() async {
-    final content = _composeController.text.trim();
-    if (content.isEmpty) return;
-    setState(() => _isPosting = true);
-    try {
-      await ProApiService().createCommunityPost(content, postType: _composeType);
-      _composeController.clear();
-      FocusScope.of(context).unfocus();
-      await _load();
-      if (_myPostsLoaded) await _loadMyPosts();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isPosting = false);
-    }
+  Future<void> _publish(String content, String postType) async {
+    await ProApiService().createCommunityPost(content, postType: postType);
+    await _load();
+    if (_myPostsLoaded) await _loadMyPosts();
+  }
+
+  void _openComposePage() {
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => ProComposePage(onSubmit: _publish),
+    ));
   }
 
   void _updatePostInLists(String postId, Map<String, dynamic> Function(Map<String, dynamic>) update) {
@@ -251,8 +233,6 @@ class _ProCommunityScreenState extends State<ProCommunityScreen> with SingleTick
             // ── Onglet Fil ──────────────────────────────────────────────
             Column(
               children: [
-                _buildBanner(),
-                _buildComposeArea(),
                 const SizedBox(height: 8),
                 _buildSearchBar(),
                 _buildFilterChips(),
@@ -273,92 +253,10 @@ class _ProCommunityScreenState extends State<ProCommunityScreen> with SingleTick
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildBanner() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.06),
-        borderRadius: AppRadius.md,
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.badge_outlined, color: AppColors.primary, size: 18),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Tes publications et interactions ici sont identifiées avec ton nom et ton badge professionnel — jamais anonymes.',
-              style: AppTextStyles.caption.copyWith(color: AppColors.primary),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildComposeArea() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: AppRadius.lg,
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Choix du type de publication
-          Wrap(
-            spacing: 6,
-            children: _proComposableTypes.map((id) {
-              final conf = postTypeConfig[id]!;
-              final selected = _composeType == id;
-              return ChoiceChip(
-                label: Text('${conf.emoji} ${conf.label}'),
-                selected: selected,
-                onSelected: (_) => setState(() => _composeType = id),
-                selectedColor: conf.color.withValues(alpha: 0.15),
-                labelStyle: TextStyle(
-                  color: selected ? conf.color : AppColors.onSurfaceMuted,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  fontSize: 12,
-                ),
-                side: BorderSide(color: selected ? conf.color : AppColors.divider),
-                backgroundColor: AppColors.background,
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _composeController,
-            maxLines: 3,
-            maxLength: 1500,
-            decoration: const InputDecoration(
-              hintText: 'Partage un conseil ou un mot de soutien avec la communauté...',
-              border: InputBorder.none,
-              counterText: '',
-            ),
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: ElevatedButton(
-              onPressed: _isPosting ? null : _publish,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                shape: const RoundedRectangleBorder(borderRadius: AppRadius.full),
-              ),
-              child: _isPosting
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Publier'),
-            ),
-          ),
-        ],
+      floatingActionButton: FloatingActionButton(
+        onPressed: _openComposePage,
+        backgroundColor: AppColors.primary,
+        child: const Icon(Icons.edit, color: Colors.white),
       ),
     );
   }
