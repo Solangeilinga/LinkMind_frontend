@@ -63,8 +63,10 @@ class _ProComposePageState extends State<ProComposePage> {
         backgroundColor: AppColors.background,
         elevation: 0,
         leading: IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
-        title: Row(mainAxisSize: MainAxisSize.min, children: [
-          const Text('Nouveau post', style: AppTextStyles.h4),
+        title: Row(children: [
+          const Flexible(
+            child: Text('Nouveau post', style: AppTextStyles.h4, overflow: TextOverflow.ellipsis),
+          ),
           const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

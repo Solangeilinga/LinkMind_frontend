@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../utils/theme.dart';
 import '../../services/pro_api.service.dart';
 import '../main/community/models/post_type_config.dart';
+import '../main/community/widgets/filter_chip.dart' as custom;
 import 'pro_compose_page.dart';
 
 const _reactionEmojis = {
@@ -296,15 +298,23 @@ class _ProCommunityScreenState extends State<ProCommunityScreen> with SingleTick
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
         children: [
-          _FilterChip(label: 'Tout', isSelected: _activeFilter == null, onTap: () => _setFilter(null)),
+          custom.FilterChip(
+            label: 'Tout',
+            emoji: '🌐',
+            isSelected: _activeFilter == null,
+            color: AppColors.primary,
+            onTap: () => _setFilter(null),
+          ),
           const SizedBox(width: 8),
           ...types.map((id) {
             final conf = postTypeConfig[id]!;
             return Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: _FilterChip(
-                label: '${conf.emoji} ${conf.label}',
+              child: custom.FilterChip(
+                label: conf.label,
+                emoji: conf.emoji,
                 isSelected: _activeFilter == id,
+                color: conf.color,
                 onTap: () => _setFilter(id),
               ),
             );
@@ -334,36 +344,6 @@ class _ProCommunityScreenState extends State<ProCommunityScreen> with SingleTick
         onSameFeeling: () => _toggleSameFeeling(posts[index]['_id'] as String),
         onComment: () => _openComments(posts[index] as Map<String, dynamic>),
         onDelete: () => _deletePost(posts[index]['_id'] as String),
-      ),
-    );
-  }
-}
-
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-  const _FilterChip({required this.label, required this.isSelected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : AppColors.surface,
-          borderRadius: AppRadius.full,
-          border: Border.all(color: isSelected ? AppColors.primary : AppColors.divider),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: AppTextStyles.caption.copyWith(
-            color: isSelected ? Colors.white : AppColors.onSurfaceMuted,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
       ),
     );
   }
@@ -419,7 +399,13 @@ class _PostCard extends StatelessWidget {
               Expanded(
                 child: Row(
                   children: [
-                    Text(displayName, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700)),
+                    Flexible(
+                      child: Text(
+                        displayName,
+                        style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                     if (isProfessional) ...[
                       const SizedBox(width: 8),
                       Container(
@@ -687,8 +673,11 @@ class _CommentTile extends StatelessWidget {
     final replies = (comment['replies'] as List<dynamic>? ?? []);
     final id = comment['_id'] as String;
 
+    // Plafonné à 4 niveaux : au-delà, un fil très profond finirait par
+    // écraser le contenu utile sur les écrans étroits.
+    final indent = math.min(depth, 4) * 24.0;
     return Padding(
-      padding: EdgeInsets.only(left: depth * 24.0, top: 10, bottom: 2),
+      padding: EdgeInsets.only(left: indent, top: 10, bottom: 2),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
