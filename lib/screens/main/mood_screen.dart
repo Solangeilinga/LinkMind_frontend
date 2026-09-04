@@ -1128,7 +1128,7 @@ class _WellnessTipsSection extends StatelessWidget {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('Recommandé pour toi', style: AppTextStyles.h4),
       const SizedBox(height: 12),
-      ...tips.map((t) => GestureDetector(
+      ...tips.take(3).map((t) => GestureDetector(
             onTap: t.route != null ? () => context.push(t.route!) : null,
             child: Container(
               margin: const EdgeInsets.only(bottom: 10),

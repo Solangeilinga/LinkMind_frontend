@@ -71,8 +71,13 @@ class _CommentItemState extends State<CommentItem> {
     final content = widget.comment['content'] as String? ?? '';
     final isPrivate = widget.comment['isPrivate'] == true;
     final date = fmtDate(widget.comment['createdAt']);
-    final alias = (widget.comment['author'] as Map?)?['anonymousAlias'] as String?;
-    final displayName = anonName(commentId, alias: alias);
+    final commentAuthor = widget.comment['author'] as Map?;
+    final alias = commentAuthor?['anonymousAlias'] as String?;
+    // Même règle que pour les posts : un commentaire pro n'est jamais anonyme.
+    final isProfessionalComment = commentAuthor?['isProfessional'] == true;
+    final displayName = isProfessionalComment
+        ? (commentAuthor?['name'] as String? ?? 'Professionnel partenaire')
+        : anonName(commentId, alias: alias);
     final accentColor = isPrivate ? AppColors.primary : AppColors.secondary;
     final leftPad = widget.depth * 20.0;
 
@@ -103,9 +108,21 @@ class _CommentItemState extends State<CommentItem> {
                     : null),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
-                  Text(isPrivate ? '🔒 $displayName' : displayName,
-                      style: AppTextStyles.caption.copyWith(
-                          color: accentColor, fontWeight: FontWeight.w800, fontSize: 11)),
+                  Flexible(
+                    child: Text(isPrivate ? '🔒 $displayName' : displayName,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.caption.copyWith(
+                            color: accentColor, fontWeight: FontWeight.w800, fontSize: 11)),
+                  ),
+                  if (isProfessionalComment) ...[
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.full),
+                      child: const Text('Pro',
+                          style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w800)),
+                    ),
+                  ],
                   const Spacer(),
                   Text(date, style: AppTextStyles.caption.copyWith(
                       color: AppColors.onSurfaceMuted, fontSize: 10)),
@@ -145,7 +162,7 @@ class _CommentItemState extends State<CommentItem> {
                 if (widget.depth < 2)
                   GestureDetector(
                     onTap: () => widget.onReply(commentId,
-                        isPrivate ? '🔒 Privé' : anonName(commentId, alias: alias)),
+                        isPrivate ? '🔒 Privé' : displayName),
                     child: Text('Répondre', style: AppTextStyles.caption.copyWith(
                       color: AppColors.onSurfaceMuted,
                       fontWeight: FontWeight.w700, fontSize: 11))),

@@ -391,6 +391,16 @@ class _PostCardState extends State<PostCard> {
     final typeConf = postTypeConfig[postType] ?? postTypeConfig['feeling']!;
     final commentsCount = (post['commentsCount'] ?? 0) as int;
     final moodEmoji = post['moodEmoji'] as String?;
+    // Un professionnel n'est jamais anonyme (cf. serializePost côté backend) :
+    // ce post peut avoir été publié depuis l'espace pro même si on le voit
+    // ici, dans le fil testeur — il doit rester identifié avec son badge,
+    // pas retomber sur "👤 Anonyme" faute d'alias.
+    final postAuthor = post['author'] as Map?;
+    final isProfessionalPost = postAuthor?['isProfessional'] == true;
+    final displayName = isProfessionalPost
+        ? (postAuthor?['name'] as String? ?? 'Professionnel partenaire')
+        : anonName(_postId,
+            alias: (post['anonymousAlias'] ?? postAuthor?['anonymousAlias']) as String?);
     final content = post['content'] as String? ?? '';
     final editedAt = post['editedAt'] as String?;
     final isLong = content.length > 300;
@@ -435,15 +445,21 @@ class _PostCardState extends State<PostCard> {
                     Row(children: [
                       Flexible(
                         child: Text(
-                          anonName(_postId,
-                              alias: (widget.post['anonymousAlias'] ??
-                                  (widget.post['author']
-                                      as Map?)?['anonymousAlias']) as String?),
+                          displayName,
                           style: AppTextStyles.bodySmall
                               .copyWith(fontWeight: FontWeight.w800),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      if (isProfessionalPost) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.full),
+                          child: const Text('Professionnel',
+                              style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800)),
+                        ),
+                      ],
                       const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(

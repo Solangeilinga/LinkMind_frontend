@@ -70,14 +70,9 @@ class _CrisisHelpScreenState extends State<CrisisHelpScreen> {
             const SizedBox(height: 24),
 
             // ── Ressources immédiates ──────────────────────────────────
-            _ResourceCard(
-              icon: Icons.call,
-              title: 'Urgence — Le 15',
-              subtitle: 'Numéro d\'urgence général, disponible immédiatement.',
-              actionLabel: 'Appeler le 15',
-              onTap: () => _call('15'),
-            ),
-            const SizedBox(height: 12),
+            // Le numéro d'urgence (15) a été retiré en attendant la
+            // confirmation du partenariat associé — à réintégrer une fois
+            // validé.
             _ResourceCard(
               icon: Icons.psychology_outlined,
               title: 'Nos psychologues partenaires',
@@ -94,7 +89,7 @@ class _CrisisHelpScreenState extends State<CrisisHelpScreen> {
             Text('Prévenir l\'équipe BASYAM', style: AppTextStyles.h3),
             const SizedBox(height: 8),
             Text(
-              'Ce message est transmis directement à notre équipe, qui reviendra vers toi dès que possible. Ce n\'est pas un service d\'urgence immédiate — pour un danger immédiat, appelle le 15.',
+              'Ce message est transmis directement à notre équipe, qui reviendra vers toi dès que possible. Ce n\'est pas un service d\'urgence immédiate.',
               style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted),
             ),
             const SizedBox(height: 16),
