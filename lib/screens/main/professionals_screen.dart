@@ -1381,16 +1381,21 @@ class _BookingSheetState extends State<_BookingSheet> {
           )),
 
           // Bouton confirmer (sticky bas)
+          // Désactivé sans créneau sélectionnable : il ne servait auparavant
+          // qu'à afficher "Sélectionne un créneau pour continuer" — autant
+          // rendre l'impossibilité visible tout de suite plutôt que de
+          // laisser un bouton actif qui ne peut jamais aboutir.
           Padding(
             padding: const EdgeInsets.only(bottom: 28, top: 8),
             child: SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _sending ? null : _submit,
+                onPressed: (_sending || _slotsByDate.isEmpty) ? null : _submit,
                 style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
                 child: _sending
                     ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Text('Confirmer le rendez-vous', style: TextStyle(fontWeight: FontWeight.w700)),
+                    : Text(_slotsByDate.isEmpty ? 'Aucun créneau disponible' : 'Confirmer le rendez-vous',
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
               ),
             ),
           ),
@@ -1757,7 +1762,11 @@ class _NoSlotsBox extends StatelessWidget {
       const SizedBox(height: 8),
       Text('Aucun créneau disponible en ligne', style: AppTextStyles.bodySmall.copyWith(color: AppColors.onSurfaceMuted)),
       const SizedBox(height: 4),
-      Text('Ta demande sera traitée manuellement par l\'équipe BASYAM.',
+      // ⚠️ Ex-texte "Ta demande sera traitée manuellement par l'équipe BASYAM"
+      // — faux : sans créneau sélectionné, _submit() bloque l'envoi (aucun
+      // traitement manuel n'existe côté app ni admin). On décrit ici ce qui
+      // se passe réellement plutôt qu'une promesse non tenue.
+      Text('Reviens un peu plus tard ou choisis un autre professionnel.',
         style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted),
         textAlign: TextAlign.center),
     ]),

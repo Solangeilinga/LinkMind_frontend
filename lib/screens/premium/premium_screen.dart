@@ -295,7 +295,10 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen> {
             SizedBox(height: 16),
             Text('Ton paiement est en cours de traitement.'),
             SizedBox(height: 8),
-            Text('Tu recevras une confirmation par email.'),
+            // ⚠️ Ex-texte "Tu recevras une confirmation par email" — faux :
+            // aucun email de confirmation n'est envoyé pour le paiement,
+            // seulement une vérification en app (_checkPaymentStatus).
+            Text('Ton statut Premium s\'activera automatiquement dès que le paiement sera confirmé — reviens sur cette page dans quelques minutes.'),
           ],
         ),
         actions: [
