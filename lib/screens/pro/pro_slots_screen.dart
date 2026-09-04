@@ -21,12 +21,17 @@ class _ProSlotsScreenState extends State<ProSlotsScreen> {
     _load();
   }
 
-  Future<void> _load() async {
-    if (!await ProApiService().isLoggedIn()) {
-      if (mounted) context.go('/pro/login');
-      return;
+  // `silent` évite le flash plein écran du spinner quand le rechargement
+  // suit directement une action locale (ajout/suppression) — l'utilisateur
+  // vient déjà de voir son action, pas besoin de repasser par un écran vide.
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      if (!await ProApiService().isLoggedIn()) {
+        if (mounted) context.go('/pro/login');
+        return;
+      }
+      setState(() { _isLoading = true; _error = null; });
     }
-    setState(() { _isLoading = true; _error = null; });
     try {
       final me = await ProApiService().getMe();
       final slots = List<dynamic>.from(me['professional']?['availableSlots'] ?? []);
@@ -36,12 +41,14 @@ class _ProSlotsScreenState extends State<ProSlotsScreen> {
         final db = '${b['date']}_${b['startTime']}';
         return da.compareTo(db);
       });
-      setState(() { _slots = slots; _isLoading = false; });
+      if (mounted) setState(() { _slots = slots; _isLoading = false; });
     } catch (e) {
-      setState(() {
-        _error = e.toString().replaceFirst('Exception: ', '');
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          if (!silent) _error = e.toString().replaceFirst('Exception: ', '');
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -71,7 +78,7 @@ class _ProSlotsScreenState extends State<ProSlotsScreen> {
 
     try {
       await ProApiService().addSlot(date: dateStr, startTime: startStr, endTime: endStr);
-      _load();
+      _load(silent: true);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -90,7 +97,7 @@ class _ProSlotsScreenState extends State<ProSlotsScreen> {
     }
     try {
       await ProApiService().deleteSlot(slotId);
-      _load();
+      _load(silent: true);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

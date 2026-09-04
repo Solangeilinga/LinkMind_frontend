@@ -292,11 +292,10 @@ class _ProCommunityScreenState extends State<ProCommunityScreen> with SingleTick
 
   Widget _buildFilterChips() {
     final types = postTypeConfig.keys.toList();
-    return SizedBox(
-      height: 44,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+      child: Row(
         children: [
           custom.FilterChip(
             label: 'Tout',
@@ -452,13 +451,13 @@ class _PostCard extends StatelessWidget {
                 return _Chip(label: '${e.value}${count > 0 ? ' $count' : ''}', isActive: mine, onTap: () => onReact(e.key));
               }),
               if (myReaction == null)
-                _Chip(label: '🤍 Réagir', isActive: false, onTap: () => onReact('heart')),
+                _Chip(label: 'Réagir', isActive: false, onTap: () => onReact('heart')),
               _Chip(
-                label: '🙋 Même ressenti${sameFeelingsCount > 0 ? ' $sameFeelingsCount' : ''}',
+                label: 'Même ressenti${sameFeelingsCount > 0 ? ' $sameFeelingsCount' : ''}',
                 isActive: isSameFeeling,
                 onTap: onSameFeeling,
               ),
-              _Chip(label: '💬 ${commentsCount > 0 ? commentsCount : 'Commenter'}', isActive: false, onTap: onComment),
+              _Chip(label: '${commentsCount > 0 ? commentsCount : 'Commenter'}', isActive: false, onTap: onComment),
             ],
           ),
         ],

@@ -323,27 +323,51 @@ class _MoodScreenState extends ConsumerState<MoodScreen>
                               const Text('Comment te sens-tu ?',
                                   style: AppTextStyles.h2),
                             ])),
-                        Row(
-                          children: [
-                            IconButton(
-                              onPressed: () => context.push('/crisis-help'),
-                              icon: const Icon(Icons.support_outlined, color: AppColors.primary),
-                              tooltip: 'Besoin d\'aide',
-                            ),
-                            const SizedBox(width: 4),
-                            Flexible(
-                                child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                              _PointsBadge(points: user?.totalPoints ?? 0),
-                              if ((user?.streakDays ?? 0) > 0) ...[
-                                const SizedBox(height: 4),
-                                _StreakBadge(days: user!.streakDays),
-                              ],
-                            ])),
+                        Flexible(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                          _PointsBadge(points: user?.totalPoints ?? 0),
+                          if ((user?.streakDays ?? 0) > 0) ...[
+                            const SizedBox(height: 4),
+                            _StreakBadge(days: user!.streakDays),
                           ],
-                        ),
+                        ])),
                       ]),
+                )),
+
+                // ── Bouton d'urgence ────────────────────────────────────────
+                // Anciennement une simple IconButton coincée dans le header,
+                // entre le nom et les badges de points/streak — trop discrète
+                // pour un accès censé rester identifiable en un coup d'œil.
+                // Bannière pleine largeur, couleur alerte dédiée, juste sous
+                // le header et avant tout le reste du contenu.
+                SliverToBoxAdapter(
+                    child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                  child: GestureDetector(
+                    onTap: () => context.push('/crisis-help'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.accentRed.withValues(alpha: 0.1),
+                        borderRadius: AppRadius.lg,
+                        border: Border.all(color: AppColors.accentRed.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Text('🆘', style: TextStyle(fontSize: 20)),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text('Besoin d\'aide maintenant ?',
+                                style: AppTextStyles.body.copyWith(
+                                    color: AppColors.accentRed, fontWeight: FontWeight.w700)),
+                          ),
+                          const Icon(Icons.chevron_right, color: AppColors.accentRed, size: 20),
+                        ],
+                      ),
+                    ),
+                  ),
                 )),
 
                 // ── Message du jour ──────────────────────────────────────────

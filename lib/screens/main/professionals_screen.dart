@@ -333,6 +333,24 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
     );
   }
 
+  // Fiche détaillée d'un professionnel (bio entière, spécialités, note...) —
+  // les infos que la carte compacte de la liste ne peut pas toutes montrer.
+  void _showProfileSheet(Map<String, dynamic> pro) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ProfileDetailSheet(
+        pro: pro,
+        professionalTypes: ref.read(contentProvider).professionalTypes,
+        onBook: () {
+          Navigator.pop(context);
+          _showBookingSheet(pro);
+        },
+      ),
+    );
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -463,6 +481,7 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
                               child: _ProfessionalCard(
                                 pro: state.professionals[i],
                                 onBook: () => _showBookingSheet(state.professionals[i]),
+                                onTap: () => _showProfileSheet(state.professionals[i]),
                                 professionalTypes: professionalTypes,
                               ),
                             );
@@ -519,15 +538,22 @@ class _ProfessionalsScreenState extends ConsumerState<ProfessionalsScreen>
 class _ProfessionalCard extends StatelessWidget {
   final Map<String, dynamic> pro;
   final VoidCallback onBook;
+  final VoidCallback onTap;
   final List<ProTypeDef> professionalTypes;
-  const _ProfessionalCard({required this.pro, required this.onBook, required this.professionalTypes});
+  const _ProfessionalCard({required this.pro, required this.onBook, required this.onTap, required this.professionalTypes});
 
   @override
   Widget build(BuildContext context) {
     final typeConf = _typeConf(pro['type'], professionalTypes);
     final specs = (pro['specialties'] as List?) ?? [];
 
-    return Container(
+    return Material(
+      color: AppColors.surface,
+      borderRadius: AppRadius.lg,
+      child: InkWell(
+      onTap: onTap,
+      borderRadius: AppRadius.lg,
+      child: Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: AppRadius.lg,
@@ -612,6 +638,8 @@ class _ProfessionalCard extends StatelessWidget {
           ]),
         ]),
       ),
+      ),
+      ),
     );
   }
 }
@@ -626,6 +654,145 @@ class _ModeChip extends StatelessWidget {
     decoration: const BoxDecoration(color: AppColors.surfaceVariant, borderRadius: AppRadius.full),
     child: Text(label, style: AppTextStyles.caption.copyWith(fontSize: 10)),
   );
+}
+
+// ─── Fiche détaillée d'un professionnel ──────────────────────────────────────
+// Ouverte au tap sur une carte de la liste : montre la bio complète (jamais
+// tronquée), les spécialités (chargées côté back mais jamais affichées avant
+// ce sheet) et la note/nombre de RDV. Volontairement PAS de téléphone/email/
+// whatsapp ici même si le back les renvoie déjà dans le même objet : le
+// contact direct doit toujours passer par le flux de demande de RDV, pas par
+// un canal parallèle hors de l'app.
+class _ProfileDetailSheet extends StatelessWidget {
+  final Map<String, dynamic> pro;
+  final List<ProTypeDef> professionalTypes;
+  final VoidCallback onBook;
+  const _ProfileDetailSheet({required this.pro, required this.professionalTypes, required this.onBook});
+
+  @override
+  Widget build(BuildContext context) {
+    final typeConf = _typeConf(pro['type'], professionalTypes);
+    final specs = ((pro['specialties'] as List?) ?? []).map((e) => e.toString()).where((s) => s.trim().isNotEmpty).toList();
+    final hasOnline = pro['isOnline'] == true;
+    final hasInPerson = pro['isInPerson'] == true;
+    final rating = pro['rating'];
+    final totalBookings = pro['totalBookings'];
+
+    return Container(
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.92),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: Column(children: [
+        Center(child: Container(width: 40, height: 4,
+          decoration: const BoxDecoration(color: AppColors.divider, borderRadius: AppRadius.full))),
+        const SizedBox(height: 14),
+
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(width: 52, height: 52,
+            decoration: BoxDecoration(color: typeConf.color.withValues(alpha: 0.1), shape: BoxShape.circle),
+            child: Center(child: Text(typeConf.emoji, style: const TextStyle(fontSize: 24)))),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Flexible(child: Text(pro['fullName']?.toString() ?? '', style: AppTextStyles.h4, overflow: TextOverflow.ellipsis)),
+              if (pro['isVerified'] == true) ...[
+                const SizedBox(width: 6),
+                const Icon(Icons.verified, color: AppColors.secondary, size: 16),
+              ],
+            ]),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(color: typeConf.color.withValues(alpha: 0.1), borderRadius: AppRadius.full),
+              child: Text(typeConf.label, style: AppTextStyles.caption.copyWith(color: typeConf.color, fontWeight: FontWeight.w700)),
+            ),
+          ])),
+          IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close, size: 20)),
+        ]),
+        const SizedBox(height: 4),
+        const Divider(),
+
+        Expanded(child: SingleChildScrollView(
+          padding: const EdgeInsets.only(top: 4, bottom: 16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+            if (rating != null || (totalBookings != null && totalBookings > 0)) ...[
+              Row(children: [
+                if (rating != null) ...[
+                  const Icon(Icons.star_rounded, size: 16, color: AppColors.secondary),
+                  const SizedBox(width: 4),
+                  Text(rating.toString(), style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w700)),
+                  const SizedBox(width: 12),
+                ],
+                if (totalBookings != null && totalBookings > 0)
+                  Text('$totalBookings consultation${totalBookings > 1 ? 's' : ''} réalisée${totalBookings > 1 ? 's' : ''}',
+                    style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted)),
+              ]),
+              const SizedBox(height: 16),
+            ],
+
+            if (pro['city'] != null) ...[
+              Row(children: [
+                const Icon(Icons.location_on_outlined, size: 15, color: AppColors.onSurfaceMuted),
+                const SizedBox(width: 6),
+                Expanded(child: Text(
+                  pro['address'] != null ? '${pro['city']} — ${pro['address']}' : pro['city'].toString(),
+                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.onSurfaceMuted),
+                )),
+              ]),
+              const SizedBox(height: 16),
+            ],
+
+            if (hasOnline || hasInPerson) ...[
+              const _SectionLabel(label: 'Mode de consultation', icon: Icons.videocam_outlined),
+              const SizedBox(height: 8),
+              Row(children: [
+                if (hasOnline) const _ModeChip('🌐 En ligne'),
+                if (hasInPerson) const _ModeChip('📍 Présentiel'),
+              ]),
+              const SizedBox(height: 20),
+            ],
+
+            if (pro['bio'] != null && pro['bio'].toString().trim().isNotEmpty) ...[
+              const _SectionLabel(label: 'À propos', icon: Icons.person_outline),
+              const SizedBox(height: 8),
+              Text(pro['bio'].toString(), style: AppTextStyles.body.copyWith(height: 1.5)),
+              const SizedBox(height: 20),
+            ],
+
+            if (specs.isNotEmpty) ...[
+              const _SectionLabel(label: 'Spécialités', icon: Icons.workspace_premium_outlined),
+              const SizedBox(height: 8),
+              Wrap(spacing: 6, runSpacing: 6, children: specs.map((s) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: AppRadius.full),
+                child: Text(s, style: AppTextStyles.caption.copyWith(color: AppColors.onSurface)),
+              )).toList()),
+              const SizedBox(height: 20),
+            ],
+          ]),
+        )),
+
+        SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: onBook,
+                style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48)),
+                child: const Text('Demander un rendez-vous'),
+              ),
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
 }
 
 class _BookingCard extends StatelessWidget {
