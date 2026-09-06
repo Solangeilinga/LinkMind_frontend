@@ -980,7 +980,7 @@ class _BookingCard extends StatelessWidget {
               Text(booking['userFeedback']['attended'] == true ? '✅' : '❌', style: const TextStyle(fontSize: 14)),
               const SizedBox(width: 6),
               Expanded(child: Text(
-                booking['userFeedback']['attended'] == true ? 'RDV confirmé par le patient' : 'RDV non tenu',
+                booking['userFeedback']['attended'] == true ? 'RDV confirmé' : 'RDV non tenu',
                 style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w700),
               )),
               if (booking['userFeedback']['rating'] != null) ...[

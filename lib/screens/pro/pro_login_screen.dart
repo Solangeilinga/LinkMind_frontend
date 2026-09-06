@@ -121,7 +121,12 @@ class _ProLoginScreenState extends State<ProLoginScreen> {
                 const SizedBox(height: 12),
                 Center(
                   child: TextButton(
-                    onPressed: () => context.push('/pro/forgot-password'),
+                    // Même écran que côté testeur (/auth/forgot-password) —
+                    // reset.controller.js vérifie désormais les deux types de
+                    // compte pour un même email, donc plus besoin d'un flux
+                    // séparé ici. Voir aussi pro_forgot_password_screen.dart,
+                    // conservé mais plus lié depuis l'UI.
+                    onPressed: () => context.push('/auth/forgot-password'),
                     child: const Text('Mot de passe oublié ?'),
                   ),
                 ),
