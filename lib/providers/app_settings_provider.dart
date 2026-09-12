@@ -7,27 +7,21 @@ import '../services/sound_service.dart';
 class AppSettings {
   final ThemeMode themeMode;
   final double textScale;
-  final String language;
   final bool soundsEnabled;
 
   const AppSettings({
     this.themeMode = ThemeMode.light,
     this.textScale  = 1.0,
-    this.language   = 'fr',
     this.soundsEnabled = true,
   });
-
-  Locale get locale => Locale(language);
 
   AppSettings copyWith({
     ThemeMode? themeMode,
     double?    textScale,
-    String?    language,
     bool?      soundsEnabled,
   }) => AppSettings(
     themeMode: themeMode ?? this.themeMode,
     textScale:  textScale  ?? this.textScale,
-    language:   language   ?? this.language,
     soundsEnabled: soundsEnabled ?? this.soundsEnabled,
   );
 }
@@ -36,7 +30,6 @@ class AppSettings {
 class AppSettingsNotifier extends Notifier<AppSettings> {
   static const _kTheme    = 'theme_mode';   // 'light' | 'dark' | 'system'
   static const _kScale    = 'text_scale';
-  static const _kLanguage = 'language';
   static const _kSounds   = 'sounds_enabled';
 
   @override
@@ -49,13 +42,11 @@ class AppSettingsNotifier extends Notifier<AppSettings> {
     final prefs = await SharedPreferences.getInstance();
     final themeStr = prefs.getString(_kTheme) ?? 'light';
     final scale    = prefs.getDouble(_kScale)  ?? 1.0;
-    final lang     = prefs.getString(_kLanguage) ?? 'fr';
     final sounds   = prefs.getBool(_kSounds) ?? true;
     SoundService.instance.setEnabled(sounds);
     state = AppSettings(
       themeMode: _parseTheme(themeStr),
       textScale:  scale,
-      language:   lang,
       soundsEnabled: sounds,
     );
   }
@@ -93,12 +84,6 @@ class AppSettingsNotifier extends Notifier<AppSettings> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(_kScale, scale);
     state = state.copyWith(textScale: scale);
-  }
-
-  Future<void> setLanguage(String lang) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kLanguage, lang);
-    state = state.copyWith(language: lang);
   }
 
   Future<void> setSoundsEnabled(bool enabled) async {

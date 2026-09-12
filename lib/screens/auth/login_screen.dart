@@ -7,7 +7,6 @@ import '../../utils/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/validators.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../services/api.service.dart';
 import '../../services/pro_api.service.dart';
 import '../../main.dart' show rootNavigatorKey;
 

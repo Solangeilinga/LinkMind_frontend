@@ -8,7 +8,6 @@ import 'widgets/feed_list.dart';
 import 'widgets/filter_chip.dart' as custom;
 import 'widgets/compose_page.dart';
 import 'models/post_type_config.dart';
-import '../../../widgets/report_button.dart';
 import '../../../middleware/activity_recorder.dart';
 
 class CommunityScreen extends ConsumerStatefulWidget {

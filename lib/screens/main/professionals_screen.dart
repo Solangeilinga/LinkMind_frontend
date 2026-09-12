@@ -545,7 +545,6 @@ class _ProfessionalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final typeConf = _typeConf(pro['type'], professionalTypes);
-    final specs = (pro['specialties'] as List?) ?? [];
 
     return Material(
       color: AppColors.surface,
@@ -615,15 +614,10 @@ class _ProfessionalCard extends StatelessWidget {
           const SizedBox(height: 12),
           Row(children: [
             Expanded(child: Wrap(spacing: 6, runSpacing: 4, children: [
-              // ⚠️ Tarif masqué pendant la phase pilote bénévole (gratuite).
-              // Remettre `pro['sessionPrice'] != null` pour réactiver après le pilote.
-              if (false && pro['sessionPrice'] != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: AppColors.secondary.withValues(alpha: 0.1), borderRadius: AppRadius.full),
-                  child: Text('${pro['sessionPrice']} ${pro['currency'] ?? 'FCFA'}',
-                    style: AppTextStyles.caption.copyWith(color: AppColors.secondary, fontWeight: FontWeight.w800)),
-                ),
+              // ⚠️ Tarif volontairement non affiché pendant la phase pilote
+              // bénévole (gratuite). Pour le réactiver après le pilote :
+              // afficher un chip avec `pro['sessionPrice']` + `pro['currency']`
+              // (ex-code retiré ici pour ne pas laisser de bloc mort).
               if (pro['isOnline'] == true)  const _ModeChip('🌐 En ligne'),
               if (pro['isInPerson'] == true) const _ModeChip('📍 Présentiel'),
             ])),
@@ -1037,7 +1031,6 @@ class _BookingSheetState extends State<_BookingSheet> {
   String? _error;
 
   // Créneaux
-  List<Map<String, dynamic>> _slots     = [];
   String? _selectedSlotId;
   String? _selectedSlotLabel;
 
@@ -1080,7 +1073,6 @@ class _BookingSheetState extends State<_BookingSheet> {
       }
       if (!mounted) return;
       setState(() {
-        _slots       = raw;
         _slotsByDate = byDate;
         _loadingSlots = false;
         _lastRefresh = DateTime.now();
@@ -1115,7 +1107,6 @@ class _BookingSheetState extends State<_BookingSheet> {
       }
       if (!mounted) return;
       setState(() {
-        _slots       = raw;
         _slotsByDate = byDate;
         _lastRefresh = DateTime.now();
         // Slot sélectionné pris entre-temps → alerte immédiate
@@ -1419,7 +1410,6 @@ class _EditBookingSheetState extends State<_EditBookingSheet> {
   final _messageCtrl = TextEditingController();
   String _consultationType = 'online';
   bool _loadingSlots = false;
-  List<Map<String, dynamic>> _slots = [];
   Map<String, List<Map<String, dynamic>>> _slotsByDate = {};
   String? _selectedDate;
   String? _selectedSlotId;
@@ -1447,17 +1437,6 @@ class _EditBookingSheetState extends State<_EditBookingSheet> {
     } catch (_) { return iso; }
   }
 
-  String _fmtDateTime(String iso) {
-    try {
-      final d = DateTime.parse(iso).toLocal();
-      const days   = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
-      const months = ['jan','fév','mar','avr','mai','juin','juil','aoû','sep','oct','nov','déc'];
-      final hh = d.hour.toString().padLeft(2,'0');
-      final mm = d.minute.toString().padLeft(2,'0');
-      return '${days[d.weekday%7]} ${d.day} ${months[d.month-1]} à ${hh}h${mm}';
-    } catch (_) { return iso; }
-  }
-
   Future<void> _loadSlots() async {
     final pro = widget.booking['professional'] as Map<String, dynamic>?;
     final proId = pro?['id'] ?? pro?['_id'];
@@ -1477,7 +1456,6 @@ class _EditBookingSheetState extends State<_EditBookingSheet> {
       }
       if (!mounted) return;
       setState(() {
-        _slots = raw;
         _slotsByDate = byDate;
         _loadingSlots = false;
         if (byDate.isNotEmpty) _selectedDate = byDate.keys.first;

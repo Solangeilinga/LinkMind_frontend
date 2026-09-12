@@ -4,7 +4,6 @@
     <domain-config cleartextTrafficPermitted="false">
         <!-- Allow HTTPS for all domains -->
         <domain includeSubdomains="true">api.basyam.com</domain>
-        <domain includeSubdomains="true">api.basyam.com</domain>
         <domain includeSubdomains="true">linkmind-917b4.firebaseapp.com</domain>
         
         <!-- Trust system CAs -->

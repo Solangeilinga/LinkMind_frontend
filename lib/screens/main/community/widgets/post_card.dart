@@ -68,31 +68,6 @@ class _PostCardState extends State<PostCard> {
     _isLiked = _myReactionType == 'heart';
   }
 
-  List<Map<String, dynamic>> _getTopReactions() {
-    final Map<String, int> counts = {};
-    for (final r in _reactions) {
-      final type = r['type'] as String;
-      counts[type] = (counts[type] ?? 0) + 1;
-    }
-    final sorted = counts.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-    final topTypes = sorted.take(3).map((e) => e.key).toList();
-
-    const emojiMap = {
-      'heart': '❤️',
-      'hug': '🤗',
-      'strong': '💪',
-      'fire': '🔥',
-    };
-
-    return topTypes.map((type) {
-      return {
-        'type': type,
-        'emoji': emojiMap[type] ?? '👍',
-        'count': counts[type]!
-      };
-    }).toList();
-  }
 
   @override
   void initState() {
@@ -389,7 +364,6 @@ class _PostCardState extends State<PostCard> {
     final post = widget.post;
     final postType = post['postType'] as String? ?? 'feeling';
     final typeConf = postTypeConfig[postType] ?? postTypeConfig['feeling']!;
-    final commentsCount = (post['commentsCount'] ?? 0) as int;
     final moodEmoji = post['moodEmoji'] as String?;
     // Un professionnel n'est jamais anonyme (cf. serializePost côté backend) :
     // ce post peut avoir été publié depuis l'espace pro même si on le voit

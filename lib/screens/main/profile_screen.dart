@@ -1,8 +1,6 @@
-﻿import 'dart:io';
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_mapper.dart';
 import '../../providers/auth_provider.dart';
@@ -632,42 +630,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  void _showPremiumDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: const RoundedRectangleBorder(borderRadius: AppRadius.lg),
-        title: Row(
-          children: [
-            IconMapper.getIcon('👑', size: 24, color: AppColors.primary),
-            const SizedBox(width: 8),
-            const Text('Fonctionnalité Premium'),
-          ],
-        ),
-        content: const Text(
-          'Les rapports PDF détaillés sont réservés aux membres Premium. '
-          'Passe à Premium pour débloquer cette fonctionnalité et bien plus !',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Plus tard'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              // Naviguer vers l'écran Premium
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-            ),
-            child: const Text('Voir les offres'),
-          ),
-        ],
-      ),
     );
   }
 

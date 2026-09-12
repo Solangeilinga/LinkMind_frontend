@@ -45,6 +45,15 @@ class _MoodScreenState extends ConsumerState<MoodScreen>
   Map<String, dynamic>? _serverInsights;
   Map<String, dynamic>? _recommendations;
 
+  List<Map<String, dynamic>> get _topMoodFactors {
+    final raw = _serverInsights?['topFactors'] as List?;
+    if (raw == null) return [];
+    return raw
+        .map((f) => Map<String, dynamic>.from(f as Map))
+        .where((f) => (f['_id']?.toString() ?? '').isNotEmpty)
+        .toList();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -75,14 +84,6 @@ class _MoodScreenState extends ConsumerState<MoodScreen>
             _todayMessage = '${msg['text'] ?? ''} ${msg['emoji'] ?? ''}';
           final grouped =
               _castMap<String, dynamic>(results[1]['tips'] ?? {});
-          // 🔍 DIAGNOSTIC TEMPORAIRE — à retirer une fois le bug de la page
-          // Mood résolu. Affiche la structure brute reçue pour vérifier si
-          // les tips arrivent bien groupés par humeur avec title/description.
-          debugPrint('🔍 [WellnessTips] raw results[1]: ${results[1]}');
-          debugPrint('🔍 [WellnessTips] grouped keys: ${grouped.keys}');
-          grouped.forEach((moodKey, tipsForMood) {
-            debugPrint('🔍 [WellnessTips] "$moodKey" -> $tipsForMood');
-          });
           _wellnessTips = grouped.map((mood, tips) {
             final tipsList = (tips as List?)?.map((t) {
                   final tip = _castMap<String, dynamic>(t);
@@ -196,7 +197,6 @@ class _MoodScreenState extends ConsumerState<MoodScreen>
       if (recs != null) setState(() => _recommendations = recs);
 
       // Planifier notif contextuelle avec contexte mis à jour
-      final updatedState = ref.read(moodProvider);
       final streak = ref.read(authProvider).user?.streakDays ?? 0;
       LocalNotificationService.setupAllReminders(
         lastMoodLabel: mood.id,
@@ -244,17 +244,6 @@ class _MoodScreenState extends ConsumerState<MoodScreen>
     );
   }
 
-  void _showWellnessSheet(String moodId) {
-    final tips =
-        _wellnessTips[moodId] ?? _wellnessTips['neutral'] ?? [];
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) =>
-          _WellnessSheet(moodId: moodId, tips: tips));
-  }
-
   List<_WellnessTip> get _currentTips {
     final moods = ref.read(contentProvider).moodDefinitions;
     if (_selectedMoodIndex == null) return _wellnessTips['neutral'] ?? [];
@@ -275,12 +264,6 @@ class _MoodScreenState extends ConsumerState<MoodScreen>
     final stressFactors = content.loaded && content.stressFactors.isNotEmpty
         ? content.stressFactors
         : <StressFactorDef>[];
-
-    // 🔍 DIAGNOSTIC TEMPORAIRE — à retirer une fois le bug résolu.
-    debugPrint('🔍 [WellnessTips] moodState.todayMood: ${moodState.todayMood}');
-    debugPrint('🔍 [WellnessTips] lookup key used: '
-        '${_selectedMoodIndex != null ? moods[_selectedMoodIndex!].id : (moodState.todayMood?['label'] ?? 'neutral')}');
-    debugPrint('🔍 [WellnessTips] available _wellnessTips keys: ${_wellnessTips.keys}');
 
     if (!content.loaded) {
       return const Scaffold(body: SafeArea(child: SkeletonMoodScreen()));
@@ -448,6 +431,18 @@ class _MoodScreenState extends ConsumerState<MoodScreen>
                   ),
                 )),
 
+                // ── Tendances (insights calculés côté serveur, toutes périodes) ──
+                // Complète _weeklyInsight (calculé localement sur 7 jours) avec
+                // les facteurs qui reviennent le plus souvent sur tout
+                // l'historique — donnée déjà récupérée via getMoodInsights()
+                // mais jamais affichée jusqu'ici.
+                if (_topMoodFactors.isNotEmpty)
+                  SliverToBoxAdapter(
+                      child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                    child: _TopFactorsCard(topFactors: _topMoodFactors),
+                  )),
+
                 // ── Tips bien-être ────────────────────────────────────────────
                 SliverToBoxAdapter(
                     child: Padding(
@@ -505,7 +500,6 @@ class _PostLogSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isGoodMood = ['happy', 'excited', 'calm', 'content'].contains(moodId);
     final isHardMood = ['sad', 'anxious', 'angry', 'stressed'].contains(moodId);
 
     String title;
@@ -1111,6 +1105,50 @@ class _WeeklyMoodChart extends StatelessWidget {
   }
 }
 
+// ─── Facteurs récurrents (insight serveur) ────────────────────────────────────
+class _TopFactorsCard extends StatelessWidget {
+  final List<Map<String, dynamic>> topFactors;
+  const _TopFactorsCard({required this.topFactors});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppRadius.lg,
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.insights_outlined, size: 18, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Text('Ce qui revient souvent', style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w800)),
+        ]),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: topFactors.map((f) {
+            final label = f['_id'].toString();
+            final count = f['count'] ?? 0;
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.08),
+                borderRadius: AppRadius.full,
+              ),
+              child: Text('$label · $count',
+                  style: AppTextStyles.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700)),
+            );
+          }).toList(),
+        ),
+      ]),
+    );
+  }
+}
+
 // ─── Wellness Tips Section ────────────────────────────────────────────────────
 class _WellnessTipsSection extends StatelessWidget {
   final List<_WellnessTip> tips;
@@ -1166,78 +1204,6 @@ class _WellnessTipsSection extends StatelessWidget {
 }
 
 // ─── Wellness Sheet ───────────────────────────────────────────────────────────
-class _WellnessSheet extends StatelessWidget {
-  final String moodId;
-  final List<_WellnessTip> tips;
-  const _WellnessSheet({required this.moodId, required this.tips});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-      decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(28))),
-      child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                  width: 40, height: 4,
-                  decoration: const BoxDecoration(
-                      color: AppColors.divider,
-                      borderRadius: AppRadius.full)),
-            ),
-            const SizedBox(height: 20),
-            const Text('Prends un moment pour toi',
-                style: AppTextStyles.h3),
-            const SizedBox(height: 16),
-            ...tips.map((t) => ListTile(
-                  leading: Container(
-                    width: 40, height: 40,
-                    decoration: BoxDecoration(
-                        color: AppColors.surfaceVariant,
-                        borderRadius: BorderRadius.circular(10)),
-                    child: Center(
-                        child: Text(t.icon,
-                            style: const TextStyle(fontSize: 20))),
-                  ),
-                  title: Text(t.title,
-                      style: AppTextStyles.bodySmall
-                          .copyWith(fontWeight: FontWeight.w800)),
-                  subtitle: Text(t.desc,
-                      style: AppTextStyles.caption.copyWith(
-                          color: AppColors.onSurfaceMuted)),
-                  contentPadding:
-                      const EdgeInsets.symmetric(vertical: 6),
-                  trailing: t.route != null
-                      ? const Icon(Icons.chevron_right, size: 20)
-                      : null,
-                  onTap: () {
-                    Navigator.pop(context);
-                    if (t.route != null) context.push(t.route!);
-                  },
-                )),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(50)),
-                child: const Text('Compris'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // ─── Badges ───────────────────────────────────────────────────────────────────
 class _PointsBadge extends StatelessWidget {
   final int points;

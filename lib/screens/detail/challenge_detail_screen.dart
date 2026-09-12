@@ -555,6 +555,23 @@ class _ChallengeDetailScreenState extends ConsumerState<ChallengeDetailScreen>
             ),
           ),
 
+        // Permet de reprendre le défi guidé depuis le début si l'utilisateur
+        // rate son timing sur une étape — sans ça, aucun moyen de revenir en
+        // arrière une fois lancé.
+        if (!_allStepsDone)
+          Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: TextButton.icon(
+                onPressed: _resetChallenge,
+                icon: const Icon(Icons.replay_rounded, size: 16),
+                label: const Text('Recommencer'),
+                style: TextButton.styleFrom(foregroundColor: AppColors.onSurfaceMuted),
+              ),
+            ),
+          ),
+
         SizedBox(
           width: double.infinity,
           child: isLastStep

@@ -5,6 +5,19 @@ plugins {
     id "com.google.gms.google-services"
 }
 
+// ── Signature de release ────────────────────────────────────────────────────
+// key.properties (jamais commité — voir .gitignore) contient les identifiants
+// du vrai keystore de production. Absent en local/CI sans les secrets : le
+// build release retombe alors sur la clé debug plutôt que d'échouer, pour ne
+// pas bloquer un simple `flutter analyze`/`flutter test` — mais un tel build
+// ne doit JAMAIS être uploadé sur le Play Store.
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("key.properties")
+def hasReleaseKeystore = keystorePropertiesFile.exists()
+if (hasReleaseKeystore) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.linkmind.app"
     compileSdk = 36
@@ -27,6 +40,17 @@ android {
         jvmTarget = "17"
     }
 
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            release {
+                keyAlias = keystoreProperties["keyAlias"]
+                keyPassword = keystoreProperties["keyPassword"]
+                storeFile = file(keystoreProperties["storeFile"])
+                storePassword = keystoreProperties["storePassword"]
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled = true
@@ -35,9 +59,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.debug
+            signingConfig = hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
         }
-        
+
         debug {
             minifyEnabled = false
             shrinkResources = false

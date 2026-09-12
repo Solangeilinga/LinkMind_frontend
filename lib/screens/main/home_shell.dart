@@ -14,12 +14,8 @@ class HomeShell extends ConsumerStatefulWidget {
 }
 
 class _HomeShellState extends ConsumerState<HomeShell> {
-  // Mindo reste dans la navigation sur toutes les plateformes, y compris web :
-  // l'écran affiche déjà son propre état "Bientôt disponible" (v2), pas besoin
-  // de le cacher séparément ici — ça resterait cohérent avec le mobile.
   static const _tabs = [
     _NavItem('/home', Icons.mood_outlined, Icons.mood, 'Mood'),
-    _NavItem('/assistant', Icons.psychology_outlined, Icons.psychology, 'Mindo'),
     _NavItem('/community', Icons.people_outline, Icons.people, 'Hub'),
     _NavItem('/professionals', Icons.medical_services_outlined, Icons.medical_services, 'Pros'),
     _NavItem('/challenges', Icons.bolt_outlined, Icons.bolt, 'Défis'),
@@ -94,7 +90,6 @@ class _HomeShellState extends ConsumerState<HomeShell> {
               children: List.generate(_tabs.length, (i) {
                 final tab = _tabs[i];
                 final isActive = i == currentIndex;
-                final isMindo = tab.path == '/assistant';
 
                 return Expanded(
                   child: GestureDetector(
@@ -119,40 +114,23 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                       children: [
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
-                          width: isMindo ? 52 : 46,
-                          height: isMindo ? 36 : 32,
+                          width: 46,
+                          height: 32,
                           decoration: BoxDecoration(
-                            color: isActive && isMindo
-                                ? AppColors.primary
-                                : isActive && !isMindo
-                                    ? AppColors.primary.withValues(alpha: 0.12)
-                                    : Colors.transparent,
-                            borderRadius: isMindo ? AppRadius.lg : AppRadius.md,
-                            border: !isActive && isMindo
-                                ? Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 1.5)
-                                : null,
+                            color: isActive ? AppColors.primary.withValues(alpha: 0.12) : Colors.transparent,
+                            borderRadius: AppRadius.md,
                           ),
-                          child: isMindo
-                              ? Center(
-                                  child: Image.asset(
-                                    'assets/images/logo.png',
-                                    width: isActive ? 24 : 20,
-                                    height: isActive ? 24 : 20,
-                                    fit: BoxFit.contain,
-                                  ))
-                              : Icon(
-                                  isActive ? tab.activeIcon : tab.icon,
-                                  color: isActive ? AppColors.primary : AppColors.onSurfaceMuted,
-                                  size: 22,
-                                ),
+                          child: Icon(
+                            isActive ? tab.activeIcon : tab.icon,
+                            color: isActive ? AppColors.primary : AppColors.onSurfaceMuted,
+                            size: 22,
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           tab.label,
                           style: AppTextStyles.caption.copyWith(
-                            color: isActive
-                                ? (isMindo ? AppColors.primary : AppColors.primary)
-                                : AppColors.onSurfaceMuted,
+                            color: isActive ? AppColors.primary : AppColors.onSurfaceMuted,
                             fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
                             fontSize: 10,
                           ),

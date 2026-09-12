@@ -5,17 +5,18 @@
     <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
-    
-    <!-- Permissions pour sauvegarder le PDF -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage"/>
+
+    <!-- ⚠️ WRITE/READ/MANAGE_EXTERNAL_STORAGE retirées le 2026-09-11 : elles
+         ne servaient qu'à l'export PDF (report_service.dart), supprimé.
+         Aucun code de l'app ne touche plus au stockage externe — open_file
+         et path_provider (pubspec.yaml) étaient déjà inutilisés. Garder
+         MANAGE_EXTERNAL_STORAGE sans usage réel est un motif de rejet quasi
+         automatique en review Google Play. -->
 
     <application
         android:label="BASYAM"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:requestLegacyExternalStorage="true"
         android:networkSecurityConfig="@xml/network_security_config">
         
         <activity

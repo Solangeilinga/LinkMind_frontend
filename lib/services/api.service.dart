@@ -758,9 +758,6 @@ class ApiService {
       await get('/community/search',
           queryParams: {'q': query, if (postType != null) 'type': postType});
 
-  Future<Map<String, dynamic>> getGroupChallenges() async =>
-      await get('/community/group-challenges');
-
   // ─── Notifications ─────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> getNotifications({int page = 1}) async =>
       await get('/notifications', queryParams: {'page': page.toString()});
@@ -869,21 +866,6 @@ class ApiService {
   Future<Map<String, dynamic>> getLeaderboard() async =>
       await get('/users/leaderboard');
 
-  // ─── Assistant ─────────────────────────────────────────────────────────────
-  Future<Map<String, dynamic>> chatWithAssistant({
-    required String message,
-    Map<String, dynamic>? context,
-  }) async {
-    return await post('/assistant/chat', {
-      'message': message,
-      if (context != null) 'context': context,
-    });
-  }
-
-  Future<void> clearAssistantSession() async {
-    try { await delete('/assistant/session'); } catch (_) {}
-  }
-
   // ─── Content ───────────────────────────────────────────────────────────────
   Future<Map<String, dynamic>> getDailyMessage() async =>
       await get('/content/daily-message');
@@ -894,12 +876,8 @@ class ApiService {
       await get('/content/stress-factors');
   Future<Map<String, dynamic>> getBadgesConfig() async =>
       await get('/content/badges');
-  Future<Map<String, dynamic>> getAssistantStarters() async =>
-      await get('/content/assistant-starters');
   Future<Map<String, dynamic>> getMoodDefinitions() async =>
       await get('/content/moods');
-  Future<Map<String, dynamic>> getLanguages() async =>
-      await get('/content/languages');
   Future<Map<String, dynamic>> getProfessionalTypes() async =>
       await get('/content/professional-types');
   Future<Map<String, dynamic>> getChallengeCategories() async =>

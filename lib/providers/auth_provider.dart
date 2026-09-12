@@ -562,9 +562,8 @@ class MoodNotifier extends StateNotifier<MoodState> {
 // ─── Challenges Notifier ──────────────────────────────────────────────────────
 class ChallengesNotifier extends StateNotifier<ChallengesState> {
   final ApiService _api;
-  final Ref _ref;
 
-  ChallengesNotifier(this._api, this._ref) : super(const ChallengesState()) {
+  ChallengesNotifier(this._api) : super(const ChallengesState()) {
     loadDaily();
   }
 
@@ -644,5 +643,5 @@ final moodProvider = StateNotifierProvider<MoodNotifier, MoodState>(
 );
 
 final challengesProvider = StateNotifierProvider<ChallengesNotifier, ChallengesState>(
-  (ref) => ChallengesNotifier(ref.read(apiServiceProvider), ref),
+  (ref) => ChallengesNotifier(ref.read(apiServiceProvider)),
 );

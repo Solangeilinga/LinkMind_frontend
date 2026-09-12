@@ -115,13 +115,7 @@ class ProfessionalsNotifier extends StateNotifier<ProfessionalsState> {
     try {
       final data = await _api.get('/professionals/bookings/me');
       final bookings = List<Map<String, dynamic>>.from(data['bookings'] ?? []);
-      
-      for (final b in bookings) {
-        final status = b['status'] ?? 'unknown';
-        final feedback = b['userFeedback'];
-        final id = b['_id'] ?? b['id'] ?? '?';
-      }
-      
+
       state = state.copyWith(
         isLoadingBookings: false,
         bookings: bookings,

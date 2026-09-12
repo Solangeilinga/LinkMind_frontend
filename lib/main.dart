@@ -6,17 +6,14 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:firebase_core/firebase_core.dart';
 
 // Utils & Theme
 import 'utils/theme.dart';
-import 'utils/app_localizations.dart';
 import 'utils/url_strategy.dart';
 
 // Services
 import 'services/local_notification_service.dart';
 import 'services/security.service.dart';
-import 'services/api.service.dart';
 
 // Screens - Utiliser des alias pour éviter les conflits
 import 'screens/auth/login_screen.dart';
@@ -31,7 +28,6 @@ import 'screens/main/community/community_screen.dart';
 import 'screens/main/professionals_screen.dart';
 // ✅ ALIAS pour ProfileScreen pour éviter le conflit
 import 'screens/main/profile_screen.dart' as profile;
-import 'screens/main/assistant_screen.dart';
 import 'screens/main/settings_screen.dart';
 import 'screens/main/crisis_help_screen.dart';
 import 'screens/main/install_guide_screen.dart';
@@ -44,15 +40,11 @@ import 'screens/pro/pro_forgot_password_screen.dart';
 import 'screens/pro/pro_profile_screen.dart';
 import 'screens/detail/challenge_detail_screen.dart';
 import 'screens/detail/mood_history_screen.dart';
-import 'screens/premium/premium_screen.dart';
 import 'screens/legal/legal_terms_screen.dart';
 
 // Providers
 import 'providers/auth_provider.dart';
 import 'providers/app_settings_provider.dart';
-
-// Firebase
-import 'firebase_options.dart';
 
 // Services
 import 'services/lazy_init_service.dart';
@@ -361,12 +353,6 @@ class _BASYAMAppState extends ConsumerState<BASYAMApp>
           builder: (_, __) => const ProProfileScreen(),
         ),
 
-        // Premium
-        GoRoute(
-          path: '/premium',
-          builder: (_, __) => const PremiumScreen(),
-        ),
-
         // Structure principale avec BottomNavigationBar
         ShellRoute(
           builder: (context, state, child) => HomeShell(child: child),
@@ -378,10 +364,6 @@ class _BASYAMAppState extends ConsumerState<BASYAMApp>
             GoRoute(
               path: '/challenges',
               builder: (_, __) => const ChallengesScreen(),
-            ),
-            GoRoute(
-              path: '/assistant',
-              builder: (_, __) => const AssistantScreen(),
             ),
             GoRoute(
               path: '/community',
@@ -458,10 +440,13 @@ class _BASYAMAppState extends ConsumerState<BASYAMApp>
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: settings.themeMode,
-      locale: settings.locale,
-      supportedLocales: AppLocalizations.supportedLocales,
+      // L'app n'a jamais été traduite au-delà du français codé en dur dans
+      // chaque écran (AppLocalizations existait mais n'était consommé nulle
+      // part) — locale fixée en conséquence, plutôt que de laisser croire à
+      // un support multilingue inexistant.
+      locale: const Locale('fr'),
+      supportedLocales: const [Locale('fr')],
       localizationsDelegates: const [
-        AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
@@ -472,7 +457,14 @@ class _BASYAMAppState extends ConsumerState<BASYAMApp>
           data: MediaQuery.of(context).copyWith(
             textScaler: TextScaler.linear(settings.textScale.clamp(0.8, 1.5)),
           ),
-          child: child,
+          // Réinitialise le timeout d'inactivité de SecurityService (60 min)
+          // à chaque interaction — sans ça, la session expirait toujours
+          // exactement 60 min après le lancement, même en usage continu.
+          child: Listener(
+            behavior: HitTestBehavior.translucent,
+            onPointerDown: (_) => SecurityService.touch(),
+            child: child,
+          ),
         );
       },
       routerConfig: _router,

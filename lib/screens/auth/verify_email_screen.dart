@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -41,58 +40,6 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
   void dispose() {
     _codeController.dispose();
     super.dispose();
-  }
-
-  Future<void> _sendInitialCode() async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      final response = await ref.read(authProvider.notifier).sendVerification();
-      if (mounted) {
-        setState(() {
-          _channel = response['channel'];
-          _destinationMasked = response['destination'];
-          _isLoading = false;
-        });
-        debugPrint(
-            '✅ Code envoyé par ${'email'}');
-      }
-    } on TimeoutException catch (e) {
-      debugPrint('⏱️ Timeout lors de l\'envoi du code: $e');
-      if (mounted) {
-        setState(() {
-          _error =
-              'Délai d\'attente dépassé. Vérifiez votre connexion et réessayez.';
-          _isLoading = false;
-        });
-      }
-    } catch (e, stack) {
-      debugPrint('❌ Erreur _sendInitialCode: $e\n$stack');
-      if (mounted) {
-        // Message d'erreur plus spécifique selon le type d'erreur
-        String errorMsg = 'Impossible d\'envoyer le code de vérification';
-        final errorStr = e.toString().toLowerCase();
-
-        if (errorStr.contains('429') || errorStr.contains('rate')) {
-          errorMsg =
-              'Trop de tentatives. Attends 2 minutes avant de réessayer.';
-        } else if (errorStr.contains('timeout')) {
-          errorMsg = 'Délai d\'attente dépassé. Réessaie.';
-        } else if (errorStr.contains('configuration') ||
-            errorStr.contains('credentials')) {
-          errorMsg = 'Service email non disponible. Réessaie plus tard.';
-        } else if (errorStr.contains('lafricamobile') ||
-            errorStr.contains('resend')) {
-          errorMsg = 'Problème d\'envoi email. Réessaie plus tard.';
-        } else if (errorStr.contains('not properly configured')) {
-          errorMsg = 'Service non disponible. Réessaie plus tard.';
-        }
-        setState(() {
-          _error = errorMsg;
-          _isLoading = false;
-        });
-      }
-    }
   }
 
   Future<void> _verifyCode() async {
@@ -138,11 +85,10 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
     });
 
     try {
-      final response = await ref.read(authProvider.notifier).sendVerification();
+      await ref.read(authProvider.notifier).sendVerification();
       if (mounted) {
         setState(() {
-          _success =
-              'Nouveau code envoyé par ${'email'}';
+          _success = 'Nouveau code envoyé par email';
           _isResending = false;
         });
       }

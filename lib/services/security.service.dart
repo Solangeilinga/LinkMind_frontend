@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../utils/theme.dart';
 import 'api.service.dart';
 
@@ -39,8 +38,11 @@ class SecurityService {
     
     _updateActivity();
     _startSessionTimer(context);
-    _setupUserInteraction(context);
-    
+    // La détection d'interaction elle-même vit dans main.dart, qui enrobe
+    // l'app d'un Listener appelant SecurityService.touch() — un simple
+    // service statique ne peut pas s'insérer dans l'arbre de widgets tout
+    // seul.
+
     // Vérifier l'état du compte au démarrage
     _checkAccountStatus(context);
   }
@@ -49,6 +51,12 @@ class SecurityService {
   static void _updateActivity() {
     _lastActivity = DateTime.now();
   }
+
+  /// Point d'entrée public appelé à chaque interaction utilisateur (via un
+  /// Listener posé dans main.dart) — sans ça, le timeout de session de
+  /// 60 min se déclenchait systématiquement 60 min après le lancement de
+  /// l'app, même en usage continu. Complété le 2026-09-10.
+  static void touch() => _updateActivity();
 
   /// Démarrer le timer de session
   static void _startSessionTimer(BuildContext context) {
@@ -135,21 +143,6 @@ class SecurityService {
     }
   }
 
-  /// Configurer la détection des interactions utilisateur
-  static void _setupUserInteraction(BuildContext context) {
-    // Détecter les interactions sur l'écran via WidgetsBinding
-    final binding = WidgetsBinding.instance;
-    binding.addPostFrameCallback((_) {
-      // Note: Pour une détection complète, il faudrait un wrapper dans l'app principale
-    });
-  }
-
-  /// Réinitialiser le timer
-  static void _resetTimer(BuildContext context) {
-    _sessionTimer?.cancel();
-    _startSessionTimer(context);
-  }
-
   /// Rafraîchir la session côté serveur
   static Future<void> refreshSession() async {
     try {
@@ -166,17 +159,12 @@ class SecurityService {
   }
 
   /// Enregistrer une activité (pour détection comportements suspects)
-  /// Temporairement désactivé car la route n'existe pas encore
+  /// Réactivé le 2026-09-10 — la route POST /api/users/activity existe
+  /// maintenant côté backend (voir user.routes.js).
   static Future<void> recordActivity({
     required String type,
     Map<String, dynamic>? metadata,
   }) async {
-    // TODO: Implémenter la route dans le backend quand elle sera prête
-    // Actuellement désactivé pour éviter les erreurs 404
-    debugPrint('📝 Activity recorded (local): $type - ${metadata ?? {}}');
-    return;
-    
-    /* Code original désactivé
     try {
       unawaited(ApiService().post('/users/activity', {
         'type': type,
@@ -184,9 +172,8 @@ class SecurityService {
         'timestamp': DateTime.now().toIso8601String(),
       }));
     } catch (e) {
-      // Ne pas afficher d'erreur pour éviter de polluer la console
+      // Ne jamais bloquer l'app pour un enregistrement d'activité.
     }
-    */
   }
 
   /// Vérifier si le compte est restreint
