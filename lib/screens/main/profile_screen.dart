@@ -434,6 +434,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               color: AppColors.onSurfaceMuted,
             ),
           ),
+          const SizedBox(height: 8),
+          Text(
+            'Chaque humeur enregistrée et chaque défi complété te rapporte des points, qui te font monter de niveau.',
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.onSurfaceMuted,
+              height: 1.4,
+            ),
+          ),
         ],
       ),
     );

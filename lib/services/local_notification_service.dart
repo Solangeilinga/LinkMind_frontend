@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -10,8 +11,13 @@ class LocalNotificationService {
   static final _plugin = FlutterLocalNotificationsPlugin();
   static bool _initialized = false;
 
+  // ⚠️ flutter_local_notifications n'a pas d'implémentation web — sur le
+  // navigateur/PWA, les rappels passent uniquement par le push FCM serveur
+  // (voir scheduler.service.js côté backend) + la notification web native
+  // affichée par messaging_platform_web.dart. Appeler ce plugin sur web
+  // lève une exception à chaque fois (rattrapée, mais inutilement).
   static Future<void> init() async {
-    if (_initialized) return;
+    if (_initialized || kIsWeb) return;
     tz_data.initializeTimeZones();
 
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -227,6 +233,7 @@ class LocalNotificationService {
     int? streakDays,
     int? badgesNeeded,
   }) async {
+    if (kIsWeb) return;
     try {
       final prefs       = await SharedPreferences.getInstance();
       final enabled     = prefs.getBool('notifications_enabled') ?? true;
@@ -251,6 +258,9 @@ class LocalNotificationService {
         await scheduleStreakWarning(streakDays: streakDays)
             .catchError((e) => _log.warning('scheduleStreakWarning error', e));
       }
+
+      await scheduleChallengeReminder()
+          .catchError((e) => _log.warning('scheduleChallengeReminder error', e));
     } catch (e) {
       _log.warning('setupAllReminders error', e);
     }

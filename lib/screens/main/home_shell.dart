@@ -5,6 +5,7 @@ import '../../providers/content_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/professionals_provider.dart';
 import '../../utils/theme.dart';
+import '../../widgets/quick_tour_overlay.dart';
 
 class HomeShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -32,6 +33,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       ref.read(authProvider.notifier).setSessionReplacedCallback(() {
         if (mounted) _showSessionReplacedDialog();
       });
+      if (mounted) maybeShowQuickTour(context);
     });
   }
 
@@ -85,7 +87,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
+            padding: const EdgeInsets.symmetric(vertical: 10),
             child: Row(
               children: List.generate(_tabs.length, (i) {
                 final tab = _tabs[i];
@@ -114,25 +116,28 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                       children: [
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
-                          width: 46,
-                          height: 32,
+                          width: 56,
+                          height: 40,
                           decoration: BoxDecoration(
-                            color: isActive ? AppColors.primary.withValues(alpha: 0.12) : Colors.transparent,
+                            color: isActive ? AppColors.primary.withValues(alpha: 0.16) : Colors.transparent,
                             borderRadius: AppRadius.md,
+                            border: isActive
+                                ? Border.all(color: AppColors.primary.withValues(alpha: 0.25), width: 1)
+                                : null,
                           ),
                           child: Icon(
                             isActive ? tab.activeIcon : tab.icon,
                             color: isActive ? AppColors.primary : AppColors.onSurfaceMuted,
-                            size: 22,
+                            size: 26,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 3),
                         Text(
                           tab.label,
                           style: AppTextStyles.caption.copyWith(
                             color: isActive ? AppColors.primary : AppColors.onSurfaceMuted,
                             fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
-                            fontSize: 10,
+                            fontSize: 12,
                           ),
                         ),
                       ],

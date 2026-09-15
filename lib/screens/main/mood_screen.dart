@@ -11,6 +11,29 @@ import '../../providers/content_provider.dart';
 import '../../services/local_notification_service.dart';
 import '../../services/sound_service.dart';
 
+class _InfoRow extends StatelessWidget {
+  final String emoji, title, desc;
+  const _InfoRow(this.emoji, this.title, this.desc);
+  @override
+  Widget build(BuildContext context) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 20)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: AppTextStyles.body.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 2),
+                Text(desc, style: AppTextStyles.caption.copyWith(color: AppColors.onSurfaceMuted, height: 1.4)),
+              ],
+            ),
+          ),
+        ],
+      );
+}
+
 class _WellnessTip {
   final String icon, title, desc;
   final String? route;
@@ -37,6 +60,53 @@ class _MoodScreenState extends ConsumerState<MoodScreen>
 
   String _todayMessage = 'Chaque jour est une nouvelle chance de prendre soin de toi. 🌱';
   Map<String, List<_WellnessTip>> _wellnessTips = {};
+
+  void _showPointsInfo(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(color: AppColors.divider, borderRadius: AppRadius.full),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text('⚡ Points & progression', style: AppTextStyles.h4),
+            const SizedBox(height: 14),
+            _InfoRow('⚡', 'Points', 'Tu gagnes des points en enregistrant ton humeur chaque jour et en complétant des défis.'),
+            const SizedBox(height: 12),
+            _InfoRow('🔥', 'Série de jours', 'Le nombre de jours consécutifs où tu as enregistré ton humeur, sans interruption.'),
+            const SizedBox(height: 12),
+            _InfoRow('🏅', 'Niveau & progression', 'Tes points te font progresser vers le niveau suivant, visible sur ton profil.'),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  backgroundColor: AppColors.primary,
+                  shape: const RoundedRectangleBorder(borderRadius: AppRadius.md),
+                ),
+                child: Text("J'ai compris", style: AppTextStyles.button.copyWith(color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   // ── Insight généré localement ──────────────────────────────────────────────
   String? _weeklyInsight;
@@ -307,7 +377,9 @@ class _MoodScreenState extends ConsumerState<MoodScreen>
                                   style: AppTextStyles.h2),
                             ])),
                         Flexible(
-                            child: Column(
+                            child: GestureDetector(
+                                onTap: () => _showPointsInfo(context),
+                                child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                           _PointsBadge(points: user?.totalPoints ?? 0),
@@ -315,7 +387,12 @@ class _MoodScreenState extends ConsumerState<MoodScreen>
                             const SizedBox(height: 4),
                             _StreakBadge(days: user!.streakDays),
                           ],
-                        ])),
+                          const SizedBox(height: 3),
+                          Text('ⓘ Comment ça marche ?',
+                              style: AppTextStyles.caption.copyWith(
+                                  color: AppColors.onSurfaceMuted,
+                                  fontSize: 9)),
+                        ]))),
                       ]),
                 )),
 

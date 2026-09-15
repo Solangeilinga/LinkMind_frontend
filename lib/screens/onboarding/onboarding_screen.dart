@@ -6,6 +6,7 @@ import 'package:lottie/lottie.dart';
 import '../../utils/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api.service.dart';
+import '../../services/local_notification_service.dart';
 
 class _Slide {
   final String emoji, title, body;
@@ -62,16 +63,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       ],
     ),
     _Slide(
-      emoji: '🤝',
-      title: 'Mindo, ton allié bienveillant',
-      body: 'Discute avec Mindo 24h/24. Il t\'écoute, te comprend et t\'accompagne à tout moment',
+      emoji: '📈',
+      title: 'Suivi quotidien & défis',
+      body: 'Enregistre ton humeur chaque jour, suis ta progression et complète des défis pour gagner des points.',
       color: AppColors.accent,
       gradientColor: AppColors.secondary,
       lottieAnimation: 'assets/animations/love_basyam.json',
       features: [
-        ('💙', 'Te comprend sans te juger'),
-        ('⏰', 'Disponible à tout moment'),
-        ('🩺', 'Te connecte à un pro si besoin'),
+        ('📊', 'Suivi de ton humeur'),
+        ('⚡', 'Défis & points'),
+        ('🔥', 'Séries de jours'),
       ],
     ),
     _Slide(
@@ -120,6 +121,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         });
       }
     } catch (_) {}
+    // Notif de retour à J+3 — uniquement pour un compte qui vient de
+    // terminer son onboarding juste après inscription (streak encore à 0).
+    if (ref.read(authProvider).isAuthenticated) {
+      LocalNotificationService.scheduleJ3ReturnNotif(currentStreak: 0, badgeThreshold: 7)
+          .catchError((_) {});
+    }
     if (!mounted) return;
     setState(() => _isSaving = false);
     context.go(ref.read(authProvider).isAuthenticated ? '/home' : '/auth/login');

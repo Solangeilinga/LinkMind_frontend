@@ -9,15 +9,21 @@
 // (web/firebase-messaging-sw.js), pas à un isolate Dart comme sur natif —
 // FirebaseMessaging.onBackgroundMessage() n'est donc pas appelé ici.
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../local_notification_service.dart';
 import '../api.service.dart';
+import 'foreground_banner.dart';
 
+// ⚠️ flutter_local_notifications n'a pas d'implémentation web : l'appeler ici
+// échouait silencieusement, donc un push reçu onglet ouvert n'affichait
+// jamais rien. Le service worker (firebase-messaging-sw.js) gère déjà
+// l'onglet fermé/arrière-plan via l'API Notification du navigateur — pour le
+// premier plan, une bannière in-app (SnackBar) est la pratique standard côté
+// web FCM (l'utilisateur regarde déjà l'onglet, pas besoin d'une notif OS).
 void _onForegroundMessage(RemoteMessage message) {
   debugPrint('📬 [Web] Foreground message: ${message.messageId}');
-  LocalNotificationService.showNotification(
-    title: message.notification?.title ?? 'Notification',
+  showForegroundNotificationBanner(
+    title: message.notification?.title ?? 'BASYAM',
     body: message.notification?.body ?? '',
   );
 }
