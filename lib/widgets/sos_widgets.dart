@@ -155,7 +155,7 @@ class _SosCallButton extends StatelessWidget {
   }
 }
 
-// ─── Disclaimer médical court (dans AppBar Mindo) ─────────────────────────────
+// ─── Disclaimer médical court (bandeau AppBar) ────────────────────────────────
 class MedicalDisclaimerBanner extends StatelessWidget {
   const MedicalDisclaimerBanner({super.key});
 
@@ -170,7 +170,7 @@ class MedicalDisclaimerBanner extends StatelessWidget {
         const SizedBox(width: 6),
         Expanded(
           child: Text(
-            LegalTexts.mindoShortDisclaimer,
+            LegalTexts.wellnessShortDisclaimer,
             style: AppTextStyles.caption.copyWith(
                 color: AppColors.accentOrange, fontWeight: FontWeight.w700),
             overflow: TextOverflow.ellipsis)),
