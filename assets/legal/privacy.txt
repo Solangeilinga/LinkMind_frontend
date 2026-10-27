@@ -1,0 +1,178 @@
+Politique de Confidentialité de BASYAM
+
+Dernière mise à jour : Octobre 2026, Version 2026-10
+
+
+En bref
+
+• BASYAM est une application de bien-être mental réservée aux personnes de 18 ans et plus.
+• Votre humeur et vos notes sont des données sensibles. Nous les utilisons uniquement pour faire fonctionner le service, jamais pour de la publicité, et nous ne les vendons pas.
+• Dans la communauté, les autres membres vous voient uniquement sous un pseudo.
+• Vous pouvez accéder à vos données, les exporter, les corriger ou supprimer votre compte à tout moment.
+• Pour toute question, écrivez-nous à support@basyam.com.
+
+
+1. Qui est responsable de vos données ?
+
+Le responsable du traitement est BASYAM, éditeur de l'application. Pour toute question ou demande concernant vos données personnelles, écrivez à support@basyam.com.
+
+
+2. Quelles données collectons-nous ?
+
+2.1 Données de compte
+• Adresse email ou numéro de téléphone
+• Mot de passe, conservé sous forme hachée et jamais en clair
+• Pseudo anonyme, choisi par vous ou généré automatiquement
+• Âge, ville et pays
+• Genre, de manière facultative
+
+2.2 Données de bien-être (données sensibles)
+• Humeur quotidienne, niveau de stress et facteurs que vous indiquez
+• Notes personnelles que vous ajoutez, qui sont chiffrées
+• Objectifs choisis, défis réalisés, points, badges et séries de jours
+
+2.3 Bouton « Besoin d'aide maintenant »
+Lorsque vous utilisez ce bouton, une alerte est transmise à l'équipe de suivi, accompagnée le cas échéant d'un court extrait (200 caractères au maximum) du message que vous avez saisi. Un membre de l'équipe peut ainsi réagir et suivre la situation.
+
+2.4 Communauté
+• Publications, commentaires et réactions
+• Signalements effectués ou reçus
+
+2.5 Rendez-vous avec les professionnels
+• Demandes de rendez-vous, créneaux et mode de consultation (en ligne ou en personne)
+• Informations que vous choisissez de communiquer au professionnel
+• Avis laissé après une consultation
+
+2.6 Données techniques et de sécurité
+• Type d'appareil ou de navigateur, système d'exploitation et version de l'application
+• Identifiant d'appareil, adresse IP de connexion et dates de connexion
+• Jeton de notification, nécessaire à l'envoi des notifications
+• Journaux techniques et indicateurs de sécurité, comme les tentatives de connexion échouées ou les signalements d'abus
+
+2.7 Préférences
+• Heure du rappel quotidien, notifications, thème et taille du texte
+
+Ce que nous ne collectons pas
+• Votre nom et prénom réels
+• Votre adresse postale
+• Vos coordonnées bancaires
+• Votre position géographique précise
+• Vos contacts, votre micro ou votre caméra
+• Des messages privés, car l'application n'en propose pas
+
+
+3. Pourquoi utilisons-nous vos données, et sur quelle base ?
+
+• Créer et gérer votre compte, faire fonctionner l'application : exécution du contrat (les CGU).
+• Traiter vos données de bien-être (humeur, stress, notes, objectifs) : votre consentement explicite.
+• Transmettre une alerte quand vous utilisez « Besoin d'aide maintenant » : votre demande volontaire, qui vaut consentement.
+• Personnaliser les défis et les rappels : exécution du contrat et votre consentement.
+• Envoyer des notifications : votre autorisation, donnée dans votre appareil ou navigateur.
+• Vous mettre en relation avec un professionnel : votre demande et l'exécution du contrat.
+• Assurer la sécurité, prévenir les abus et modérer la communauté : notre intérêt légitime à protéger les utilisateurs et la plateforme.
+• Répondre à une demande des autorités : obligation légale.
+
+En créant votre compte puis en renseignant votre humeur, vous consentez expressément au traitement de vos données de bien-être. Vous pouvez retirer ce consentement à tout moment en supprimant les données concernées ou votre compte, sans que cela remette en cause ce qui a été fait auparavant.
+
+Nous ne vendons pas vos données et nous ne les utilisons pas à des fins publicitaires. Elles ne sont jamais transmises à des assureurs ni à des employeurs.
+
+
+4. Personnalisation et mesures automatiques
+
+• Les défis proposés s'adaptent à votre humeur et à votre historique.
+• Certains rappels et notifications tiennent compte de vos habitudes, par exemple une invitation à faire un défi après des journées difficiles.
+• Des mesures de sécurité automatiques peuvent limiter temporairement un compte en cas d'activité anormale, comme des tentatives de connexion répétées ou du spam.
+
+Ces mécanismes n'établissent aucun diagnostic et ne produisent aucun effet juridique. Si votre compte est restreint, vous pouvez demander à un membre de l'équipe de réexaminer la situation en écrivant à support@basyam.com.
+
+
+5. Communauté et anonymat
+
+Les autres membres, ainsi que les professionnels qui participent à la communauté, voient uniquement votre pseudo et le contenu que vous publiez. Votre email et les informations de votre compte ne sont jamais affichés.
+
+Les personnes habilitées de l'équipe peuvent consulter les contenus signalés pour assurer la modération, ainsi que les données de compte nécessaires au support et à la sécurité. Cet accès est limité à ces besoins.
+
+Évitez de publier des informations qui permettraient de vous identifier ou d'identifier un tiers, car un texte libre peut contenir de telles informations. Lorsque vous supprimez votre compte, vos publications sont anonymisées, c'est-à-dire détachées de votre compte. Vous pouvez aussi les supprimer vous-même avant.
+
+
+6. Rendez-vous avec un professionnel
+
+Lorsque vous demandez un rendez-vous, nous transmettons au professionnel les informations nécessaires à la consultation, ainsi que celles que vous choisissez de lui communiquer. Le professionnel est responsable de son propre suivi et soumis aux obligations de confidentialité de sa profession.
+
+Les consultations en ligne peuvent passer par un outil de visioconférence choisi par le professionnel. La politique de confidentialité de cet outil s'applique alors à la séance.
+
+
+7. Avec qui partageons-nous vos données ?
+
+• Nos prestataires techniques, qui agissent sur nos instructions et sont tenus à la confidentialité : hébergement et base de données, envoi d'emails, stockage d'images, et notifications via Firebase Cloud Messaging de Google.
+• Le professionnel que vous avez choisi, dans les conditions décrites à la section 6.
+• Les autorités, lorsque la loi nous y oblige.
+• Toute personne concernée, lorsque cela est nécessaire pour protéger nos droits ou la sécurité des utilisateurs.
+
+Certains prestataires peuvent traiter des données en dehors du pays où vous vivez. Nous veillons à ce que ces transferts soient encadrés par des garanties appropriées, conformes à la loi applicable.
+
+
+8. Combien de temps conservons-nous vos données ?
+
+• Compte et profil : durée du compte, puis suppression dans les 30 jours qui suivent votre demande.
+• Données de bien-être, défis, points et badges : durée du compte, puis suppression dans les 30 jours qui suivent la suppression du compte.
+• Alertes « Besoin d'aide maintenant » : 12 mois au maximum, puis suppression.
+• Publications communautaires : anonymisées lors de la suppression du compte.
+• Rendez-vous : le temps nécessaire à la gestion du rendez-vous et au suivi de votre compte. Le professionnel conserve son propre dossier selon ses obligations.
+• Journaux techniques et adresses IP : 12 mois au maximum.
+• Compte inactif : un compte inactif depuis plus de 24 mois peut être supprimé, après un préavis par email.
+• Statistiques anonymisées : sans limite de durée, car elles ne permettent plus de vous identifier.
+
+Les copies de sauvegarde sont renouvelées régulièrement. Une donnée supprimée peut donc subsister quelque temps dans une sauvegarde avant d'être définitivement effacée.
+
+
+9. Quels sont vos droits ?
+
+Conformément à la loi burkinabè sur la protection des données personnelles et, lorsqu'il s'applique, au RGPD, vous disposez des droits suivants.
+• Le droit d'accéder à vos données et d'en obtenir une copie.
+• Le droit de corriger les informations inexactes.
+• Le droit à l'effacement : vous pouvez supprimer votre compte et vos données directement dans l'application, dans les réglages, ou, si vous n'y avez plus accès, depuis la page www.basyam.com/legal/account-deletion.
+• Le droit à la portabilité : vous pouvez récupérer vos données dans un format structuré (JSON).
+• Le droit de vous opposer à certains traitements ou d'en demander la limitation.
+• Le droit de retirer votre consentement à tout moment.
+
+Pour exercer ces droits, rendez-vous dans Profil, Paramètres, puis Mes données, ou écrivez à support@basyam.com depuis l'adresse de votre compte. Nous répondons dans un délai d'un mois. Pour protéger votre compte, nous pouvons vous demander de confirmer votre identité.
+
+Si vous estimez que vos droits ne sont pas respectés, vous pouvez saisir la Commission de l'informatique et des libertés (CIL) du Burkina Faso, ou l'autorité de protection des données de votre pays de résidence.
+
+
+10. Comment protégeons-nous vos données ?
+
+• Les échanges entre l'application et nos serveurs sont chiffrés (HTTPS).
+• Les mots de passe sont hachés et vos notes d'humeur sont chiffrées.
+• L'accès aux données est limité aux personnes habilitées.
+• Un code de vérification est envoyé par email à la création du compte.
+• Les tentatives de connexion répétées entraînent un verrouillage temporaire, et une nouvelle connexion sur un autre appareil déconnecte l'ancien.
+
+En cas de violation de données présentant un risque pour vous, nous vous en informons, ainsi que l'autorité compétente, dans les délais prévus par la loi.
+
+
+11. Stockage sur votre appareil et notifications
+
+L'application mobile et la version web enregistrent sur votre appareil uniquement des données nécessaires à leur fonctionnement : votre jeton de connexion, vos préférences et un cache. Nous n'utilisons ni cookies publicitaires ni outil de mesure d'audience tiers.
+
+Les notifications ne sont envoyées qu'avec votre autorisation. Vous pouvez les désactiver à tout moment dans les réglages de l'application, de votre appareil ou de votre navigateur.
+
+
+12. Mineurs
+
+BASYAM est réservé aux personnes âgées d'au moins 18 ans, ce que vous déclarez à l'inscription. Si nous apprenons qu'un utilisateur est mineur, nous suspendons son compte puis le supprimons avec ses données. Si vous pensez qu'un mineur utilise BASYAM, écrivez-nous à support@basyam.com.
+
+
+13. Modifications de cette politique
+
+Nous pouvons mettre à jour cette politique. La date et la version figurent en haut de cette page. Toute modification importante vous est signalée dans l'application ou par email. Si vous continuez à utiliser BASYAM après cette information, les nouvelles conditions s'appliquent.
+
+
+14. Nous contacter
+
+Pour toute question relative à vos données personnelles : support@basyam.com
+Indiquez « Données personnelles » dans l'objet de votre message.
+
+
+Dernière mise à jour : Octobre 2026, Version 2026-10

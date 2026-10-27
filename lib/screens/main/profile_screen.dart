@@ -736,12 +736,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   }
 
   Future<void> _save() async {
-    final alias = _aliasCtrl.text.trim();
     final email = _emailCtrl.text.trim();
-    if (alias.isEmpty) {
-      setState(() => _error = 'Le pseudo est obligatoire');
-      return;
-    }
     if (email.isEmpty) {
       setState(() => _error = 'L\'email est obligatoire');
       return;
@@ -1018,8 +1013,9 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                 controller: _aliasCtrl,
                 maxLength: 30,
                 decoration: const InputDecoration(
-                  labelText: 'Pseudo anonyme *',
+                  labelText: 'Pseudo anonyme (optionnel)',
                   hintText: 'Ex: 🌙 Lune curieuse',
+                  helperText: 'Laisse vide pour apparaître comme « Anonyme »',
                   border: OutlineInputBorder(),
                 ),
               ),

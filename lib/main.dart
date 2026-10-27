@@ -41,6 +41,7 @@ import 'screens/pro/pro_profile_screen.dart';
 import 'screens/detail/challenge_detail_screen.dart';
 import 'screens/detail/mood_history_screen.dart';
 import 'screens/legal/legal_terms_screen.dart';
+import 'screens/legal/account_deletion_screen.dart';
 
 // Providers
 import 'providers/auth_provider.dart';
@@ -147,7 +148,9 @@ Future<String?> _computeRedirect(BuildContext context, GoRouterState state, Widg
   final isForgotPassword = location == '/auth/forgot-password';
   final isOnboarding = location == '/onboarding';
   final isVerifyEmail = location == '/verify-email';
-  final isLegalTerms = location == '/legal-terms';
+  // Documents légaux : consultables sans connexion (aussi via l'adresse web
+  // publique, ex. /legal/privacy, exigée par les stores).
+  final isLegalTerms = location == '/legal-terms' || location.startsWith('/legal/');
   // L'espace professionnel a sa propre authentification (ProApiService),
   // totalement indépendante de authProvider — jamais concerné par ces
   // redirections utilisateur classique, dans un sens comme dans l'autre.
@@ -187,7 +190,7 @@ Future<String?> _computeRedirect(BuildContext context, GoRouterState state, Widg
     // Forcer la vérification email si pas encore vérifiée
     final user = ref.read(authProvider).user;
     final emailNotVerified = user?.email != null && user?.isEmailVerified != true;
-    if (emailNotVerified && !isVerifyEmail && !isAuthRoute) {
+    if (emailNotVerified && !isVerifyEmail && !isAuthRoute && !isLegalTerms) {
       return '/verify-email';
     }
 
@@ -318,6 +321,21 @@ class _BASYAMAppState extends ConsumerState<BASYAMApp>
         GoRoute(
           path: '/legal-terms',
           builder: (_, __) => const LegalTermsScreen(),
+        ),
+        GoRoute(
+          path: '/legal/terms',
+          builder: (_, __) => const LegalTermsScreen(),
+        ),
+        GoRoute(
+          path: '/legal/account-deletion',
+          builder: (_, __) => const AccountDeletionScreen(),
+        ),
+        GoRoute(
+          path: '/legal/privacy',
+          builder: (_, __) => const LegalTermsScreen(
+            title: 'Politique de confidentialité',
+            asset: 'assets/legal/privacy.txt',
+          ),
         ),
 
         // Espace professionnel (psychologues partenaires) — routes

@@ -3,7 +3,13 @@ import 'package:flutter/services.dart';
 import '../../utils/theme.dart';
 
 class LegalTermsScreen extends StatefulWidget {
-  const LegalTermsScreen({super.key});
+  final String title;
+  final String asset;
+  const LegalTermsScreen({
+    super.key,
+    this.title = 'Conditions générales',
+    this.asset = 'assets/legal/terms.txt',
+  });
 
   @override
   State<LegalTermsScreen> createState() => _LegalTermsScreenState();
@@ -22,14 +28,14 @@ class _LegalTermsScreenState extends State<LegalTermsScreen> {
 
   Future<void> _loadTerms() async {
     try {
-      final content = await rootBundle.loadString('assets/legal/terms.txt');
+      final content = await rootBundle.loadString(widget.asset);
       setState(() {
         _content = content;
         _isLoading = false;
       });
     } catch (e) {
       setState(() {
-        _error = 'Impossible de charger les conditions générales.';
+        _error = 'Impossible de charger ce document.';
         _isLoading = false;
       });
       debugPrint('Erreur chargement CGU: $e');
@@ -40,7 +46,7 @@ class _LegalTermsScreenState extends State<LegalTermsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Conditions générales'),
+        title: Text(widget.title),
         centerTitle: true,
       ),
       body: _isLoading
