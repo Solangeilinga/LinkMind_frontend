@@ -6,7 +6,7 @@ import '../utils/theme.dart';
 // ─── Petite visite guidée au premier lancement ──────────────────────────────
 // Recommandation d'un coach externe : montrer un aperçu rapide des rubriques
 // dès la première visite, avec possibilité de passer. Pas d'asset vidéo dans
-// le projet — on réutilise les animations Lottie déjà présentes dans
+// le projet, on réutilise les animations Lottie déjà présentes dans
 // l'onboarding plutôt que d'introduire une dépendance video_player pour un
 // fichier qui n'existe pas.
 class _TourSlide {
@@ -18,24 +18,24 @@ class _TourSlide {
 const _tourSlides = [
   _TourSlide(
     emoji: '🌱',
-    title: 'Mood — ton suivi quotidien',
+    title: 'Mood : ton suivi quotidien',
     body: 'Enregistre ton humeur chaque jour. Tu verras ta progression et des tendances se dessiner au fil du temps.',
     lottieAnimation: 'assets/animations/yoga_mental_basyam.json',
   ),
   _TourSlide(
     emoji: '👥',
-    title: 'Hub — la communauté',
+    title: 'Hub : la communauté',
     body: 'Partage ce que tu vis, anonymement, avec une communauté bienveillante qui te comprend.',
     lottieAnimation: 'assets/animations/community_basyam.json',
   ),
   _TourSlide(
     emoji: '🩺',
-    title: 'Pros — de l\'aide qualifiée',
+    title: 'Pros : de l\'aide qualifiée',
     body: 'Psychologues, coachs et médecins disponibles pour un rendez-vous, en ligne ou en personne.',
   ),
   _TourSlide(
     emoji: '⚡',
-    title: 'Défis — progresse en t\'amusant',
+    title: 'Défis : progresse en t\'amusant',
     body: 'Complète des défis adaptés à ton rythme pour gagner des points et monter de niveau.',
   ),
 ];

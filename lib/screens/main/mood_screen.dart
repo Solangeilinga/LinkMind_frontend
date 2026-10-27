@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../utils/theme.dart';
 import '../../widgets/skeleton_widget.dart';
 import '../../utils/icon_mapper.dart';
-import '../../widgets/ad_banner.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api.service.dart';
 import '../../providers/content_provider.dart';
@@ -547,8 +546,6 @@ class _MoodScreenState extends ConsumerState<MoodScreen>
                     ),
                   ),
 
-                const SliverToBoxAdapter(
-                    child: AdBanner(placement: 'mood_screen')),
                 const SliverToBoxAdapter(child: SizedBox(height: 100)),
               ],
             ),

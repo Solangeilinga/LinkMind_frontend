@@ -53,7 +53,6 @@ class ApiCacheManager {
     '/community/',
     '/professionals',
     '/content/',
-    '/ads',
   ];
 
   final Map<String, ApiCacheEntry> _memory = {};

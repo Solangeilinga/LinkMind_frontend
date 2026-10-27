@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../utils/theme.dart';
 import '../../../../widgets/skeleton_widget.dart';
-import '../../../../widgets/ad_banner.dart';
 import 'post_card.dart';
 import 'empty_feed.dart';
 
@@ -70,29 +69,20 @@ class _FeedListState extends State<FeedList> {
         controller: _scrollCtrl,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-        itemCount: widget.posts.length + (widget.onLoadMore != null && widget.posts.length ~/ 5 > 0 ? widget.posts.length ~/ 5 : 0) + (widget.isPaginating ? 1 : 0),
+        itemCount: widget.posts.length + (widget.isPaginating ? 1 : 0),
         itemBuilder: (context, i) {
           // Loader de pagination (seulement si onLoadMore existe)
-          if (widget.onLoadMore != null && i == widget.posts.length + (widget.posts.length ~/ 5)) {
+          if (widget.onLoadMore != null && i == widget.posts.length) {
             return const Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
               child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
             );
           }
 
-          const adEvery = 5;
-          final adsInserted = i ~/ (adEvery + 1);
-          final postIndex = i - adsInserted;
-          
-          // Pub native (seulement si onLoadMore existe pour éviter les publicités intempestives)
-          if (widget.onLoadMore != null && i > 0 && (i + 1) % (adEvery + 1) == 0) {
-            return const AdBanner(placement: 'community_feed');
-          }
-          
-          if (postIndex >= widget.posts.length) return const SizedBox.shrink();
-          
-          final post = widget.posts[postIndex];
-          
+          if (i >= widget.posts.length) return const SizedBox.shrink();
+
+          final post = widget.posts[i];
+
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: PostCard(
